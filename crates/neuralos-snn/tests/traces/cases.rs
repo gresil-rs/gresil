@@ -179,16 +179,13 @@ fn neuron(id: u16, kind: NeuronType, res: VoltageResolution, noise_ua: u8) -> LI
     n
 }
 
-/// A network from given neurons and the given edges, finalized when there
-/// is at least one.
+/// A network from given neurons and the given edges, which its first step
+/// sorts.
 fn wired(neurons: Vec<LIFNeuron>, edges: &[(u16, u16, i16)]) -> SpikingNeuralNetwork {
     let mut net = SpikingNeuralNetwork::from_neurons(neurons, DT_US).expect("neurons given");
     for &(pre, post, w) in edges {
         net.add_synapse(pre, post, w)
             .expect("ids in range, no self edge");
-    }
-    if !edges.is_empty() {
-        net.finalize_synapses();
     }
     net
 }

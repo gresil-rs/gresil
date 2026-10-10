@@ -706,10 +706,11 @@ impl SpikingNeuralNetwork {
         }
     }
 
-    /// Append a synapse. Both the CSR and the `synapses` vec get a copy.
-    /// The next [`step`](Self::step) delivers it, after the sort it runs
-    /// first (O(S + N)): adding between steps pays that sort at each step
-    /// after an add.
+    /// Append a synapse. Both the CSR and the `synapses` vec get a copy,
+    /// and `stats().total_synapses` counts it. The next
+    /// [`step`](Self::step) delivers it, after the sort it runs first
+    /// (O(S + N)): adding between steps pays that sort at each step after
+    /// an add.
     ///
     /// # Errors
     ///
@@ -726,22 +727,19 @@ impl SpikingNeuralNetwork {
         self.synapse_matrix
             .add(pre_id, post_id, weight, synapse_index);
         self.synapses.push(synapse);
+        self.stats.total_synapses = self.synapses.len() as u32;
         Ok(())
     }
 
-    /// Sort the CSR now, the work the next [`step`] does first: a network
-    /// wired by [`add_synapse`](Self::add_synapse) since its last sort pays
-    /// it once, here or at that step. Returns at once on a network with no
-    /// synapse added since, so a second call changes nothing. Also
-    /// refreshes `stats.total_synapses`.
-    ///
-    /// [`step`]: Self::step
-    pub fn finalize_synapses(&mut self) {
+    /// Sort the CSR if a synapse came in since the last sort; on a clean
+    /// network, nothing. The step runs it first, and the NIR import once,
+    /// after its last edge, so the network it returns steps without a sort.
+    /// Crate-private: a network sorts its own CSR, so no caller needs to.
+    pub(crate) fn finalize_synapses(&mut self) {
         if !self.synapse_matrix.is_dirty() {
             return;
         }
         self.synapse_matrix.finalize();
-        self.stats.total_synapses = self.synapses.len() as u32;
     }
 
     /// Unstable: behind `unstable-stdp`.
@@ -1786,11 +1784,12 @@ mod tests {
     }
 
     #[test]
-    fn finalize_synapses_sorts_external_adds_and_builds_both_csrs() {
-        // Session D-2: the public external-wiring path. `add_synapse` in
-        // arbitrary pre_id order + `finalize_synapses()` must produce the
-        // authoritative forward CSR (right members, stable within-row order),
-        // the reverse CSR (right incoming edges), and refreshed stats.
+    fn the_first_step_sorts_external_adds_and_builds_both_csrs() {
+        // Session D-2's external-wiring path, sorted by the step since
+        // round 64. `add_synapse` in arbitrary pre_id order, then a step,
+        // must produce the authoritative forward CSR (right members, stable
+        // within-row order), the reverse CSR (right incoming edges), and
+        // the count in the stats.
         let mut net =
             SpikingNeuralNetwork::new(4, 1000, NetworkTopology::Random { connectivity: 0.0 })
                 .expect("valid");
@@ -1801,9 +1800,10 @@ mod tests {
         net.add_synapse(0, 1, 125).expect("add");
         net.add_synapse(2, 3, -125).expect("add");
         net.add_synapse(1, 3, 0).expect("add");
-        net.finalize_synapses();
+        assert_eq!(net.stats().total_synapses, 4, "each add is counted");
+        net.step(&[0; 4]).expect("steps");
         assert_eq!(net.synapse_count(), 4);
-        assert_eq!(net.stats().total_synapses, 4, "stats must refresh");
+        assert_eq!(net.stats().total_synapses, 4);
 
         // Forward CSR: each row holds exactly its presynaptic neuron's edges,
         // stable order among same-pre adds (0 was added before 3 for pre 2).

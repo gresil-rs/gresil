@@ -341,7 +341,6 @@ fn section_c(cases: &mut Cases) {
                 let mut net = SpikingNeuralNetwork::from_neurons(neurons, 1000)?;
                 net.set_synaptic_input_divisor(d)?;
                 net.add_synapse(0, 1, w)?;
-                net.finalize_synapses();
                 let _ = FixedSynapse::from_network(&net);
                 net.step(&[3000, 0]).map(|_| ())
             });
@@ -349,15 +348,12 @@ fn section_c(cases: &mut Cases) {
     }
 }
 
-/// Three neurons, wired, and finalized when asked.
-fn net3(edges: &[(u16, u16, i16)], finalize: bool) -> Result<SpikingNeuralNetwork, Error> {
+/// Three neurons, wired.
+fn net3(edges: &[(u16, u16, i16)]) -> Result<SpikingNeuralNetwork, Error> {
     let neurons = (0..3).map(LIFNeuron::new).collect();
     let mut net = SpikingNeuralNetwork::from_neurons(neurons, 1000)?;
     for &(pre, post, weight) in edges {
         net.add_synapse(pre, post, weight)?;
-    }
-    if finalize {
-        net.finalize_synapses();
     }
     Ok(net)
 }
@@ -382,7 +378,7 @@ fn section_d(cases: &mut Cases) {
             (false, false) => Rule::Builds,
         };
         cases.check(&format!("D/add/{pre}->{post}"), rule, || {
-            net3(&[], true)?.add_synapse(pre, post, 1000)
+            net3(&[])?.add_synapse(pre, post, 1000)
         });
     }
 }
@@ -392,10 +388,10 @@ fn fixed<const N: usize, const S: usize>(net: &SpikingNeuralNetwork) -> Result<(
 }
 
 /// `FixedNetwork::try_from`: the right sizes, the wrong ones, edges out of
-/// `pre` order sorted and not, and, with `unstable-stdp`, plasticity on.
+/// `pre` order, and, with `unstable-stdp`, plasticity on.
 fn section_e(cases: &mut Cases) {
     let edges = [(0, 1, 5000), (1, 2, 5000)];
-    let net = net3(&edges, true).expect("three neurons");
+    let net = net3(&edges).expect("three neurons");
     cases.check("E/3-2", Rule::Builds, || fixed::<3, 2>(&net));
     cases.check(
         "E/n=4",
@@ -417,17 +413,13 @@ fn section_e(cases: &mut Cases) {
         Rule::Refused(&[Error::SynapseCountMismatch]),
         || fixed::<3, 3>(&net),
     );
-    let unsorted = net3(&[(1, 2, 5000), (0, 1, 5000)], false).expect("three neurons");
-    cases.check("E/out-of-order-unsorted", Rule::Builds, || {
-        fixed::<3, 2>(&unsorted)
-    });
-    let finalized = net3(&[(1, 2, 5000), (0, 1, 5000)], true).expect("three neurons");
-    cases.check("E/out-of-order-finalized", Rule::Builds, || {
-        fixed::<3, 2>(&finalized)
+    let out_of_order = net3(&[(1, 2, 5000), (0, 1, 5000)]).expect("three neurons");
+    cases.check("E/out-of-pre-order", Rule::Builds, || {
+        fixed::<3, 2>(&out_of_order)
     });
     #[cfg(feature = "unstable-stdp")]
     {
-        let mut on = net3(&edges, true).expect("three neurons");
+        let mut on = net3(&edges).expect("three neurons");
         on.set_plasticity_enabled(true);
         cases.check(
             "E/plasticity-on",
@@ -439,7 +431,7 @@ fn section_e(cases: &mut Cases) {
 
 /// `trace::header` with twelve case names: one or more of `[a-z0-9-]`.
 fn section_f(cases: &mut Cases) {
-    let net = net3(&[], true).expect("three neurons");
+    let net = net3(&[]).expect("three neurons");
     for name in [
         "", "ok", "ok-1", "a", "Ok", "a_b", "a b", "\u{e9}", "-", "a--b", "0", "A",
     ] {
@@ -484,7 +476,7 @@ fn every_constructor_case_follows_its_rule() {
     section_f(&mut cases);
     section_g_refused(&mut cases);
     let plasticity = usize::from(cfg!(feature = "unstable-stdp"));
-    cases.assert_kept(1889 + 30 + 84 + 9 + 7 + plasticity + 12 + 5);
+    cases.assert_kept(1889 + 30 + 84 + 9 + 6 + plasticity + 12 + 5);
 }
 
 /// The cases at 65,535 neurons that build: two layer lists that sum to
