@@ -1930,10 +1930,6 @@ mod tests {
     /// release its second edge went to neuron 0 again, where the ring
     /// says 1.
     #[test]
-    #[cfg_attr(
-        debug_assertions,
-        ignore = "65,535 neurons: slow in a debug build; release runs it"
-    )]
     fn smallworld_near_the_cap_wires_the_ring() {
         let (n, k) = (65_535u32, 2u32);
         let mut net = SpikingNeuralNetwork::new(

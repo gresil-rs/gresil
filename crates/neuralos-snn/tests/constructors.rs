@@ -5,10 +5,7 @@
 //! panics. When a case breaks two rules either name will do: the library
 //! promises no order between them.
 //!
-//! The topology cases at 65,535 neurons that build take over a minute in
-//! a debug build (the CSR's insert walks every later row), so a debug
-//! build skips their test and a release build runs it. Part of the test
-//! gate (`cargo test --workspace`); alone,
+//! Part of the test gate (`cargo test --workspace`); alone,
 //! `cargo test -p neuralos-snn --test constructors`.
 
 use neuralos_snn::trace::{self, Kind, Rows};
@@ -496,10 +493,6 @@ fn every_constructor_case_follows_its_rule() {
 /// abort, never a wrong edge: the ring is
 /// `smallworld_near_the_cap_wires_the_ring`'s.
 #[test]
-#[cfg_attr(
-    debug_assertions,
-    ignore = "65,535 neurons: slow in a debug build; release runs it"
-)]
 fn the_cases_at_65_535_neurons_build() {
     let mut cases = Cases::default();
     for list in [&[65_534u16, 1][..], &[1, 65_534]] {
