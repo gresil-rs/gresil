@@ -17,6 +17,8 @@
 //! - Topology builders never create self-connections.
 //! - LFSR RNG is deterministic: same seed → same network connectivity.
 //! - Synapse weights respect the presynaptic neuron's type (E → positive, I → negative).
+//! - `step()` delivers each synapse under its own `pre`, in the order it
+//!   was added, however adds and steps interleave.
 //!
 //! # Bug fixes vs v0.1
 //!
@@ -396,11 +398,8 @@ impl SpikingNeuralNetwork {
                 self.build_balanced(excitatory_ratio)?;
             }
         }
-        // Authoritative CSR build: the topology builders add edges in arbitrary
-        // pre_id order, so the incremental row_ptrs is wrong until this counting
-        // sort reorders the parallel arrays by presynaptic neuron. Without it,
-        // connections(pre) returns slices with the right count but the wrong
-        // edges — corrupting both propagation and STDP targeting.
+        // The builders add in any pre order; one sort here, so the network
+        // leaves clean and its first step sorts nothing.
         self.synapse_matrix.finalize();
         self.stats.total_synapses = self.synapses.len() as u32;
         Ok(())
@@ -408,6 +407,12 @@ impl SpikingNeuralNetwork {
 
     /// Advance the simulation by one `time_step_us`. Returns the spikes emitted
     /// this step in chronological (neuron-id) order.
+    ///
+    /// A step first sorts the CSR if a synapse came in since the last sort
+    /// ([`add_synapse`](Self::add_synapse); a step and `build_topology`
+    /// sort): O(S + N), S the synapses and N the neurons. A batch of adds
+    /// pays it once, at the next step; a caller who adds between steps pays
+    /// it at each step after an add.
     ///
     /// # Order
     ///
@@ -449,6 +454,10 @@ impl SpikingNeuralNetwork {
     ///
     /// None today: no path of the step returns `Err`.
     pub fn step(&mut self, input_currents: &[i16]) -> Result<Vec<Spike>> {
+        // A synapse added since the last sort is in no row yet: sort first,
+        // so this step delivers each synapse under its own `pre`, in the
+        // order added (nothing to do on a clean network).
+        self.finalize_synapses();
         let mut output_spikes: Vec<Spike> = Vec::new();
         let mut firing_neurons: Vec<u16> = Vec::new();
 
@@ -698,6 +707,9 @@ impl SpikingNeuralNetwork {
     }
 
     /// Append a synapse. Both the CSR and the `synapses` vec get a copy.
+    /// The next [`step`](Self::step) delivers it, after the sort it runs
+    /// first (O(S + N)): adding between steps pays that sort at each step
+    /// after an add.
     ///
     /// # Errors
     ///
@@ -717,79 +729,19 @@ impl SpikingNeuralNetwork {
         Ok(())
     }
 
-    /// Rebuild the CSR layout (authoritative forward sort + reverse CSR +
-    /// inverse permutation) after wiring the network externally via
-    /// [`add_synapse`](Self::add_synapse).
-    ///
-    /// [`build_topology`](Self::build_topology) already does this for its own builders; this method
-    /// is the path for callers that construct synapse wiring themselves —
-    /// e.g. importing a pretrained weight matrix edge by edge. Without it:
-    ///
-    /// - the step delivers spikes to the wrong targets whenever edges were
-    ///   added out of `pre_id` order (before the sort, the forward CSR is
-    ///   only right for sorted insertion), and
-    /// - with `unstable-stdp`, the post-firing LTP pass finds no incoming
-    ///   edge (the reverse CSR is empty until a finalize), silently
-    ///   regressing plasticity to the pre-1.5d LTD-only substrate.
-    ///
-    /// Contract: call **exactly once**, after all `add_synapse` calls and
-    /// before the first [`step`]. Like the CSR's own finalize, it
-    /// is not idempotent on an already-finalized matrix (the counting sort's
-    /// source arrays hold insertion order); rebuilding external wiring means
-    /// clearing and re-adding. Also refreshes `stats.total_synapses`.
+    /// Sort the CSR now, the work the next [`step`] does first: a network
+    /// wired by [`add_synapse`](Self::add_synapse) since its last sort pays
+    /// it once, here or at that step. Returns at once on a network with no
+    /// synapse added since, so a second call changes nothing. Also
+    /// refreshes `stats.total_synapses`.
     ///
     /// [`step`]: Self::step
     pub fn finalize_synapses(&mut self) {
+        if !self.synapse_matrix.is_dirty() {
+            return;
+        }
         self.synapse_matrix.finalize();
         self.stats.total_synapses = self.synapses.len() as u32;
-    }
-
-    /// Whether the CSR delivers every synapse under its own `pre`, in the
-    /// order it was added: exactly what
-    /// [`FixedSynapse::from_network`](crate::fixed::FixedSynapse::from_network)
-    /// lists, and what [`connections`] yields on a finalized matrix.
-    ///
-    /// False once a caller has lost that property: by adding edges out of
-    /// `pre` order with no [`finalize`] after them, for example, or by
-    /// finalizing such edges a second time ([`finalize`] is not
-    /// idempotent, and `build_topology` already calls it). `row_ptrs` is
-    /// exact either way — [`add`]'s bump and [`finalize`]'s prefix sum
-    /// count the same edges — so the slices have the right length and the
-    /// wrong members, and the step delivers a spike's pulse under another
-    /// synapse's edge. True on a network with no edges, on one finalized
-    /// ONCE, and on one whose edges were added in `pre` order: each steps
-    /// as its own CSR reads.
-    ///
-    /// It reads each slot's synapse index alone. A slot's `post` and
-    /// `weight` are written from its synapse by [`add`] and kept there by
-    /// [`set_weight`], so no state a caller can reach parts them from it;
-    /// a slot that disagreed would be a bug of this crate, and refusing
-    /// the caller for it would name the wrong culprit. The weight half is
-    /// pinned by `ternary_writes_reach_their_csr_slot` below.
-    ///
-    /// O(S), once per conversion. `pub(crate)`: read by
-    /// `FixedNetwork::try_from`, which refuses what it denies.
-    ///
-    /// [`add`]: SparseSynapseMatrix::add
-    /// [`finalize`]: SparseSynapseMatrix::finalize
-    /// [`connections`]: SparseSynapseMatrix::connections
-    /// [`set_weight`]: SparseSynapseMatrix::set_weight
-    pub(crate) fn csr_delivers_its_synapses(&self) -> bool {
-        let mut seen = 0usize;
-        for pre in 0..self.neuron_count() {
-            let mut last: Option<usize> = None;
-            for (_post, _weight, idx) in self.synapse_matrix.connections(pre) {
-                let Some(s) = self.synapses.get(idx) else {
-                    return false;
-                };
-                if s.pre_neuron_id != pre || last.is_some_and(|l| idx <= l) {
-                    return false;
-                }
-                last = Some(idx);
-                seen += 1;
-            }
-        }
-        seen == self.synapses.len()
     }
 
     /// Unstable: behind `unstable-stdp`.
@@ -1741,12 +1693,20 @@ mod tests {
         assert_eq!(err, Err(Error::SelfConnection));
     }
 
+    /// The rows are `finalize`'s: an edge added since the last one is in
+    /// no row, and the matrix says so, until the next; `clear` leaves it
+    /// clean.
     #[test]
-    fn sparse_matrix_iter_returns_added_synapses() {
+    fn sparse_matrix_delivers_added_synapses_after_finalize() {
         let mut m = SparseSynapseMatrix::new(5, 4);
+        assert!(!m.is_dirty(), "a new matrix is clean");
         m.add(0, 1, 100, 0);
         m.add(0, 2, 200, 1);
         m.add(2, 3, -150, 2);
+        assert!(m.is_dirty(), "an add marks it");
+        assert_eq!(m.connections(0).count(), 0, "no row before the sort");
+        m.finalize();
+        assert!(!m.is_dirty(), "the sort clears the mark");
         let row0: Vec<(u16, i16, usize)> = m.connections(0).collect();
         assert_eq!(row0, vec![(1, 100, 0), (2, 200, 1)]);
         let row2: Vec<(u16, i16, usize)> = m.connections(2).collect();
@@ -1754,14 +1714,29 @@ mod tests {
         let row1: Vec<(u16, i16, usize)> = m.connections(1).collect();
         assert!(row1.is_empty());
         assert_eq!(m.len(), 3);
+        m.add(1, 4, 50, 3);
+        assert!(m.is_dirty());
+        assert_eq!(
+            m.connections(1).count(),
+            0,
+            "the new edge waits for the sort"
+        );
+        assert_eq!(m.connections(0).count(), 2, "the sorted rows stand");
+        m.clear();
+        assert!(!m.is_dirty(), "a cleared matrix is clean");
+        assert_eq!(
+            (0..5).map(|pre| m.connections(pre).count()).sum::<usize>(),
+            0
+        );
     }
 
     #[test]
     fn csr_finalize_recovers_correct_members_for_unsorted_insertion() {
-        // Regression: add() in arbitrary pre_id order used to make connections(pre)
-        // return slices with the right COUNT but the wrong MEMBERS (the incremental
-        // row_ptrs only works for sorted insertion). finalize() counting-sorts by
-        // pre_id so connections returns each neuron's actual outgoing edges.
+        // Regression: add() in arbitrary pre_id order used to make
+        // connections(pre) return slices with the right COUNT but the wrong
+        // MEMBERS (the incremental row_ptrs, gone since round 64, was right
+        // only for sorted insertion). finalize() counting-sorts by pre_id
+        // so connections returns each neuron's actual outgoing edges.
         let mut m = SparseSynapseMatrix::new(5, 4);
         m.add(0, 1, 100, 0);
         m.add(2, 3, 200, 1);
@@ -1860,34 +1835,32 @@ mod tests {
         assert_eq!(inc0, vec![2]);
     }
 
+    /// The LTP (post-firing) pass reads the reverse CSR, which only a sort
+    /// builds. External wiring that no caller sorted is sorted by its first
+    /// step, so it learns as sorted wiring does: the same drive on two
+    /// nets, one sorted by hand and one not, potentiates both to the same
+    /// weight. Before round 64 the second stayed at 0 (LTD clamps the
+    /// zero-born excitatory weight there): the pre-1.5d LTD-only
+    /// substrate, in silence.
     #[test]
-    fn finalize_synapses_makes_ltp_reachable_on_external_wiring() {
-        // Session D-2: the reason `finalize_synapses` must exist. The LTP
-        // (post-firing) plasticity pass iterates the reverse CSR; on external
-        // wiring it is empty until a finalize, so pre-before-post firing can
-        // NEVER potentiate — the pre-1.5d LTD-only regression, silently. Same
-        // drive on two nets: the finalized one potentiates, the unfinalized
-        // one cannot (LTD clamps the zero-born excitatory weight at 0).
-        let mut net =
-            SpikingNeuralNetwork::new(4, 1000, NetworkTopology::Random { connectivity: 0.0 })
-                .expect("valid");
-        net.build_topology().expect("build");
-        net.neurons[1].noise_amplitude_ua = 0;
-        net.neurons[2].noise_amplitude_ua = 0;
-        net.add_synapse(1, 2, 0).expect("add");
-        net.finalize_synapses();
-        #[cfg(feature = "unstable-stdp")]
-        net.set_plasticity_enabled(true);
-
-        let mut raw =
-            SpikingNeuralNetwork::new(4, 1000, NetworkTopology::Random { connectivity: 0.0 })
-                .expect("valid");
-        raw.build_topology().expect("build");
-        raw.neurons[1].noise_amplitude_ua = 0;
-        raw.neurons[2].noise_amplitude_ua = 0;
-        raw.add_synapse(1, 2, 0).expect("add");
-        #[cfg(feature = "unstable-stdp")]
-        raw.set_plasticity_enabled(true);
+    fn ltp_reaches_external_wiring_never_sorted() {
+        let wired = |sorted: bool| {
+            let mut net =
+                SpikingNeuralNetwork::new(4, 1000, NetworkTopology::Random { connectivity: 0.0 })
+                    .expect("valid");
+            net.build_topology().expect("build");
+            net.neurons[1].noise_amplitude_ua = 0;
+            net.neurons[2].noise_amplitude_ua = 0;
+            net.add_synapse(1, 2, 0).expect("add");
+            if sorted {
+                net.finalize_synapses();
+            }
+            #[cfg(feature = "unstable-stdp")]
+            net.set_plasticity_enabled(true);
+            net
+        };
+        let mut net = wired(true);
+        let mut raw = wired(false);
 
         // Drive: pre (neuron 1) steps 0..6, then post (neuron 2) steps 7..17.
         // Pre fires ≈step 6 (integer LIF integration needs 7 driven steps to
@@ -1912,13 +1885,12 @@ mod tests {
         #[cfg(feature = "unstable-stdp")]
         assert!(
             net.synapses[0].weight > 0,
-            "finalized external wiring must allow LTP: weight {} (started 0)",
+            "sorted external wiring must allow LTP: weight {} (started 0)",
             net.synapses[0].weight
         );
-        #[cfg(feature = "unstable-stdp")]
         assert_eq!(
-            raw.synapses[0].weight, 0,
-            "without finalize the reverse CSR is empty — LTP unreachable, weight frozen at 0"
+            raw.synapses[0].weight, net.synapses[0].weight,
+            "never sorted, the wiring learns as the sorted one"
         );
     }
 
@@ -2319,6 +2291,7 @@ mod tests {
         net.neurons[0].noise_amplitude_ua = 0;
         net.neurons[1].noise_amplitude_ua = 0;
         net.add_synapse(0, 1, 100).expect("synapse");
+        net.finalize_synapses(); // the rows read below are the sort's
 
         net.neurons[0].last_spike_time_us = 1_000;
         net.neurons[1].last_spike_time_us = 1_000;
@@ -2706,6 +2679,567 @@ mod tests {
                 "incoming({post}) must return post's actual incoming edges"
             );
         }
+    }
+
+    // ----- A network steps its synapses as added (round 64) -----
+    //
+    // A step delivers each synapse under its own `pre`, in the order added,
+    // whatever adds, sorts and steps came before it: the step sorts the CSR
+    // first when a synapse came in since the last sort. `Wiring` is that
+    // rule written apart from the CSR, from the step's § Order; with
+    // plasticity on, the reference is a network wired in `pre` order and
+    // sorted after each batch of adds.
+
+    /// The cases' generator: xorshift64*, no dependency.
+    struct Rng(u64);
+
+    impl Rng {
+        fn new(seed: u64) -> Self {
+            Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1)
+        }
+
+        /// A draw in `0..n`.
+        fn below(&mut self, n: u64) -> u64 {
+            let mut x = self.0;
+            x ^= x >> 12;
+            x ^= x << 25;
+            x ^= x >> 27;
+            self.0 = x;
+            x.wrapping_mul(0x2545_F491_4F6C_DD1D) % n
+        }
+    }
+
+    /// The drive of step `t` on `n` neurons: neuron 0 at 400 μA, which
+    /// fires it on its own, every other at 100 μA plus 0 to 150 μA, which
+    /// fires none of them. It holds an excitatory neuron at −70 to −64 mV,
+    /// where one pulse fires it from about 1,600 to 2,900 μA, by the
+    /// membrane and the drive; an inhibitory one, in a built topology,
+    /// climbs to −54 mV, 4 mV under its threshold.
+    fn drive(seed: u64, t: u32, n: usize) -> Vec<i16> {
+        let mut rng = Rng::new(seed ^ (u64::from(t) << 20));
+        (0..n)
+            .map(|i| {
+                if i == 0 {
+                    400
+                } else {
+                    100 + rng.below(151) as i16
+                }
+            })
+            .collect()
+    }
+
+    /// Every field a step writes, neuron by neuron.
+    fn written(neurons: &[LIFNeuron]) -> Vec<(i16, u32, u32, u32, i16, i16)> {
+        neurons
+            .iter()
+            .map(|n| {
+                (
+                    n.membrane_potential,
+                    n.refractory_time_us,
+                    n.last_update_time_us,
+                    n.last_spike_time_us,
+                    n.synaptic_current_ua,
+                    n.adaptation_current_ua,
+                )
+            })
+            .collect()
+    }
+
+    /// The step's § Order without plasticity, written apart from the CSR:
+    /// each neuron that fired, in id order, sends the pulse of each of its
+    /// synapses, in the order they were added.
+    struct Wiring {
+        neurons: Vec<LIFNeuron>,
+        synapses: Vec<(u16, u16, i16)>,
+        divisor: i16,
+        dt_us: u32,
+        time_us: u64,
+    }
+
+    impl Wiring {
+        /// `net` as it stands, before its first step.
+        fn of(net: &SpikingNeuralNetwork) -> Self {
+            Self {
+                neurons: net.neurons().to_vec(),
+                synapses: net
+                    .synapses()
+                    .iter()
+                    .map(|s| (s.pre_neuron_id, s.post_neuron_id, s.weight))
+                    .collect(),
+                divisor: net.synaptic_input_divisor() as i16,
+                dt_us: net.time_step_us,
+                time_us: net.current_time_us,
+            }
+        }
+
+        fn step(&mut self, input: &[i16]) -> Vec<u16> {
+            for n in &mut self.neurons {
+                n.decay_adaptation_current();
+            }
+            let now_us = self.time_us as u32;
+            let mut fired = Vec::new();
+            for (id, n) in (0u16..).zip(&mut self.neurons) {
+                let current = input.get(usize::from(id)).copied().unwrap_or(0);
+                if n.integrate_and_fire(current, self.dt_us, now_us) {
+                    fired.push(id);
+                }
+            }
+            for n in &mut self.neurons {
+                n.clear_synaptic_current();
+            }
+            for &pre in &fired {
+                for &(_, post, weight) in self.synapses.iter().filter(|s| s.0 == pre) {
+                    self.neurons[usize::from(post)].add_synaptic_current(weight / self.divisor);
+                }
+            }
+            self.time_us += u64::from(self.dt_us);
+            fired
+        }
+    }
+
+    /// One act on a hand-wired network.
+    #[derive(Clone, Copy, Debug)]
+    enum Act {
+        Add(u16, u16, i16),
+        /// `finalize_synapses`.
+        Sort,
+        /// That many steps, on the case's drive.
+        Steps(u32),
+    }
+
+    /// The steps of a run.
+    const STEPS: u32 = 200;
+
+    /// One step of `net` and of its `Wiring`: the spikes of every neuron
+    /// but 0, which only a pulse fires, when the two spike alike and every
+    /// field a step writes is the same, or `None`.
+    fn step_both(
+        net: &mut SpikingNeuralNetwork,
+        rule: &mut Wiring,
+        seed: u64,
+        t: u32,
+    ) -> Option<usize> {
+        let input = drive(seed, t, usize::from(net.neuron_count()));
+        let got: Vec<u16> = net
+            .step(&input)
+            .expect("steps")
+            .iter()
+            .map(|s| s.neuron_id)
+            .collect();
+        let alike = got == rule.step(&input) && written(net.neurons()) == written(&rule.neurons);
+        alike.then(|| got.iter().filter(|&&id| id != 0).count())
+    }
+
+    /// `acts` on `net` and on its `Wiring` side by side, then both stepped
+    /// to `STEPS`: `Err` with the first step at which they part, or `Ok`
+    /// with the spikes of every neuron but 0.
+    fn steps_as_its_wiring(
+        mut net: SpikingNeuralNetwork,
+        acts: &[Act],
+        seed: u64,
+    ) -> std::result::Result<usize, u32> {
+        let mut rule = Wiring::of(&net);
+        let (mut t, mut pulsed) = (0, 0);
+        for &act in acts {
+            match act {
+                Act::Add(pre, post, weight) => {
+                    net.add_synapse(pre, post, weight)
+                        .expect("ids in range, no self edge");
+                    rule.synapses.push((pre, post, weight));
+                }
+                Act::Sort => net.finalize_synapses(),
+                Act::Steps(k) => {
+                    for _ in 0..k {
+                        pulsed += step_both(&mut net, &mut rule, seed, t).ok_or(t)?;
+                        t += 1;
+                    }
+                }
+            }
+        }
+        while t < STEPS {
+            pulsed += step_both(&mut net, &mut rule, seed, t).ok_or(t)?;
+            t += 1;
+        }
+        Ok(pulsed)
+    }
+
+    /// The synapses of `net` by `pre`, a stable sort: within one `pre` in
+    /// the order added.
+    #[cfg(feature = "unstable-stdp")]
+    fn by_pre(net: &SpikingNeuralNetwork) -> Vec<(u16, u16, i16)> {
+        let mut list: Vec<(u16, u16, i16)> = net
+            .synapses()
+            .iter()
+            .map(|s| (s.pre_neuron_id, s.post_neuron_id, s.weight))
+            .collect();
+        list.sort_by_key(|s| s.0);
+        list
+    }
+
+    /// The batch on `reference`, in `pre` order, then a sort.
+    #[cfg(feature = "unstable-stdp")]
+    fn add_sorted(reference: &mut SpikingNeuralNetwork, batch: &mut Vec<(u16, u16, i16)>) {
+        batch.sort_by_key(|s| s.0);
+        for &(pre, post, weight) in &*batch {
+            reference
+                .add_synapse(pre, post, weight)
+                .expect("ids in range, no self edge");
+        }
+        reference.finalize_synapses();
+        batch.clear();
+    }
+
+    /// One step of both: the same spikes.
+    #[cfg(feature = "unstable-stdp")]
+    fn spike_alike(
+        net: &mut SpikingNeuralNetwork,
+        reference: &mut SpikingNeuralNetwork,
+        seed: u64,
+        t: u32,
+    ) -> bool {
+        let input = drive(seed, t, usize::from(net.neuron_count()));
+        let ids = |net: &mut SpikingNeuralNetwork| -> Vec<u16> {
+            net.step(&input)
+                .expect("steps")
+                .iter()
+                .map(|s| s.neuron_id)
+                .collect()
+        };
+        ids(net) == ids(reference)
+    }
+
+    /// With plasticity on: `acts` on `net`, and the same synapses on a
+    /// network of the same neurons wired in `pre` order and sorted after
+    /// each batch, side by side to `STEPS`. Whether every spike agrees,
+    /// and at the end every weight, each list taken `by_pre`.
+    #[cfg(feature = "unstable-stdp")]
+    fn learns_as_its_reference(mut net: SpikingNeuralNetwork, acts: &[Act], seed: u64) -> bool {
+        let mut reference =
+            SpikingNeuralNetwork::from_neurons(net.neurons().to_vec(), net.time_step_us)
+                .expect("the same neurons");
+        reference
+            .set_synaptic_input_divisor(net.synaptic_input_divisor())
+            .expect("the same divisor");
+        net.set_plasticity_enabled(true);
+        reference.set_plasticity_enabled(true);
+        // The synapses `net` holds already (a topology's), then each batch.
+        let mut batch = by_pre(&net);
+        let mut t = 0;
+        for &act in acts {
+            match act {
+                Act::Add(pre, post, weight) => {
+                    net.add_synapse(pre, post, weight)
+                        .expect("ids in range, no self edge");
+                    batch.push((pre, post, weight));
+                }
+                Act::Sort => net.finalize_synapses(),
+                Act::Steps(k) => {
+                    add_sorted(&mut reference, &mut batch);
+                    for _ in 0..k {
+                        if !spike_alike(&mut net, &mut reference, seed, t) {
+                            return false;
+                        }
+                        t += 1;
+                    }
+                }
+            }
+        }
+        add_sorted(&mut reference, &mut batch);
+        while t < STEPS {
+            if !spike_alike(&mut net, &mut reference, seed, t) {
+                return false;
+            }
+            t += 1;
+        }
+        by_pre(&net) == by_pre(&reference)
+    }
+
+    /// The cases' seed.
+    const SEED: u64 = 1;
+
+    /// Case `c`: 3 to 8 neurons and two or more distinct pairs in random
+    /// order, weights 200 to 2,000 μA.
+    fn case_edges(case: u64) -> (u16, Vec<(u16, u16, i16)>) {
+        let mut rng = Rng::new(SEED.wrapping_add(case));
+        let neurons = 3 + rng.below(6) as u16;
+        let pairs: Vec<(u16, u16)> = (0..neurons)
+            .flat_map(|pre| {
+                (0..neurons)
+                    .filter(move |&post| post != pre)
+                    .map(move |post| (pre, post))
+            })
+            .collect();
+        let count = 2 + rng.below(pairs.len() as u64 - 1) as usize;
+        let mut order: Vec<usize> = (0..pairs.len()).collect();
+        for i in 0..order.len() {
+            let j = i + rng.below((order.len() - i) as u64) as usize;
+            order.swap(i, j);
+        }
+        let edges = order[..count]
+            .iter()
+            .map(|&k| (pairs[k].0, pairs[k].1, 200 + rng.below(1801) as i16))
+            .collect();
+        (neurons, edges)
+    }
+
+    fn adds(edges: &[(u16, u16, i16)]) -> impl Iterator<Item = Act> + '_ {
+        edges
+            .iter()
+            .map(|&(pre, post, weight)| Act::Add(pre, post, weight))
+    }
+
+    /// A built network for wiring 8: one of the four topologies, by case.
+    fn built(n: u16, c: u64) -> SpikingNeuralNetwork {
+        let topology = match (c / WIRINGS) % 4 {
+            0 => NetworkTopology::Random { connectivity: 0.3 },
+            1 => NetworkTopology::SmallWorld {
+                local_connections: 2,
+                rewiring_prob: 0.3,
+            },
+            2 => NetworkTopology::Feedforward {
+                layers: Box::leak(vec![n / 2, n - n / 2].into_boxed_slice()),
+            },
+            _ => NetworkTopology::Balanced {
+                excitatory_ratio: 0.8,
+            },
+        };
+        let mut net = SpikingNeuralNetwork::new(n, 1000, topology).expect("3 to 8 neurons");
+        net.build_topology().expect("each rule holds");
+        net
+    }
+
+    /// The wirings of a case, each the network it starts from (divisor 1)
+    /// and the acts that wire it. 0 to 6: in random order and sorted once;
+    /// in `pre` order and never sorted; in random order and never sorted;
+    /// half, a sort, the rest; the same and a sort; in random order and
+    /// sorted twice; half, a sort, the rest and two sorts. 7: half, 50
+    /// steps, the rest. 8: a built topology, then the case's synapses. 9:
+    /// one synapse before each of the first steps.
+    const WIRINGS: u64 = 10;
+
+    fn wiring(c: u64) -> (SpikingNeuralNetwork, Vec<Act>) {
+        let (n, mut edges) = case_edges(c);
+        let half = edges.len() / 2;
+        let mut net =
+            SpikingNeuralNetwork::from_neurons((0..n).map(LIFNeuron::new).collect(), 1000)
+                .expect("3 to 8 neurons");
+        let (first, rest) = edges.split_at(half);
+        let acts: Vec<Act> = match c % WIRINGS {
+            0 => adds(&edges).chain([Act::Sort]).collect(),
+            1 => {
+                edges.sort_by_key(|s| s.0);
+                adds(&edges).collect()
+            }
+            2 => adds(&edges).collect(),
+            3 => adds(first).chain([Act::Sort]).chain(adds(rest)).collect(),
+            4 => adds(first)
+                .chain([Act::Sort])
+                .chain(adds(rest))
+                .chain([Act::Sort])
+                .collect(),
+            5 => adds(&edges).chain([Act::Sort, Act::Sort]).collect(),
+            6 => adds(first)
+                .chain([Act::Sort])
+                .chain(adds(rest))
+                .chain([Act::Sort, Act::Sort])
+                .collect(),
+            7 => adds(first)
+                .chain([Act::Steps(50)])
+                .chain(adds(rest))
+                .collect(),
+            8 => {
+                net = built(n, c);
+                adds(&edges).collect()
+            }
+            _ => adds(&edges).flat_map(|a| [a, Act::Steps(1)]).collect(),
+        };
+        net.set_synaptic_input_divisor(1).expect("in 1 to 32,767");
+        (net, acts)
+    }
+
+    /// Every wiring of 400 cases steps as its synapses were added, against
+    /// its `Wiring`, and with `unstable-stdp` learns as its reference with
+    /// plasticity on. In most cases a pulse fires a neuron (the guard
+    /// below): the drive fires neuron 0 alone, so without such pulses only
+    /// its synapses would deliver.
+    #[test]
+    fn every_wiring_steps_as_its_synapses_were_added() {
+        const CASES: u64 = 400;
+        let mut parted: Vec<String> = Vec::new();
+        let (mut parted_cases, mut pulsed_cases) = (0, 0);
+        for c in 0..CASES {
+            let before = parted.len();
+            let (net, acts) = wiring(c);
+            match steps_as_its_wiring(net, &acts, SEED ^ c) {
+                Ok(pulsed) => pulsed_cases += usize::from(pulsed > 0),
+                Err(t) => {
+                    parted.push(format!(
+                        "case {c}, wiring {}: parts at step {t}",
+                        c % WIRINGS
+                    ));
+                }
+            }
+            #[cfg(feature = "unstable-stdp")]
+            {
+                let (net, acts) = wiring(c);
+                if !learns_as_its_reference(net, &acts, SEED ^ c) {
+                    parted.push(format!(
+                        "case {c}, wiring {}: learns otherwise",
+                        c % WIRINGS
+                    ));
+                }
+            }
+            parted_cases += usize::from(parted.len() > before);
+        }
+        assert!(
+            parted.is_empty(),
+            "{parted_cases} of {CASES} cases part:\n{}",
+            parted.join("\n")
+        );
+        assert!(
+            pulsed_cases * 4 >= CASES as usize * 3,
+            "a pulse fires a neuron in {pulsed_cases} of {CASES} cases, not three in four"
+        );
+    }
+
+    /// The step sorts a network wired since the last sort and leaves it
+    /// clean; `build_topology` leaves it clean too.
+    #[test]
+    fn a_step_sorts_what_was_added_since_the_last_sort() {
+        let mut net =
+            SpikingNeuralNetwork::from_neurons((0..3).map(LIFNeuron::new).collect(), 1000)
+                .expect("three neurons");
+        assert!(!net.synapse_matrix.is_dirty(), "built clean");
+        net.add_synapse(1, 2, 500).expect("ids in range");
+        net.add_synapse(0, 1, 500).expect("ids in range");
+        assert!(net.synapse_matrix.is_dirty(), "two adds since");
+        net.step(&[0, 0, 0]).expect("steps");
+        assert!(!net.synapse_matrix.is_dirty(), "the step sorted");
+        let rows = |net: &SpikingNeuralNetwork| -> Vec<Vec<(u16, i16, usize)>> {
+            (0..3)
+                .map(|pre| net.synapse_matrix.connections(pre).collect())
+                .collect()
+        };
+        assert_eq!(
+            rows(&net),
+            vec![vec![(1, 500, 1)], vec![(2, 500, 0)], vec![]]
+        );
+        net.add_synapse(0, 2, 300).expect("ids in range");
+        net.step(&[0, 0, 0]).expect("steps");
+        assert_eq!(
+            rows(&net),
+            vec![vec![(1, 500, 1), (2, 300, 2)], vec![(2, 500, 0)], vec![]],
+            "pre 0's two in the order added"
+        );
+        assert_eq!(net.stats().total_synapses, 3);
+        let mut built =
+            SpikingNeuralNetwork::new(10, 1000, NetworkTopology::default()).expect("ten neurons");
+        built.build_topology().expect("builds");
+        assert!(!built.synapse_matrix.is_dirty(), "build_topology sorts");
+    }
+
+    /// `finalize` sorts whatever order it finds: a second call, or one
+    /// after more adds, keeps each `pre`'s edges in the order they were
+    /// added. Round 43's witness: `add(3→2)`, `add(2→3, 200)`, finalize,
+    /// `add(2→3, 300)`, finalize, finalize. Before round 64 the last two
+    /// walked a key list the arrays no longer matched and left pre 2's two
+    /// edges newest first. And on edges added out of `pre` order a second
+    /// finalize keeps every forward slot, each post's incoming edges, and
+    /// where `set_weight` writes.
+    #[test]
+    fn a_finalize_after_a_finalize_keeps_the_order_added() {
+        let rows = |m: &SparseSynapseMatrix| -> Vec<Vec<(u16, i16, usize)>> {
+            (0..4).map(|pre| m.connections(pre).collect()).collect()
+        };
+        let mut m = SparseSynapseMatrix::new(4, 3);
+        m.add(3, 2, 100, 0);
+        m.add(2, 3, 200, 1);
+        m.finalize();
+        m.add(2, 3, 300, 2);
+        m.finalize();
+        m.finalize();
+        assert_eq!(
+            rows(&m),
+            vec![
+                vec![],
+                vec![],
+                vec![(3, 200, 1), (3, 300, 2)],
+                vec![(2, 100, 0)]
+            ],
+            "pre 2's two in the order added"
+        );
+
+        let edges: [(u16, u16, i16); 6] = [
+            (2, 0, -125),
+            (0, 2, 7),
+            (2, 3, -250),
+            (1, 3, 40),
+            (0, 1, 125),
+            (3, 1, 60),
+        ];
+        let mut m = SparseSynapseMatrix::new(4, edges.len());
+        for (i, &(pre, post, weight)) in edges.iter().enumerate() {
+            m.add(pre, post, weight, i);
+        }
+        m.finalize();
+        let incoming = |m: &SparseSynapseMatrix| -> Vec<Vec<(u16, usize)>> {
+            (0..4)
+                .map(|post| {
+                    let mut edges: Vec<(u16, usize)> = m.incoming(post).collect();
+                    edges.sort_unstable();
+                    edges
+                })
+                .collect()
+        };
+        let (once_rows, once_incoming) = (rows(&m), incoming(&m));
+        m.finalize();
+        assert_eq!(rows(&m), once_rows, "every forward slot kept");
+        assert_eq!(
+            incoming(&m),
+            once_incoming,
+            "each post's incoming edges kept"
+        );
+        for (i, weight) in (0..edges.len()).zip(1i16..) {
+            m.set_weight(i, weight);
+        }
+        for pre in 0..4 {
+            for (_post, weight, i) in m.connections(pre) {
+                assert_eq!(weight, i as i16 + 1, "synapse {i}'s write on its slot");
+            }
+        }
+    }
+
+    /// An add after `build_topology` steps as added, in each of the four
+    /// topologies: one synapse from neuron 0 to the last.
+    #[test]
+    fn an_add_after_build_topology_steps_as_added() {
+        let mut parted = Vec::new();
+        for (n, topology) in [
+            (6, NetworkTopology::Feedforward { layers: &[2, 2, 2] }),
+            (12, NetworkTopology::Random { connectivity: 0.3 }),
+            (
+                12,
+                NetworkTopology::SmallWorld {
+                    local_connections: 2,
+                    rewiring_prob: 0.3,
+                },
+            ),
+            (
+                12,
+                NetworkTopology::Balanced {
+                    excitatory_ratio: 0.8,
+                },
+            ),
+        ] {
+            let mut net = SpikingNeuralNetwork::new(n, 1000, topology).expect("valid");
+            net.build_topology().expect("builds");
+            net.set_synaptic_input_divisor(1).expect("in 1 to 32,767");
+            let pulsed = steps_as_its_wiring(net, &[Act::Add(0, n - 1, 1500)], 7);
+            if !matches!(pulsed, Ok(1..)) {
+                parted.push(format!("{topology:?}: {pulsed:?}"));
+            }
+        }
+        assert!(parted.is_empty(), "{parted:#?}");
     }
 
     // ----- Transmission live (session F fix: clear-after-read reorder) -----
@@ -3155,7 +3689,8 @@ mod tests {
             prop_assert_eq!(a, c);
         }
 
-        /// Sparse matrix iteration count matches total synapses added.
+        /// Sparse matrix iteration count, after a sort, matches total
+        /// synapses added.
         #[test]
         fn prop_sparse_matrix_iter_matches_count(
             n in 1u16..=20,
@@ -3168,6 +3703,7 @@ mod tests {
                 let post = if post == pre { (post + 1) % n } else { post };
                 m.add(pre, post, 100, i);
             }
+            m.finalize();
             let total: usize = (0..n).map(|i| m.connections(i).count()).sum();
             prop_assert_eq!(total, syn_count);
         }

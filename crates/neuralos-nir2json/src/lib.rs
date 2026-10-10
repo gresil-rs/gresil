@@ -1397,9 +1397,8 @@ pub fn module_name(stem: &str) -> Option<String> {
 /// Never, and not by luck: an assembled network steps, a `String` takes
 /// every write, and neither the header line nor the library's freezer
 /// refuses what it is handed here. Each refusal is ruled out at its
-/// source: plasticity on, refused above; a CSR that no longer delivers
-/// its synapses — `build_network` finalizes once, after its last edge;
-/// a clock not at 0, and a neuron that is not at rest — the module is
+/// source: plasticity on, refused above; a clock not at 0, and a neuron
+/// that is not at rest — the module is
 /// written before the stepping loop below, and `build_network` builds
 /// every membrane at its leak; neurons on two grids — `build_network`
 /// builds every neuron on the options' grid; a case name off the rule —

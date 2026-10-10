@@ -394,8 +394,8 @@ fn fixed<const N: usize, const S: usize>(net: &SpikingNeuralNetwork) -> Result<(
     FixedNetwork::<N, S>::try_from(net).map(|_| ())
 }
 
-/// `FixedNetwork::try_from`: the right sizes, the wrong ones, a stale CSR,
-/// one finalized out of order, and, with `unstable-stdp`, plasticity on.
+/// `FixedNetwork::try_from`: the right sizes, the wrong ones, edges out of
+/// `pre` order sorted and not, and, with `unstable-stdp`, plasticity on.
 fn section_e(cases: &mut Cases) {
     let edges = [(0, 1, 5000), (1, 2, 5000)];
     let net = net3(&edges, true).expect("three neurons");
@@ -420,9 +420,9 @@ fn section_e(cases: &mut Cases) {
         Rule::Refused(&[Error::SynapseCountMismatch]),
         || fixed::<3, 3>(&net),
     );
-    let stale = net3(&[(1, 2, 5000), (0, 1, 5000)], false).expect("three neurons");
-    cases.check("E/stale-csr", Rule::Refused(&[Error::StaleCsr]), || {
-        fixed::<3, 2>(&stale)
+    let unsorted = net3(&[(1, 2, 5000), (0, 1, 5000)], false).expect("three neurons");
+    cases.check("E/out-of-order-unsorted", Rule::Builds, || {
+        fixed::<3, 2>(&unsorted)
     });
     let finalized = net3(&[(1, 2, 5000), (0, 1, 5000)], true).expect("three neurons");
     cases.check("E/out-of-order-finalized", Rule::Builds, || {

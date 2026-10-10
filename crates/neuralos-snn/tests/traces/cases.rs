@@ -96,8 +96,8 @@ pub fn frozen_path() -> PathBuf {
 /// When a case's drive is not one current per neuron, which no case here
 /// is; and with every refusal of `freeze::module`, none of which a case
 /// here trips: each is built and frozen before its first step, on one
-/// grid, named by the rule, its edges finalized, and each numbers its
-/// neurons from 0; the one case with plasticity on is skipped.
+/// grid, named by the rule, and each numbers its neurons from 0; the one
+/// case with plasticity on is skipped.
 #[cfg(feature = "unstable-freeze")]
 pub fn freeze() -> String {
     let mut out = String::from(freeze::preamble());

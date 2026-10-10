@@ -90,9 +90,6 @@ pub enum Error {
     /// A network whose synapse count is not the [`FixedNetwork`]'s `S`
     /// (`FixedNetwork::try_from`).
     SynapseCountMismatch,
-    /// A network whose CSR does not deliver each synapse under its own
-    /// `pre`, in the order added (`FixedNetwork::try_from`).
-    StaleCsr,
     /// Neurons on more than one voltage grid: a network keeps one
     /// (`SpikingNeuralNetwork::from_neurons`, and `trace::header` as a
     /// guard).
@@ -120,7 +117,6 @@ impl core::fmt::Display for Error {
             Self::PlasticityEnabled => "a network with plasticity enabled",
             Self::NeuronCountMismatch => "a neuron count other than the fixed network's N",
             Self::SynapseCountMismatch => "a synapse count other than the fixed network's S",
-            Self::StaleCsr => "a CSR that does not deliver the synapses in the order added",
             Self::MixedVoltageGrids => "neurons on more than one voltage grid",
             Self::BadCaseName => "a case name that is empty or outside [a-z0-9-]",
         })
@@ -194,10 +190,6 @@ mod tests {
                 "a synapse count other than the fixed network's S",
             ),
             (
-                Error::StaleCsr,
-                "a CSR that does not deliver the synapses in the order added",
-            ),
-            (
                 Error::MixedVoltageGrids,
                 "neurons on more than one voltage grid",
             ),
@@ -221,7 +213,6 @@ mod tests {
                 | Error::PlasticityEnabled
                 | Error::NeuronCountMismatch
                 | Error::SynapseCountMismatch
-                | Error::StaleCsr
                 | Error::MixedVoltageGrids
                 | Error::BadCaseName => assert_eq!(error.to_string(), text),
             }
