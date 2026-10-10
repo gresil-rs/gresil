@@ -133,19 +133,18 @@ pub const MEMBRANE_MV_MAX: i16 = 50;
 #[must_use]
 pub fn dt_over_tau(dt_us: u32, tau_membrane_us: u32) -> i64 {
     let Some(tau) = NonZeroU32::new(tau_membrane_us) else {
-        // Division-by-zero guard, and nothing more. This comment claimed "the
-        // network rejects tau == 0 at construction" until 2026-09-01; no such
-        // rejection exists anywhere in the crate. `tau_membrane_us` is a `pub`
-        // field on `LIFNeuron`, and `SpikingNeuralNetwork::new` validates only
-        // `neuron_count` and `time_step_us`. So a zero time constant is
-        // reachable, and it lands here rather than on a panic.
+        // Division-by-zero guard, and nothing more. `tau_membrane_us` is a
+        // `pub` field on `LIFNeuron`, so a zero time constant reaches this
+        // line: both network constructors refuse it since round 64
+        // (`Error::FrozenMembrane`, with every time constant above 1,000
+        // steps), but a lone neuron and `FixedNetwork::new` take it, and it
+        // lands here rather than on a panic. (This comment claimed "the
+        // network rejects tau == 0 at construction" until 2026-09-01, when
+        // no such rejection existed.)
         //
         // Returning 0 means "this step does not move the membrane", which is
         // the safe reading: a zero time constant is not physical, and refusing
         // to move is better than dividing by zero or inventing an infinity.
-        // Construction-time validation is deliberately deferred to the
-        // resistance-seam change (PR #1 scope note), which is where the
-        // signature moves anyway.
         return 0;
     };
     // One hardware divide when the product fits `u32`, which covers every
@@ -581,8 +580,11 @@ impl LIFNeuron {
     ///    moves it; an inhibitory one (τ = 10 ms) leaks 0 under 10 mV, so
     ///    from reset it climbs one quantum, to −79, and stays.
     ///    And `dt_over_tau` is 0 when `tau_membrane_us` is above
-    ///    `1000 · dt_us`, or is 0: the membrane is frozen, with no error.
-    ///    The clamp and the threshold test below still run.
+    ///    `1000 · dt_us`, or is 0: the membrane is frozen, with no error
+    ///    here. Both network constructors refuse such a neuron
+    ///    ([`Error::FrozenMembrane`](crate::Error::FrozenMembrane)); a lone
+    ///    neuron and `FixedNetwork::new` take it. The clamp and the
+    ///    threshold test below still run.
     /// 7. **Saturation.** `V + delta_v` is clamped to
     ///    [`MEMBRANE_MV_MIN`]`..=`[`MEMBRANE_MV_MAX`], times `s`. The
     ///    multiply in `delta_v` saturates in `i64`, and a product that large

@@ -141,9 +141,10 @@ records it names in `evidence/INDEX.md`. Four lines, in order:
    none, a topology builder gives its neurons 5 μA), the networks' clock
    (a `u64`), the refusals (one `Error` variant per rule), the divisor's
    range (1 to 32,767), the cap of 65,535 neurons, one grid per network,
-   a connectivity or rewiring probability from 0 to 1 and a step that
-   sorts the synapses added since the last sort, with no public sort,
-   are in. Then the rename, the front door, the stamp.
+   a connectivity or rewiring probability from 0 to 1, a step that sorts
+   the synapses added since the last sort, with no public sort, and a
+   membrane the network's step can move are in. Then the rename, the
+   front door, the stamp.
 3. **0.1.0: the stamp.** The principal's call, once the fourteen checks
    of § 0.1.0 hold again at the final tree, after the rename.
 4. **After 0.1.0: the learning chapter** (`docs/VISION.md` § Realistic

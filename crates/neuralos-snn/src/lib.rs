@@ -63,6 +63,11 @@ pub enum Error {
     /// A time step of zero (`SpikingNeuralNetwork::new` and
     /// `from_neurons`).
     ZeroTimeStep,
+    /// A neuron whose membrane cannot move at the network's time step: a
+    /// membrane time constant of 0 or above 1,000 time steps, where
+    /// `dt_over_tau` truncates to 0 (`SpikingNeuralNetwork::new` and
+    /// `from_neurons`).
+    FrozenMembrane,
     /// A neuron id not below the network's neuron count
     /// (`SpikingNeuralNetwork::add_synapse`).
     NeuronIdOutOfRange,
@@ -105,6 +110,7 @@ impl core::fmt::Display for Error {
             Self::SelfConnection => "a synapse from a neuron to itself",
             Self::NeuronCountOutOfRange => "a neuron count outside 1 to 65,535",
             Self::ZeroTimeStep => "a time step of zero",
+            Self::FrozenMembrane => "a membrane time constant of 0 or above 1,000 time steps",
             Self::NeuronIdOutOfRange => "a neuron id not below the neuron count",
             Self::DivisorOutOfRange => "a synaptic input divisor outside 1 to 32,767",
             Self::BadLayerSizes => {
@@ -158,6 +164,10 @@ mod tests {
             ),
             (Error::ZeroTimeStep, "a time step of zero"),
             (
+                Error::FrozenMembrane,
+                "a membrane time constant of 0 or above 1,000 time steps",
+            ),
+            (
                 Error::NeuronIdOutOfRange,
                 "a neuron id not below the neuron count",
             ),
@@ -205,6 +215,7 @@ mod tests {
                 Error::SelfConnection
                 | Error::NeuronCountOutOfRange
                 | Error::ZeroTimeStep
+                | Error::FrozenMembrane
                 | Error::NeuronIdOutOfRange
                 | Error::DivisorOutOfRange
                 | Error::BadLayerSizes

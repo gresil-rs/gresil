@@ -95,8 +95,26 @@ fn topology_rule(n: u16, dt: u32, topology: NetworkTopology) -> Rule {
     if n == 0 {
         return Rule::Refused(&[Error::NeuronCountOutOfRange]);
     }
+    // A step of zero freezes every membrane too: either name will do.
     if dt == 0 {
-        return Rule::Refused(&[Error::ZeroTimeStep]);
+        return Rule::Refused(&[Error::ZeroTimeStep, Error::FrozenMembrane]);
+    }
+    // `new`'s neurons: the count times the ratio, truncated, excitatory
+    // (τ = 20 ms), the rest inhibitory (10 ms); the ratio is the
+    // `Balanced` one, the 80/20 split's for the other topologies. A
+    // membrane moves when the step is at least τ / 1,000: 20 μs, and 10 μs.
+    let ratio = match topology {
+        NetworkTopology::Balanced { excitatory_ratio } => excitatory_ratio,
+        NetworkTopology::Random { .. }
+        | NetworkTopology::SmallWorld { .. }
+        | NetworkTopology::Feedforward { .. } => 0.8,
+        other => panic!("no rule written here for {other:?}"),
+    };
+    let excitatory = (f64::from(n) * ratio).trunc();
+    let has_excitatory = excitatory >= 1.0;
+    let has_inhibitory = excitatory.is_nan() || excitatory < f64::from(n);
+    if (has_excitatory && dt < 20) || (has_inhibitory && dt < 10) {
+        return Rule::Refused(&[Error::FrozenMembrane]);
     }
     match topology {
         // A probability from 0 to 1, NaN refused, at any neuron count.
@@ -145,7 +163,8 @@ fn leak(layers: &[u16]) -> &'static [u16] {
 }
 
 /// `new` and `build_topology` at 1 to 30 neurons, every topology, the
-/// values at and just past each rule's edges, -0.0 and the infinities;
+/// values at and just past each rule's edges, -0.0 and the infinities, the
+/// time step at the membrane rule's edges;
 /// and every `Feedforward` list of 0 to 4 layers over the sizes 0, 1, 2
 /// and 5, the empty list included, so a layer of no neuron sits at every
 /// place, on its sum and one off it each way.
@@ -245,7 +264,7 @@ fn section_a(cases: &mut Cases) {
             }
         }
     }
-    for dt in [0, 1, 1000, u32::MAX] {
+    for dt in [0, 1, 9, 10, 19, 20, 1000, u32::MAX] {
         topology(
             cases,
             &format!("A/dt={dt}"),
@@ -253,6 +272,34 @@ fn section_a(cases: &mut Cases) {
             dt,
             NetworkTopology::default(),
         );
+    }
+    // Where the neurons' types decide the membrane rule: one neuron at the
+    // default ratio is inhibitory, and a `Balanced` ratio of 0, of 1 and
+    // NaN leaves no excitatory, no inhibitory and no excitatory neuron.
+    for (n, kind) in [
+        (1, NetworkTopology::default()),
+        (
+            10,
+            NetworkTopology::Balanced {
+                excitatory_ratio: 0.0,
+            },
+        ),
+        (
+            10,
+            NetworkTopology::Balanced {
+                excitatory_ratio: 1.0,
+            },
+        ),
+        (
+            10,
+            NetworkTopology::Balanced {
+                excitatory_ratio: f64::NAN,
+            },
+        ),
+    ] {
+        for dt in [9, 10, 19, 20] {
+            topology(cases, &format!("A/dt={dt}/n={n}/{kind:?}"), n, dt, kind);
+        }
     }
     topology(cases, "A/n=0", 0, 1000, NetworkTopology::default());
     topology(cases, "A/n=0/dt=0", 0, 0, NetworkTopology::default());
@@ -278,14 +325,24 @@ fn section_a(cases: &mut Cases) {
 }
 
 /// `from_neurons` at 0 to 3 neurons and around 65,535, with and without a
-/// time step, then every order of 1 to 3 neurons over the two grids.
+/// time step, then every order of 1 to 3 neurons over the two grids, and a
+/// membrane that cannot move at each place of three.
 fn section_b(cases: &mut Cases) {
     for n in [0usize, 1, 2, 3, 65_534, 65_535, 65_536, 65_537] {
         for dt in [0u32, 1000] {
+            // A step of zero freezes every membrane too: where a neuron is
+            // given, that name will do as well.
             let rule = match (n == 0 || n > 65_535, dt == 0) {
-                (true, true) => Rule::Refused(&[Error::NeuronCountOutOfRange, Error::ZeroTimeStep]),
+                (true, true) if n == 0 => {
+                    Rule::Refused(&[Error::NeuronCountOutOfRange, Error::ZeroTimeStep])
+                }
+                (true, true) => Rule::Refused(&[
+                    Error::NeuronCountOutOfRange,
+                    Error::ZeroTimeStep,
+                    Error::FrozenMembrane,
+                ]),
                 (true, false) => Rule::Refused(&[Error::NeuronCountOutOfRange]),
-                (false, true) => Rule::Refused(&[Error::ZeroTimeStep]),
+                (false, true) => Rule::Refused(&[Error::ZeroTimeStep, Error::FrozenMembrane]),
                 (false, false) => Rule::Builds,
             };
             cases.check(&format!("B/from/n={n}/dt={dt}"), rule, || {
@@ -295,6 +352,29 @@ fn section_b(cases: &mut Cases) {
                 input[n - 1] = 3000;
                 net.step(&input).map(|_| ())
             });
+        }
+    }
+    // A time constant of 0 or above 1,000 steps freezes a membrane; the
+    // other two neurons' is one step.
+    for dt in [1u32, 1000] {
+        let longest = dt * 1000;
+        for tau in [0, 1, longest, longest + 1, u32::MAX] {
+            for at in 0..3u16 {
+                let rule = if tau == 0 || tau > longest {
+                    Rule::Refused(&[Error::FrozenMembrane])
+                } else {
+                    Rule::Builds
+                };
+                cases.check(&format!("B/tau/dt={dt}/tau={tau}/at={at}"), rule, || {
+                    let neurons = (0..3u16)
+                        .map(|id| {
+                            LIFNeuron::new(id).with_tau_membrane_us(if id == at { tau } else { dt })
+                        })
+                        .collect();
+                    let mut net = SpikingNeuralNetwork::from_neurons(neurons, dt)?;
+                    net.step(&[3000; 3]).map(|_| ())
+                });
+            }
         }
     }
     let grids = [
@@ -476,7 +556,7 @@ fn every_constructor_case_follows_its_rule() {
     section_f(&mut cases);
     section_g_refused(&mut cases);
     let plasticity = usize::from(cfg!(feature = "unstable-stdp"));
-    cases.assert_kept(1889 + 30 + 84 + 9 + 6 + plasticity + 12 + 5);
+    cases.assert_kept(1909 + 60 + 84 + 9 + 6 + plasticity + 12 + 5);
 }
 
 /// The cases at 65,535 neurons that build: two layer lists that sum to

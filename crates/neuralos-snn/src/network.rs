@@ -56,7 +56,7 @@
 use crate::csr::SparseSynapseMatrix;
 pub use crate::stats::NetworkStats;
 
-use crate::lif_neuron::{LIFNeuron, NeuronType, VoltageResolution};
+use crate::lif_neuron::{dt_over_tau, LIFNeuron, NeuronType, VoltageResolution};
 #[cfg(feature = "unstable-stdp")]
 use crate::synapse::STDPRule;
 use crate::synapse::Synapse;
@@ -231,7 +231,10 @@ impl SpikingNeuralNetwork {
     /// # Errors
     ///
     /// [`Error::NeuronCountOutOfRange`] if `neuron_count == 0`;
-    /// [`Error::ZeroTimeStep`] if `time_step_us == 0`.
+    /// [`Error::ZeroTimeStep`] if `time_step_us == 0`;
+    /// [`Error::FrozenMembrane`] if a neuron's membrane cannot move at
+    /// `time_step_us`: under 20 μs with an excitatory neuron (τ = 20 ms),
+    /// under 10 μs with an inhibitory one (τ = 10 ms).
     pub fn new(neuron_count: u16, time_step_us: u32, topology: NetworkTopology) -> Result<Self> {
         Self::new_with_voltage_resolution(
             neuron_count,
@@ -292,6 +295,9 @@ impl SpikingNeuralNetwork {
             );
         }
 
+        if !membranes_move(&neurons, time_step_us) {
+            return Err(Error::FrozenMembrane);
+        }
         // No room is reserved for synapses, as in `from_neurons`: they grow
         // as `build_topology` adds them, after its rules.
         Ok(Self {
@@ -328,14 +334,20 @@ impl SpikingNeuralNetwork {
     /// [`Error::NeuronCountOutOfRange`] unless `neurons` holds 1 to 65,535
     /// neurons, since ids are `u16` (`Spike::neuron_id`, `add_synapse`) and
     /// so is the count; [`Error::ZeroTimeStep`] when `time_step_us == 0`;
-    /// [`Error::MixedVoltageGrids`] unless every neuron is on one voltage
-    /// grid, the one the network keeps for its stats.
+    /// [`Error::FrozenMembrane`] when a neuron's membrane cannot move at
+    /// `time_step_us`, its `tau_membrane_us` 0 or above
+    /// `1000 · time_step_us`; [`Error::MixedVoltageGrids`] unless every
+    /// neuron is on one voltage grid, the one the network keeps for its
+    /// stats.
     pub fn from_neurons(neurons: Vec<LIFNeuron>, time_step_us: u32) -> Result<Self> {
         if !(1..=usize::from(u16::MAX)).contains(&neurons.len()) {
             return Err(Error::NeuronCountOutOfRange);
         }
         if time_step_us == 0 {
             return Err(Error::ZeroTimeStep);
+        }
+        if !membranes_move(&neurons, time_step_us) {
+            return Err(Error::FrozenMembrane);
         }
         let resolution = neurons[0].voltage_resolution;
         if neurons.iter().any(|n| n.voltage_resolution != resolution) {
@@ -1179,6 +1191,16 @@ fn layer_sizes_fit(layers: &[u16], neuron_count: usize) -> bool {
         && layers.iter().map(|&size| usize::from(size)).sum::<usize>() == neuron_count
 }
 
+/// The membrane rule: at the time step every neuron's `dt_over_tau` is at
+/// least 1, so its membrane moves, a time constant neither 0 nor above
+/// 1,000 time steps. Its one home: `new` and `from_neurons` refuse neurons
+/// that break it.
+fn membranes_move(neurons: &[LIFNeuron], time_step_us: u32) -> bool {
+    neurons
+        .iter()
+        .all(|n| dt_over_tau(time_step_us, n.tau_membrane_us) > 0)
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::shadow_unrelated)]
@@ -1194,6 +1216,10 @@ mod tests {
         assert_eq!(err.err(), Some(Error::NeuronCountOutOfRange));
     }
 
+    /// A zero step breaks two rules, since it freezes every membrane, and
+    /// `Error` promises no order between them. This test pins
+    /// `ZeroTimeStep`, today's order, on purpose: only the name shows that
+    /// `new`'s zero-step check ran.
     #[test]
     fn zero_time_step_rejected() {
         let err = SpikingNeuralNetwork::new(10, 0, NetworkTopology::default());
@@ -1225,6 +1251,10 @@ mod tests {
     }
 
     /// `from_neurons` refuses an empty list and a zero step, each by name.
+    /// A zero step also freezes every membrane, and `Error` promises no
+    /// order between two broken rules: the test pins `ZeroTimeStep`,
+    /// today's order, on purpose, since only the name shows that the
+    /// zero-step check ran.
     #[test]
     fn from_neurons_refuses_by_rule() {
         assert_eq!(
@@ -1268,6 +1298,64 @@ mod tests {
         for grid in [Millivolt, CentiMillivolt] {
             let net = SpikingNeuralNetwork::from_neurons(on(&[grid; 3]), 1000).expect("one grid");
             assert_eq!(net.voltage_resolution, grid);
+        }
+    }
+
+    /// `new` refuses a step its neurons' membranes cannot move at: under
+    /// 20 μs with an excitatory neuron (τ = 20 ms), under 10 μs with an
+    /// inhibitory one (τ = 10 ms). One neuron at the default ratio is
+    /// inhibitory, and a `Balanced` ratio of 0 makes every neuron
+    /// inhibitory, of 1 excitatory. Before round 64 each built, its
+    /// membranes frozen.
+    #[test]
+    fn new_refuses_a_step_its_membranes_cannot_move_at() {
+        let mixed = NetworkTopology::default();
+        let inhibitory = NetworkTopology::Balanced {
+            excitatory_ratio: 0.0,
+        };
+        let excitatory = NetworkTopology::Balanced {
+            excitatory_ratio: 1.0,
+        };
+        for (n, topology, moves_from_us) in [
+            (10, mixed, 20),
+            (1, mixed, 10),
+            (10, inhibitory, 10),
+            (10, excitatory, 20),
+        ] {
+            for dt in [1, 9, 10, 19, 20, 1000] {
+                assert_eq!(
+                    SpikingNeuralNetwork::new(n, dt, topology).err(),
+                    (dt < moves_from_us).then_some(Error::FrozenMembrane),
+                    "{n} neurons, {topology:?}, {dt} μs"
+                );
+            }
+        }
+    }
+
+    /// `from_neurons` refuses a neuron whose membrane cannot move at the
+    /// step, a time constant of 0 or above 1,000 steps, at each place of
+    /// three; 1,000 steps exactly moves (`dt_over_tau` is 1). The other
+    /// two neurons' time constant is one step.
+    #[test]
+    fn from_neurons_refuses_a_membrane_that_cannot_move() {
+        for dt in [1u32, 1000, u32::MAX] {
+            let longest = u64::from(dt) * 1000;
+            let taus = [0, 1, longest, longest + 1, u64::from(u32::MAX)];
+            for tau in taus.into_iter().filter_map(|tau| u32::try_from(tau).ok()) {
+                for at in 0..3u16 {
+                    let neurons = (0..3u16)
+                        .map(|id| {
+                            LIFNeuron::new(id).with_tau_membrane_us(if id == at { tau } else { dt })
+                        })
+                        .collect();
+                    let moves = tau != 0 && u64::from(tau) <= longest;
+                    assert_eq!(
+                        SpikingNeuralNetwork::from_neurons(neurons, dt).err(),
+                        (!moves).then_some(Error::FrozenMembrane),
+                        "{dt} μs, a time constant of {tau} μs at {at}"
+                    );
+                }
+            }
         }
     }
 
