@@ -612,9 +612,9 @@ pub fn tix(t: Trit) -> usize {
 /// Build the substrate network from a trit matrix (row-major N×N, weight
 /// col→row: pre = column j, post = row i — matvec dataflow, recorded).
 /// Full-minus-diagonal: 512×511 = 261,632 synapses, added pre-major
-/// (sorted) then finalized through the public external-wiring path
-/// (session D-2's substrate addition — the reverse CSR the LTP pass
-/// needs). Verbatim from `hybrid_gate.rs`.
+/// (sorted); the first step sorts the CSR and builds the reverse CSR the
+/// LTP pass needs. From `hybrid_gate.rs`, less its `finalize_synapses`
+/// call: since round 64 that method is crate-private and the step sorts.
 ///
 /// # Panics
 ///
@@ -645,7 +645,6 @@ pub fn build_from_trits(
             }
         }
     }
-    net.finalize_synapses();
     net
 }
 

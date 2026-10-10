@@ -11,8 +11,8 @@
 //! spike and no target.
 //!
 //! On the host, `FixedNetwork::try_from(&net)` converts a plasticity-off
-//! `SpikingNeuralNetwork` of the same size whose CSR delivers its
-//! synapses, and the two step alike, bit for bit: the tests below pin it
+//! `SpikingNeuralNetwork` of the same size, and the two step alike, bit
+//! for bit: the tests below pin it
 //! on the network of `chain-3` (`tests/traces/cases.rs`), and
 //! `tests/traces.rs` on every plasticity-off trace.
 //!
@@ -56,16 +56,9 @@ pub struct FixedSynapse {
 impl FixedSynapse {
     /// The synapses of `net` by `pre`, ascending, and within one `pre` in
     /// the order they were added: a stable sort of
-    /// [`SpikingNeuralNetwork::synapses`] by `pre`, the order the counting
-    /// sort of [`SpikingNeuralNetwork::finalize_synapses`] gives the CSR.
-    ///
-    /// That is the order `net`'s own step delivers them in exactly when
-    /// its CSR delivers each synapse under its own `pre`, in the order
-    /// added — see `FixedNetwork::try_from` § Errors. On a network
-    /// where it does not, this list is the sorted one, the std step
-    /// reads the stale CSR, and the two can part. Returning a `Vec`,
-    /// this cannot refuse such a network; `FixedNetwork::try_from`
-    /// does, and is the way to convert one.
+    /// [`SpikingNeuralNetwork::synapses`] by `pre`, the order `net`'s own
+    /// step delivers them in, from the CSR it sorts first when a synapse
+    /// came in since the last sort ([`SpikingNeuralNetwork::step`]).
     ///
     /// Each pulse is the std step's own expression, `weight / divisor as
     /// i16`, exact for every divisor the setter takes, 1 to 32,767.
@@ -94,8 +87,8 @@ impl FixedSynapse {
 ///
 /// Built by [`new`](Self::new) from any arrays, or on the host by
 /// `FixedNetwork::try_from(&net)` from a plasticity-off
-/// `SpikingNeuralNetwork` of the same size whose CSR agrees with its
-/// synapse list — exactly what that conversion refuses is its § Errors.
+/// `SpikingNeuralNetwork` of the same size: what that conversion refuses
+/// is its § Errors.
 #[derive(Debug, Clone)]
 pub struct FixedNetwork<const N: usize, const S: usize> {
     neurons: [LIFNeuron; N],
@@ -238,14 +231,7 @@ impl<const N: usize, const S: usize> TryFrom<&SpikingNeuralNetwork> for FixedNet
     /// [`Error::PlasticityEnabled`] when `net` has plasticity enabled (a
     /// fixed network has none); [`Error::NeuronCountMismatch`] when it has
     /// not exactly `N` neurons, and [`Error::SynapseCountMismatch`] when it
-    /// has not exactly `S` synapses; [`Error::StaleCsr`] when its CSR does
-    /// not deliver each synapse under its own `pre`, in the order added. A
-    /// caller gets a stale CSR, for example, by adding edges out of `pre`
-    /// order with no `finalize_synapses` after them, or by finalizing such
-    /// edges a second time (`finalize_synapses` is not idempotent, and
-    /// `build_topology` already finalizes). That network steps through a
-    /// stale CSR, delivering a pulse under another synapse's edge, and this
-    /// one, always sorted, can part from it in silence.
+    /// has not exactly `S` synapses.
     ///
     /// A network starts with plasticity off, and only a build with the
     /// `unstable-stdp` feature can turn it on: without the feature the
@@ -259,9 +245,6 @@ impl<const N: usize, const S: usize> TryFrom<&SpikingNeuralNetwork> for FixedNet
         }
         if usize::try_from(net.synapse_count()) != Ok(S) {
             return Err(Error::SynapseCountMismatch);
-        }
-        if !net.csr_delivers_its_synapses() {
-            return Err(Error::StaleCsr);
         }
         // The two counts again, as the arrays take them. The neurons'
         // cannot differ: a network holds at most 65,535, so `neuron_count`
@@ -541,97 +524,24 @@ mod tests {
         );
     }
 
-    /// `try_from` refuses a network whose CSR does not deliver its
-    /// synapses. One way to lose that property: the same chain-3, its two
-    /// edges added out of `pre` order and never finalized. Its std step
-    /// then reads slot 0 for neuron 0, which holds the 1→2 edge, and this
-    /// pair does part — the fields at step 5, the spike lists at step 6.
-    /// One `finalize_synapses` and the two are the same network again,
-    /// for 100 steps.
+    /// `try_from` converts a network whose edges were added out of `pre`
+    /// order and never sorted, and the two step alike: the std network's
+    /// first step sorts its CSR into the order `from_network` lists. The
+    /// same chain-3, its two edges added `1→2` then `0→1`. Before round 64
+    /// that std step read slot 0 for neuron 0, which held the `1→2` edge,
+    /// and `try_from` refused the network.
     #[cfg(feature = "std")]
     #[test]
-    fn try_from_refuses_a_stale_csr() {
+    fn try_from_converts_edges_added_out_of_pre_order() {
         let mut net = chain_3();
         net.add_synapse(1, 2, 5_000).expect("ids in range");
         net.add_synapse(0, 1, 5_000).expect("ids in range");
-
-        assert_eq!(
-            FixedNetwork::<3, 2>::try_from(&net).err(),
-            Some(Error::StaleCsr),
-            "the edges were added out of pre order and never finalized"
-        );
-
-        net.finalize_synapses();
         let mut fixed =
-            FixedNetwork::<3, 2>::try_from(&net).expect("finalized: 3 neurons, 2 synapses");
+            FixedNetwork::<3, 2>::try_from(&net).expect("never sorted: 3 neurons, 2 synapses");
         let counts = steps_alike(&mut net, &mut fixed);
         assert!(
             counts.iter().all(|&n| n > 0),
             "all three fire, 1 and 2 through the chain: {counts:?}"
-        );
-    }
-
-    /// The order clause of `csr_delivers_its_synapses`, the half of that
-    /// method no test reached until now (round 42 left it open): a CSR
-    /// that holds every synapse under its own `pre` and one `pre`'s two
-    /// slots in the wrong ORDER.
-    ///
-    /// The witness, on four default neurons: `add(3→2, 100)`,
-    /// `add(2→3, 200)`, finalize, `add(2→3, 300)`, finalize, finalize.
-    /// `finalize` is not idempotent, and the last two walk a list whose
-    /// order they no longer match, so pre 2 ends up holding its own two
-    /// synapses newest first. The mirror below is what makes that a
-    /// measured fact of this test and not a claim of its comment: every
-    /// slot sits under its own `pre`, 3 of 3, so every other clause of
-    /// the method passes and the order clause alone refuses the network
-    /// — and `FixedNetwork::try_from`, which reads the method, refuses
-    /// it with them.
-    #[cfg(feature = "std")]
-    #[test]
-    fn slots_out_of_order_under_one_pre_are_refused() {
-        let edges: [(u16, u16, i16); 3] = [(3, 2, 100), (2, 3, 200), (2, 3, 300)];
-        let mut net =
-            SpikingNeuralNetwork::from_neurons((0..4).map(LIFNeuron::new).collect(), 1_000)
-                .expect("four neurons, 1 ms");
-        net.add_synapse(3, 2, 100).expect("ids in range");
-        net.add_synapse(2, 3, 200).expect("ids in range");
-        net.finalize_synapses();
-        net.add_synapse(2, 3, 300).expect("ids in range");
-        net.finalize_synapses();
-        net.finalize_synapses();
-
-        // The same calls on a bare matrix — `add_synapse` is `add` with
-        // the running synapse index, `finalize_synapses` is `finalize` —
-        // so the slots this witness produces are read, not assumed.
-        let mut csr = SparseSynapseMatrix::new(4, edges.len());
-        for (i, &(pre, post, weight)) in edges.iter().enumerate().take(2) {
-            csr.add(pre, post, weight, i);
-        }
-        csr.finalize();
-        csr.add(2, 3, 300, 2);
-        csr.finalize();
-        csr.finalize();
-        let slots: Vec<Vec<(u16, i16, usize)>> =
-            (0..4).map(|pre| csr.connections(pre).collect()).collect();
-        assert_eq!(
-            slots,
-            vec![
-                vec![],
-                vec![],
-                vec![(3, 300, 2), (3, 200, 1)],
-                vec![(2, 100, 0)],
-            ],
-            "every slot under its own pre, 3 of 3, and pre 2's two descending"
-        );
-
-        assert!(
-            !net.csr_delivers_its_synapses(),
-            "pre 2 delivers its own synapses, in the reverse of the order they were added"
-        );
-        assert_eq!(
-            FixedNetwork::<4, 3>::try_from(&net).err(),
-            Some(Error::StaleCsr),
-            "and try_from refuses the network for it"
         );
     }
 

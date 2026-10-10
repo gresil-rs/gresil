@@ -11,7 +11,7 @@
 pub struct NetworkStats {
     /// Total neuron count (fixed at construction).
     pub total_neurons: u16,
-    /// Total synapse count (set after `build_topology`).
+    /// Total synapse count: set by `build_topology` and by `add_synapse`.
     pub total_synapses: u32,
     /// Cumulative spikes emitted since construction or last `reset`.
     pub total_spikes: u64,

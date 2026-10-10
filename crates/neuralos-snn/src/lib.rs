@@ -63,6 +63,11 @@ pub enum Error {
     /// A time step of zero (`SpikingNeuralNetwork::new` and
     /// `from_neurons`).
     ZeroTimeStep,
+    /// A neuron whose membrane cannot move at the network's time step: a
+    /// membrane time constant of 0 or above 1,000 time steps, where
+    /// `dt_over_tau` truncates to 0 (`SpikingNeuralNetwork::new` and
+    /// `from_neurons`).
+    FrozenMembrane,
     /// A neuron id not below the network's neuron count
     /// (`SpikingNeuralNetwork::add_synapse`).
     NeuronIdOutOfRange,
@@ -90,9 +95,6 @@ pub enum Error {
     /// A network whose synapse count is not the [`FixedNetwork`]'s `S`
     /// (`FixedNetwork::try_from`).
     SynapseCountMismatch,
-    /// A network whose CSR does not deliver each synapse under its own
-    /// `pre`, in the order added (`FixedNetwork::try_from`).
-    StaleCsr,
     /// Neurons on more than one voltage grid: a network keeps one
     /// (`SpikingNeuralNetwork::from_neurons`, and `trace::header` as a
     /// guard).
@@ -108,6 +110,7 @@ impl core::fmt::Display for Error {
             Self::SelfConnection => "a synapse from a neuron to itself",
             Self::NeuronCountOutOfRange => "a neuron count outside 1 to 65,535",
             Self::ZeroTimeStep => "a time step of zero",
+            Self::FrozenMembrane => "a membrane time constant of 0 or above 1,000 time steps",
             Self::NeuronIdOutOfRange => "a neuron id not below the neuron count",
             Self::DivisorOutOfRange => "a synaptic input divisor outside 1 to 32,767",
             Self::BadLayerSizes => {
@@ -120,7 +123,6 @@ impl core::fmt::Display for Error {
             Self::PlasticityEnabled => "a network with plasticity enabled",
             Self::NeuronCountMismatch => "a neuron count other than the fixed network's N",
             Self::SynapseCountMismatch => "a synapse count other than the fixed network's S",
-            Self::StaleCsr => "a CSR that does not deliver the synapses in the order added",
             Self::MixedVoltageGrids => "neurons on more than one voltage grid",
             Self::BadCaseName => "a case name that is empty or outside [a-z0-9-]",
         })
@@ -162,6 +164,10 @@ mod tests {
             ),
             (Error::ZeroTimeStep, "a time step of zero"),
             (
+                Error::FrozenMembrane,
+                "a membrane time constant of 0 or above 1,000 time steps",
+            ),
+            (
                 Error::NeuronIdOutOfRange,
                 "a neuron id not below the neuron count",
             ),
@@ -194,10 +200,6 @@ mod tests {
                 "a synapse count other than the fixed network's S",
             ),
             (
-                Error::StaleCsr,
-                "a CSR that does not deliver the synapses in the order added",
-            ),
-            (
                 Error::MixedVoltageGrids,
                 "neurons on more than one voltage grid",
             ),
@@ -213,6 +215,7 @@ mod tests {
                 Error::SelfConnection
                 | Error::NeuronCountOutOfRange
                 | Error::ZeroTimeStep
+                | Error::FrozenMembrane
                 | Error::NeuronIdOutOfRange
                 | Error::DivisorOutOfRange
                 | Error::BadLayerSizes
@@ -221,7 +224,6 @@ mod tests {
                 | Error::PlasticityEnabled
                 | Error::NeuronCountMismatch
                 | Error::SynapseCountMismatch
-                | Error::StaleCsr
                 | Error::MixedVoltageGrids
                 | Error::BadCaseName => assert_eq!(error.to_string(), text),
             }

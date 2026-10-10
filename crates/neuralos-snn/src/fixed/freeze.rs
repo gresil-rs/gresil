@@ -74,11 +74,8 @@ pub fn preamble() -> &'static str {
 /// # Panics
 ///
 /// On what a frozen file cannot hold, each message naming the case:
-/// plasticity on, since a `FixedNetwork` has none; a CSR that no longer
-/// delivers each synapse under its own `pre` (edges added out of `pre`
-/// order and not finalized since, or finalized twice), which
-/// `FixedNetwork::try_from` refuses too; a clock that is not at 0,
-/// since the file starts at 0 and writes no state; neurons on two
+/// plasticity on, since a `FixedNetwork` has none; a clock that is not
+/// at 0, since the file starts at 0 and writes no state; neurons on two
 /// grids, which no public constructor builds (`from_neurons` refuses
 /// them), and a `case` that is empty or holds anything but lowercase
 /// ASCII letters, digits and `-`, both of which the header line
@@ -101,11 +98,6 @@ pub fn module(
     assert!(
         !net.plasticity_enabled(),
         "{case}: plasticity is on, and a FixedNetwork has none"
-    );
-    assert!(
-        net.csr_delivers_its_synapses(),
-        "{case}: the CSR does not deliver each synapse under its own pre (edges added \
-         out of pre order and not finalized since, or finalized twice)"
     );
     assert_eq!(
         net.current_time_us(),
@@ -393,24 +385,43 @@ mod tests {
         let _ = module(&net, "two", Kind::Regression, 3, Rows::All, &silent());
     }
 
-    /// Edges added out of `pre` order and never finalized, as
-    /// `FixedNetwork::try_from`'s own test builds them.
+    /// Edges added out of `pre` order and never sorted, as
+    /// `FixedNetwork::try_from`'s own test adds them, freeze as sorted
+    /// ones: the module lists the synapses as `FixedSynapse::from_network`
+    /// does, the order the network's first step delivers them in. Before
+    /// round 64 the freezer refused the network.
     #[test]
-    #[should_panic(expected = "stale: the CSR does not deliver")]
-    fn a_stale_csr_is_refused() {
-        let neurons = (0..3)
-            .map(|id| quiet(id, VoltageResolution::CentiMillivolt))
-            .collect();
-        let mut net = SpikingNeuralNetwork::from_neurons(neurons, 1_000).expect("neurons given");
-        net.add_synapse(1, 2, 5_000).expect("ids in range");
-        net.add_synapse(0, 1, 5_000).expect("ids in range");
-        let _ = module(
-            &net,
-            "stale",
-            Kind::Regression,
-            1,
-            Rows::All,
-            &[(1, vec![0, 0, 0])],
+    fn edges_out_of_pre_order_freeze_as_sorted() {
+        let wired = |sorted: bool| {
+            let neurons = (0..3)
+                .map(|id| quiet(id, VoltageResolution::CentiMillivolt))
+                .collect();
+            let mut net =
+                SpikingNeuralNetwork::from_neurons(neurons, 1_000).expect("neurons given");
+            net.add_synapse(1, 2, 5_000).expect("ids in range");
+            net.add_synapse(0, 1, 5_000).expect("ids in range");
+            if sorted {
+                net.finalize_synapses();
+            }
+            net
+        };
+        let frozen = |net: &SpikingNeuralNetwork| {
+            module(
+                net,
+                "out-of-order",
+                Kind::Regression,
+                1,
+                Rows::All,
+                &[(1, vec![0, 0, 0])],
+            )
+        };
+        let text = frozen(&wired(false));
+        assert_eq!(text, frozen(&wired(true)), "sorted or not, one module");
+        assert!(
+            text.contains(
+                "        FixedSynapse::new(0, 1, 500),\n        FixedSynapse::new(1, 2, 500),\n"
+            ),
+            "by pre: {text}"
         );
     }
 
