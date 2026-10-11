@@ -255,7 +255,7 @@ fn the_reference_vector_matches_the_neuron_model() {
             case.name
         );
         let n = &net.neurons()[0];
-        assert_eq!(n.noise_amplitude_ua, 0, "{}: no noise term", case.name);
+        assert_eq!(n.noise_amplitude_pa, 0, "{}: no noise term", case.name);
         assert_eq!(n.threshold, i16::MAX, "{}: no spike term", case.name);
         assert_eq!(net.synapse_count(), 0, "{}: no synaptic term", case.name);
 

@@ -137,7 +137,7 @@ fn ck_slice<T: PartialEq + core::fmt::Debug>(name: &str, got: &[T], want: &[T]) 
 
 fn quiet_neuron(id: u16, r: VoltageResolution) -> LIFNeuron {
     let mut n = LIFNeuron::new_with_type_resolution(id, NeuronType::Excitatory, r);
-    n.noise_amplitude_ua = 0;
+    n.noise_amplitude_pa = 0;
     n
 }
 
@@ -203,14 +203,14 @@ fn lif_checks() {
     let mut mv = quiet_neuron(12, VoltageResolution::Millivolt);
     mv.integrate_and_fire(12, 1000, 0);
     ck(
-        "lif::the_dead_zone_12ua_pair mV",
+        "lif::the_dead_zone_12pa_pair mV",
         mv.membrane_potential,
         -70,
     );
     let mut cmv = quiet_neuron(13, VoltageResolution::CentiMillivolt);
     cmv.integrate_and_fire(12, 1000, 0);
     ck(
-        "lif::the_dead_zone_12ua_pair centi",
+        "lif::the_dead_zone_12pa_pair centi",
         cmv.membrane_potential,
         -7_000 + 6,
     );
@@ -238,21 +238,21 @@ fn lif_checks() {
     );
 
     let mut n = quiet_neuron(21, VoltageResolution::Millivolt);
-    n.adaptation_current_ua = 3;
+    n.adaptation_current_pa = 3;
     n.decay_adaptation_current();
     ck(
         "lif::adaptation_decay 3->2",
-        n.adaptation_current_ua,
+        n.adaptation_current_pa,
         2,
     );
     n.decay_adaptation_current();
-    ck("lif::adaptation_decay 2->1", n.adaptation_current_ua, 1);
+    ck("lif::adaptation_decay 2->1", n.adaptation_current_pa, 1);
     n.decay_adaptation_current();
-    ck("lif::adaptation_decay 1->0", n.adaptation_current_ua, 0);
+    ck("lif::adaptation_decay 1->0", n.adaptation_current_pa, 0);
     n.decay_adaptation_current();
     ck(
         "lif::adaptation_decay floor 0",
-        n.adaptation_current_ua,
+        n.adaptation_current_pa,
         0,
     );
 
@@ -262,7 +262,7 @@ fn lif_checks() {
     ck_bool("lif::spike_adds_two_quanta spiked", spiked);
     ck(
         "lif::spike_adds_two_quanta +2",
-        n.adaptation_current_ua,
+        n.adaptation_current_pa,
         2,
     );
 
@@ -297,14 +297,14 @@ fn lif_checks() {
     n.add_synaptic_current(12);
     n.integrate_and_fire(300, 1000, 101);
     ck(
-        "lif::rectification +12ua ratchets",
+        "lif::rectification +12pa ratchets",
         n.membrane_potential,
         -58,
     );
     n.add_synaptic_current(-12);
     n.integrate_and_fire(300, 1000, 102);
     ck(
-        "lif::rectification -12ua absorbed",
+        "lif::rectification -12pa absorbed",
         n.membrane_potential,
         -58,
     );
@@ -978,10 +978,10 @@ fn spike_raster() {
         }
     }
     let labels = [
-        "n0 mV  +600uA",
-        "n1 mV  +300uA",
-        "n2 cmV +300uA (same drive as n1, finer ruler)",
-        "n3 cmV  +12uA",
+        "n0 mV  +600pA",
+        "n1 mV  +300pA",
+        "n2 cmV +300pA (same drive as n1, finer ruler)",
+        "n3 cmV  +12pA",
     ];
     for (i, row) in rows.iter().enumerate() {
         let mut line = [0_u8; 40];

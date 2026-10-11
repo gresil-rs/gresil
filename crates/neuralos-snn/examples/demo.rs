@@ -13,7 +13,7 @@ use neuralos_snn::{NetworkTopology, NeuronType, SpikingNeuralNetwork};
 const NEURON_COUNT: u16 = 50; // Smaller network = denser activity per neuron
 const TIMESTEP_US: u32 = 1000; // 1 ms per step
 const SIMULATION_STEPS: usize = 200; // 200 ms simulated
-const INPUT_CURRENT_UA: i16 = 800; // Strong drive — overcomes E/I balance
+const INPUT_CURRENT_PA: i16 = 800; // Strong drive — overcomes E/I balance
 const RASTER_STRIDE: usize = 2; // Show every 2nd step for density
 
 fn main() {
@@ -73,10 +73,10 @@ fn run_demo() {
 
     // --- Phase 3: Run simulation ---
     println!(
-        "┌─ Simulation: {} steps, {}μA input ────────────────────────┐",
-        SIMULATION_STEPS, INPUT_CURRENT_UA
+        "┌─ Simulation: {} steps, {}pA input ────────────────────────┐",
+        SIMULATION_STEPS, INPUT_CURRENT_PA
     );
-    let inputs = vec![INPUT_CURRENT_UA; NEURON_COUNT as usize];
+    let inputs = vec![INPUT_CURRENT_PA; NEURON_COUNT as usize];
 
     // Collect per-step data for visualization.
     let mut spikes_per_step: Vec<u32> = Vec::with_capacity(SIMULATION_STEPS);

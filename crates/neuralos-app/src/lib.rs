@@ -60,7 +60,7 @@ pub struct SimRunner {
     net: SpikingNeuralNetwork,
     /// Per-neuron spike color (E or I), precomputed once at construction.
     neuron_color: Vec<[u8; 4]>,
-    /// Reused input-current buffer (one μA value per neuron), avoiding per-tick alloc.
+    /// Reused input-current buffer (one pA value per neuron), avoiding per-tick alloc.
     inputs: Vec<i16>,
     /// Ring buffer: `RASTER_COLS` columns × `rows` rows, RGBA bytes, row-major.
     /// Column `head` is the oldest (next to be overwritten); `(head-1)` is newest.
@@ -154,14 +154,14 @@ impl SimRunner {
         self.net.plasticity_enabled()
     }
 
-    /// Advance the sim one step with a uniform input drive (μA). Writes the
+    /// Advance the sim one step with a uniform input drive (pA). Writes the
     /// resulting spike column into the raster ring at `head` and advances head.
     ///
     /// `step()` only errors on index/param violations that cannot occur in
     /// steady-state stepping (correctly-sized inputs, valid indices); any such
     /// error is swallowed as a no-spike frame rather than panicking the UI.
-    pub fn tick(&mut self, input_drive_ua: i16) {
-        self.inputs.fill(input_drive_ua);
+    pub fn tick(&mut self, input_drive_pa: i16) {
+        self.inputs.fill(input_drive_pa);
         let spikes = self.net.step(&self.inputs).unwrap_or_default();
 
         // Overwrite the oldest column with the new frame: background first,

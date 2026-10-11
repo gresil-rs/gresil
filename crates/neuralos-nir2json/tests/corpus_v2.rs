@@ -371,7 +371,7 @@ fn stranger_fallback_snntorch_two_layer_completes_full_path_sim_units() {
         [neuralos_snn::FixedSynapse {
             pre: 0,
             post: 1,
-            pulse_ua: 1_000
+            pulse_pa: 1_000
         }],
         "w 1.0 at true scale: 1,000 quanta a spike"
     );

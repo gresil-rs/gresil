@@ -62,7 +62,7 @@ impl Cases {
     }
 }
 
-/// 25 steps, a quarter of the neurons driven at 3,000 μA each step, chosen
+/// 25 steps, a quarter of the neurons driven at 3,000 pA each step, chosen
 /// by a fixed generator.
 fn drive(net: &mut SpikingNeuralNetwork) -> Result<(), Error> {
     let mut lcg: u32 = 12_345;

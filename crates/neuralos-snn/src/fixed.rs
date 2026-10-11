@@ -36,7 +36,7 @@ use crate::{Error, Result};
 #[cfg(all(feature = "std", feature = "unstable-freeze"))]
 pub mod freeze;
 
-/// One synapse of a [`FixedNetwork`]: a spike of `pre` adds `pulse_ua` to
+/// One synapse of a [`FixedNetwork`]: a spike of `pre` adds `pulse_pa` to
 /// the synaptic current of `post`, which `post`'s next step integrates.
 ///
 /// Six bytes, `Copy`. The pulse is the std network's per-spike
@@ -48,8 +48,8 @@ pub struct FixedSynapse {
     pub pre: u16,
     /// Postsynaptic neuron id: its synaptic current takes the pulse.
     pub post: u16,
-    /// The pulse, μA.
-    pub pulse_ua: i16,
+    /// The pulse, pA.
+    pub pulse_pa: i16,
 }
 
 #[cfg(feature = "std")]
@@ -73,7 +73,7 @@ impl FixedSynapse {
             .map(|s| Self {
                 pre: s.pre_neuron_id,
                 post: s.post_neuron_id,
-                pulse_ua: s.weight / divisor,
+                pulse_pa: s.weight / divisor,
             })
             .collect();
         // Stable: synapses of one `pre` keep the order they were added in.
@@ -133,13 +133,13 @@ impl<const N: usize, const S: usize> FixedNetwork<N, S> {
     ///
     /// let quiet = |id| {
     ///     let mut n = LIFNeuron::new(id);
-    ///     n.noise_amplitude_ua = 0;
+    ///     n.noise_amplitude_pa = 0;
     ///     n
     /// };
-    /// let synapse = [FixedSynapse { pre: 0, post: 1, pulse_ua: 400 }];
+    /// let synapse = [FixedSynapse { pre: 0, post: 1, pulse_pa: 400 }];
     /// let mut fired = [false; 2];
     ///
-    /// // `pre` fires at step 0 (3,000 μA: +15 mV, onto the threshold).
+    /// // `pre` fires at step 0 (3,000 pA: +15 mV, onto the threshold).
     /// let mut net = FixedNetwork::new([quiet(0), quiet(1)], synapse, 1_000);
     /// net.step(&[3_000, 0], &mut fired);
     /// assert_eq!(fired, [true, false]);
@@ -152,9 +152,9 @@ impl<const N: usize, const S: usize> FixedNetwork<N, S> {
     /// post.refractory_time_us = 2_000;
     /// let mut net = FixedNetwork::new([quiet(0), post], synapse, 1_000);
     /// net.step(&[3_000, 0], &mut fired);
-    /// assert_eq!(net.neurons()[1].synaptic_current_ua, 400); // delivered
+    /// assert_eq!(net.neurons()[1].synaptic_current_pa, 400); // delivered
     /// net.step(&[0, 0], &mut fired); // not read, then cleared
-    /// assert_eq!(net.neurons()[1].synaptic_current_ua, 0);
+    /// assert_eq!(net.neurons()[1].synaptic_current_pa, 0);
     /// assert_eq!(net.neurons()[1].refractory_time_us, 0);
     /// net.step(&[0, 0], &mut fired); // integrates, and nothing is left
     /// assert_eq!(net.neurons()[1].membrane_potential, -70);
@@ -167,8 +167,8 @@ impl<const N: usize, const S: usize> FixedNetwork<N, S> {
         // (`LIFNeuron::integrate_and_fire` § Semantics item 1).
         #[allow(clippy::cast_possible_truncation)]
         let now_us = self.time_us as u32;
-        for ((n, &current_ua), spiked) in self.neurons.iter_mut().zip(input).zip(fired.iter_mut()) {
-            *spiked = n.integrate_and_fire(current_ua, self.dt_us, now_us);
+        for ((n, &current_pa), spiked) in self.neurons.iter_mut().zip(input).zip(fired.iter_mut()) {
+            *spiked = n.integrate_and_fire(current_pa, self.dt_us, now_us);
         }
         for n in &mut self.neurons {
             n.clear_synaptic_current();
@@ -176,7 +176,7 @@ impl<const N: usize, const S: usize> FixedNetwork<N, S> {
         for s in &self.synapses {
             if fired.get(usize::from(s.pre)) == Some(&true) {
                 if let Some(post) = self.neurons.get_mut(usize::from(s.post)) {
-                    post.add_synaptic_current(s.pulse_ua);
+                    post.add_synaptic_current(s.pulse_pa);
                 }
             }
         }
@@ -272,7 +272,7 @@ impl<const N: usize, const S: usize> TryFrom<&SpikingNeuralNetwork> for FixedNet
 // earlier renumbers the blocks after it and relays the firmware's
 // `.text` with no code change (measured, ISA round 43).
 impl FixedSynapse {
-    /// A synapse from its three values: a spike of `pre` adds `pulse_ua`
+    /// A synapse from its three values: a spike of `pre` adds `pulse_pa`
     /// to the synaptic current of `post`.
     ///
     /// `const`, and not `std`: a frozen network's synapse array is a
@@ -286,14 +286,14 @@ impl FixedSynapse {
     /// use neuralos_snn::FixedSynapse;
     ///
     /// let s = FixedSynapse::new(0, 1, 400);
-    /// assert_eq!((s.pre, s.post, s.pulse_ua), (0, 1, 400));
+    /// assert_eq!((s.pre, s.post, s.pulse_pa), (0, 1, 400));
     /// ```
     #[must_use]
-    pub const fn new(pre: u16, post: u16, pulse_ua: i16) -> Self {
+    pub const fn new(pre: u16, post: u16, pulse_pa: i16) -> Self {
         Self {
             pre,
             post,
-            pulse_ua,
+            pulse_pa,
         }
     }
 }
@@ -309,7 +309,7 @@ mod tests {
     /// An excitatory neuron on the mV grid, no noise.
     fn quiet(id: u16) -> LIFNeuron {
         let mut n = LIFNeuron::new(id);
-        n.noise_amplitude_ua = 0;
+        n.noise_amplitude_pa = 0;
         n
     }
 
@@ -321,8 +321,8 @@ mod tests {
             n.refractory_time_us,
             n.last_update_time_us,
             n.last_spike_time_us,
-            n.synaptic_current_ua,
-            n.adaptation_current_ua,
+            n.synaptic_current_pa,
+            n.adaptation_current_pa,
         )
     }
 
@@ -359,7 +359,7 @@ mod tests {
                 NeuronType::Excitatory,
                 VoltageResolution::CentiMillivolt,
             );
-            n.noise_amplitude_ua = 5;
+            n.noise_amplitude_pa = 5;
             n
         };
         let run = |start_us: u64| {
@@ -387,7 +387,7 @@ mod tests {
     }
 
     /// Saturating adds do not commute, so the array order is the delivery
-    /// order, sorted or not. Neurons 1 and 2 fire at step 0 on 3,000 μA
+    /// order, sorted or not. Neurons 1 and 2 fire at step 0 on 3,000 pA
     /// (+15 mV, from rest to the −55 mV threshold) and pulse neuron 0,
     /// which is quiet: −30,000, then +30,000 twice, ends at 30,000. By
     /// `pre`, the two +30,000 would come first, saturate at 32,767, and end
@@ -400,17 +400,17 @@ mod tests {
                 FixedSynapse {
                     pre: 2,
                     post: 0,
-                    pulse_ua: -30_000,
+                    pulse_pa: -30_000,
                 },
                 FixedSynapse {
                     pre: 1,
                     post: 0,
-                    pulse_ua: 30_000,
+                    pulse_pa: 30_000,
                 },
                 FixedSynapse {
                     pre: 1,
                     post: 0,
-                    pulse_ua: 30_000,
+                    pulse_pa: 30_000,
                 },
             ],
             1_000,
@@ -418,7 +418,7 @@ mod tests {
         let mut fired = [false; 3];
         net.step(&[0, 3_000, 3_000], &mut fired);
         assert_eq!(fired, [false, true, true]);
-        assert_eq!(net.neurons()[0].synaptic_current_ua, 30_000);
+        assert_eq!(net.neurons()[0].synaptic_current_pa, 30_000);
     }
 
     /// Total: an id past the arrays is no spike and no target, and the step
@@ -431,12 +431,12 @@ mod tests {
                 FixedSynapse {
                     pre: 0,
                     post: 9,
-                    pulse_ua: 500,
+                    pulse_pa: 500,
                 },
                 FixedSynapse {
                     pre: 7,
                     post: 1,
-                    pulse_ua: 500,
+                    pulse_pa: 500,
                 },
             ],
             1_000,
@@ -444,7 +444,7 @@ mod tests {
         let mut fired = [false; 2];
         net.step(&[3_000, 0], &mut fired);
         assert_eq!(fired, [true, false]);
-        assert_eq!(net.neurons()[1].synaptic_current_ua, 0);
+        assert_eq!(net.neurons()[1].synaptic_current_pa, 0);
         assert_eq!(net.time_us(), 1_000);
     }
 
@@ -459,7 +459,7 @@ mod tests {
                     NeuronType::Excitatory,
                     VoltageResolution::CentiMillivolt,
                 );
-                n.noise_amplitude_ua = 0;
+                n.noise_amplitude_pa = 0;
                 n
             })
             .collect();
@@ -470,7 +470,7 @@ mod tests {
     }
 
     /// The two networks side by side for 100 steps, neuron 0 driven at 600
-    /// μA: every spike, every field a step writes, and the time, at each
+    /// pA: every spike, every field a step writes, and the time, at each
     /// step. Returns how many times each neuron fired.
     #[cfg(feature = "std")]
     #[must_use]
@@ -505,7 +505,7 @@ mod tests {
     /// The fixed step against the std step on the network of `chain-3`
     /// (`tests/traces/cases.rs`): three excitatory neurons in a line,
     /// centi-mV, no noise, 5,000-weight edges at divisor 1, neuron 0 driven
-    /// at 600 μA. Every spike and every field a step writes, at each of the
+    /// at 600 pA. Every spike and every field a step writes, at each of the
     /// 100 steps, and all three neurons fire.
     #[cfg(feature = "std")]
     #[test]
@@ -589,7 +589,7 @@ mod tests {
                     .map(move |(post, weight, _)| FixedSynapse {
                         pre,
                         post,
-                        pulse_ua: weight / 3,
+                        pulse_pa: weight / 3,
                     })
             })
             .collect();
@@ -622,7 +622,7 @@ mod tests {
             .expect("the largest divisor");
         let pulses: Vec<i16> = FixedSynapse::from_network(&net)
             .iter()
-            .map(|s| s.pulse_ua)
+            .map(|s| s.pulse_pa)
             .collect();
         assert_eq!(pulses, [-1, 1]);
     }

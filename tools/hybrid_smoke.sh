@@ -23,6 +23,10 @@ MODEL=models/Ternary-Bonsai-4B-Q2_0.gguf
 LOOP_OUT=/tmp/opencode/r4-smoke-loop.gguf   # smoke artifact — never the banked file
 PINNED_EXPORT_SHA_PREFIX=24ffe5f3
 
+# Every log below lands here: made first, or tier 1's refusal check
+# reads a redirect that failed as the refusal and never runs the gate.
+mkdir -p /tmp/opencode
+
 echo "== tier 1: compile =="
 cargo build --release -p neuralos-rt --examples
 
@@ -39,7 +43,6 @@ if [ "${AUTO_SMOKE:-0}" != "1" ]; then
 fi
 
 [ -f "$MODEL" ] || { echo "FAIL: $MODEL absent"; exit 1; }
-mkdir -p /tmp/opencode
 
 echo "== tier 2: hybrid_gate — recorded verdict must reproduce =="
 ./target/release/examples/hybrid_gate | tee /tmp/opencode/smoke-gate.log

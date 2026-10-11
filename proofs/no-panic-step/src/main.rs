@@ -24,32 +24,32 @@ const SYNAPSES: [FixedSynapse; 6] = [
     FixedSynapse {
         pre: 0,
         post: 3,
-        pulse_ua: 100,
+        pulse_pa: 100,
     },
     FixedSynapse {
         pre: 1,
         post: 4,
-        pulse_ua: 100,
+        pulse_pa: 100,
     },
     FixedSynapse {
         pre: 2,
         post: 5,
-        pulse_ua: 100,
+        pulse_pa: 100,
     },
     FixedSynapse {
         pre: 3,
         post: 6,
-        pulse_ua: 100,
+        pulse_pa: 100,
     },
     FixedSynapse {
         pre: 4,
         post: 7,
-        pulse_ua: 100,
+        pulse_pa: 100,
     },
     FixedSynapse {
         pre: 5,
         post: 6,
-        pulse_ua: 100,
+        pulse_pa: 100,
     },
 ];
 

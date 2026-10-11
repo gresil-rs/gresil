@@ -109,7 +109,7 @@ fn main() {
         "ref     : neuromorphs/NIR @ {}",
         neuralos_snn::nir::NIR_REF_SHA
     );
-    println!("contract: EDGE_PULSE_QUANTA = {EDGE_PULSE_QUANTA} (20 uA pulse @ divisor 10)");
+    println!("contract: EDGE_PULSE_QUANTA = {EDGE_PULSE_QUANTA} (20 pA pulse @ divisor 10)");
     println!();
 
     // ---- gate 1: branch — every population fires, pins exact -------
@@ -145,10 +145,10 @@ fn main() {
     }
     let single = raster(&mut net, &enc, &[&[Thousandths(1_000); 2], &[]], 200);
     if single[0].1 != 0 {
-        fail("a single 81 uA branch must stall below the climb");
+        fail("a single 81 pA branch must stall below the climb");
     }
     if single[1].1 == 0 {
-        fail("the 327 uA control row must fire — the encoder is live");
+        fail("the 327 pA control row must fire — the encoder is live");
     }
     let g2 = NirImport::from_json(MERGE, centi()).unwrap();
     let (mut net2, enc2, _) = g2.build_network().unwrap();
@@ -156,7 +156,7 @@ fn main() {
     let both = raster(&mut net2, &enc2, &[&one, &one], 100);
     if both[0].0 != 52 {
         fail(&format!(
-            "summed 162 uA first spike must be step 52 (g: 1620->116 by g/20), got {}",
+            "summed 162 pA first spike must be step 52 (g: 1620->116 by g/20), got {}",
             both[0].0
         ));
     }
@@ -331,7 +331,7 @@ fn main() {
             NirImportOptions::default(),
             |e| {
                 matches!(e, NirError::UnsupportedTopology(m)
-                if m.contains("CentiMillivolt") && m.contains("~200 uA dead zone"))
+                if m.contains("CentiMillivolt") && m.contains("~200 pA dead zone"))
             },
         ),
     ];

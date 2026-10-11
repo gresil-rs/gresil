@@ -37,10 +37,10 @@
 //! The AVX2 kernel replaces `/1000` with `÷1024` — the standard fixed-point
 //! fast-division approximation, ~2.4% error (`1024/1000`). What makes that
 //! biologically irrelevant is the grid, not the noise floor: on the default mV
-//! grid a steady current below ~200 μA at rest moves the membrane by exactly
+//! grid a steady current below ~200 pA at rest moves the membrane by exactly
 //! zero forever ([`crate::lif_neuron`] § the dead zone), so a ≤2 mV
 //! approximation sits inside the grid's own blindness. The older phrasing here
-//! compared a millivolt error against the ±5 μA noise amplitude of a built
+//! compared a millivolt error against the ±5 pA noise amplitude of a built
 //! network's neurons, which are different units and not comparable. The scalar
 //! reference here uses exact `/1000`. The correctness test asserts the two
 //! agree within ±2 mV per neuron, not bit-exact.
@@ -54,8 +54,8 @@
 //! module passed. Across a stepped simulation it does not: the two halves drift
 //! apart until each is caught by the dead zone, and then they PARK IN DIFFERENT
 //! PLACES. Measured before the fix, N = 16, `resting = −70`, `resistance = 100`,
-//! `dt_over_tau = 50`, threshold unreachable, 10_000 steps: at 0 μA drive the
-//! halves agreed, at +200 μA they were 1 mV apart, and at −200 μA the scalar
+//! `dt_over_tau = 50`, threshold unreachable, 10_000 steps: at 0 pA drive the
+//! halves agreed, at +200 pA they were 1 mV apart, and at −200 pA the scalar
 //! parked at −71 mV against the AVX2 half at −90 mV. A 19 mV gap, wider than
 //! the 15 mV between rest and threshold — enough to decide whether a neuron
 //! ever fires.
@@ -69,7 +69,7 @@
 //! `|dt·(leak + P/1000)| < 1000` and the vector where
 //! `|dt·(leak + P/1024)| < 1024` — two different dead-zone intervals, offset by
 //! `|P/1000 − P/1024|`, which is ~2.4% of the current term and reaches 3 at the
-//! edge of the equivalence domain. Worked example, 1000 μA into 100 MΩ: the
+//! edge of the equivalence domain. Worked example, 1000 pA into 100 MΩ: the
 //! scalar's current term is 100 against the vector's 97, so the scalar parks
 //! anywhere in `mp ∈ (10, 50)` and lands on 11, the vector in `(6.5, 47.5)` and
 //! lands on 7. After the fix the worst gap is **8 mV**, both at the fixed point
@@ -308,8 +308,8 @@
 //! sample and never the true edge.)
 //!
 //! At the default 1 ms / 20 ms step (`dt_over_tau = 50`) and the default
-//! `resistance = 100` MΩ, the current bound admits `|input| ≤ 1000` μA, two
-//! orders of magnitude above the ±5 μA noise of a built network's neurons.
+//! `resistance = 100` MΩ, the current bound admits `|input| ≤ 1000` pA, two
+//! orders of magnitude above the ±5 pA noise of a built network's neurons.
 //!
 //! # Grid limitation — mV only
 //!
@@ -1357,7 +1357,7 @@ mod tests {
         // −56 and −55 straddle the edge the AVX2 half lands on when the scalar
         // reaches threshold exactly.
         const THRESHOLD: [i16; 7] = [-100, -70, -56, -55, -20, 0, 50];
-        // Offset from the leak-cancelling current, in μA. ±770 reaches the
+        // Offset from the leak-cancelling current, in pA. ±770 reaches the
         // extremal `input × resistance = -214_000`.
         const OFFSET: [i16; 11] = [-770, -400, -210, -80, -20, 0, 20, 80, 210, 400, 770];
         // The neuron default, in MΩ. Non-negative, so every row is a state a
@@ -1831,9 +1831,9 @@ mod tests {
                             n.threshold = i16::MAX; // unreachable: raw membrane, no reset
                             n.tau_membrane_us = tau_us;
                             n.resistance_mohm = resistance as u16;
-                            n.noise_amplitude_ua = 0;
-                            n.synaptic_current_ua = 0;
-                            n.adaptation_current_ua = 0;
+                            n.noise_amplitude_pa = 0;
+                            n.synaptic_current_pa = 0;
+                            n.adaptation_current_pa = 0;
                             n.refractory_time_us = 0;
                             let fired = n.integrate_and_fire(input, dt_us, 0);
                             assert!(!fired, "i16::MAX threshold must be unreachable");
@@ -1891,7 +1891,7 @@ mod tests {
     ///
     /// The two halves are deliberately NOT compared to each other here. The
     /// inputs are chosen so they still disagree by 1 mV after the rounding fix,
-    /// because that disagreement is the marker: `leak = 70` with 500 μA into
+    /// because that disagreement is the marker: `leak = 70` with 500 pA into
     /// 100 MΩ gives the scalar `current_term = 50`, `delta = +6`, `-64`, and
     /// the vector `current_term = 48` (50_000 ÷ 1024), `delta = +5`, `-65`. The
     /// gap is the ÷1024 scale, which the rounding fix does not close and is not
@@ -1959,7 +1959,7 @@ mod tests {
     /// This is the multi-step claim the single-step ±2 mV bound does not make.
     /// Before `div1024_toward_zero`, the vector half rounded every negative
     /// delta one unit further from zero than the scalar, which is invisible in
-    /// one step and decisive over many: at −200 μA drive the scalar parked at
+    /// one step and decisive over many: at −200 pA drive the scalar parked at
     /// −71 mV and the AVX2 half at −90 mV, a 19 mV gap against the 15 mV that
     /// separates rest from threshold.
     ///
@@ -2495,9 +2495,9 @@ mod tests {
                 n.threshold = i16::MAX; // unreachable: read the raw membrane
                 n.tau_membrane_us = tau;
                 n.resistance_mohm = resistance as u16;
-                n.noise_amplitude_ua = 0;
-                n.synaptic_current_ua = 0;
-                n.adaptation_current_ua = 0;
+                n.noise_amplitude_pa = 0;
+                n.synaptic_current_pa = 0;
+                n.adaptation_current_pa = 0;
                 n.refractory_time_us = 0;
                 let _ = n.integrate_and_fire(input, dt, 0);
                 n.membrane_potential
@@ -2548,7 +2548,7 @@ mod tests {
         n.resting_potential = -70;
         n.threshold = i16::MAX;
         n.tau_membrane_us = 20_000;
-        n.noise_amplitude_ua = 0;
+        n.noise_amplitude_pa = 0;
         let _ = n.integrate_and_fire(0, 40_000, 0);
         assert_eq!(n.membrane_potential, -40, "neuron: 2000 * 30 / 1000 = +60");
 
@@ -2627,9 +2627,9 @@ mod tests {
                 n.tau_membrane_us = tau_us;
                 n.resistance_mohm = resistance as u16;
                 // The four non-arithmetic differences, neutralised.
-                n.noise_amplitude_ua = 0;
-                n.synaptic_current_ua = 0;
-                n.adaptation_current_ua = 0;
+                n.noise_amplitude_pa = 0;
+                n.synaptic_current_pa = 0;
+                n.adaptation_current_pa = 0;
                 n.refractory_time_us = 0;
                 n
             };
@@ -2705,9 +2705,9 @@ mod tests {
                 clamped.resting_potential = rp;
                 clamped.threshold = i16::MAX;
                 clamped.resistance_mohm = resistance as u16;
-                clamped.noise_amplitude_ua = 0;
-                clamped.synaptic_current_ua = 0;
-                clamped.adaptation_current_ua = 0;
+                clamped.noise_amplitude_pa = 0;
+                clamped.synaptic_current_pa = 0;
+                clamped.adaptation_current_pa = 0;
                 clamped.refractory_time_us = 0;
                 // tau chosen so the exact factor IS the clamp bound.
                 clamped.tau_membrane_us = 1_000_000;

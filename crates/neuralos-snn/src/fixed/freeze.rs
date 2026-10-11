@@ -186,7 +186,7 @@ pub fn module(
         for s in &synapses {
             out.push_str(&format!(
                 "        FixedSynapse::new({}, {}, {}),\n",
-                s.pre, s.post, s.pulse_ua
+                s.pre, s.post, s.pulse_pa
             ));
         }
         out.push_str("    ];\n");
@@ -250,11 +250,11 @@ fn neuron_chain(case: &str, i: usize, n: &LIFNeuron) -> (String, LIFNeuron) {
         refractory_time_us,
         last_update_time_us,
         last_spike_time_us,
-        synaptic_current_ua,
+        synaptic_current_pa,
         capacitance_pf,
         resistance_mohm,
-        noise_amplitude_ua,
-        adaptation_current_ua,
+        noise_amplitude_pa,
+        adaptation_current_pa,
     } = n;
     // A frozen neuron is parameters, at rest: no state is written, so a
     // neuron carrying state would be frozen as another neuron in
@@ -274,8 +274,8 @@ fn neuron_chain(case: &str, i: usize, n: &LIFNeuron) -> (String, LIFNeuron) {
             && *refractory_time_us == 0
             && *last_update_time_us == 0
             && *last_spike_time_us == 0
-            && *synaptic_current_ua == 0
-            && *adaptation_current_ua == 0,
+            && *synaptic_current_pa == 0
+            && *adaptation_current_pa == 0,
         "{case}, neuron {i}: the freezer writes a neuron at rest, before the first step"
     );
     let mut text = format!(
@@ -304,7 +304,7 @@ fn neuron_chain(case: &str, i: usize, n: &LIFNeuron) -> (String, LIFNeuron) {
         with_tau_refractory_us => *tau_refractory_us,
         with_capacitance_pf => *capacitance_pf,
         with_resistance_mohm => *resistance_mohm,
-        with_noise_amplitude_ua => *noise_amplitude_ua,
+        with_noise_amplitude_pa => *noise_amplitude_pa,
     }
     (text, rebuilt)
 }
@@ -317,7 +317,7 @@ mod tests {
     /// A neuron at rest with no noise, on `grid`.
     fn quiet(id: u16, grid: VoltageResolution) -> LIFNeuron {
         let mut n = LIFNeuron::new_with_type_resolution(id, NeuronType::Excitatory, grid);
-        n.noise_amplitude_ua = 0;
+        n.noise_amplitude_pa = 0;
         n
     }
 

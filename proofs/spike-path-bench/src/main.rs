@@ -23,11 +23,11 @@ const STEPS: u32 = 10_000_000;
 const REPS: usize = 10;
 const DT_US: u32 = 1_000;
 
-fn run(arm: &str, input_ua: i16, force: bool) -> Vec<f64> {
+fn run(arm: &str, input_pa: i16, force: bool) -> Vec<f64> {
     let mut ns_per_step = Vec::with_capacity(REPS);
     for rep in 1..=REPS {
         let mut n = LIFNeuron::new(1);
-        n.noise_amplitude_ua = 0;
+        n.noise_amplitude_pa = 0;
         if force {
             n.threshold = neuralos_snn::lif_neuron::MEMBRANE_MV_MIN;
             n.tau_refractory_us = 0;
@@ -37,7 +37,7 @@ fn run(arm: &str, input_ua: i16, force: bool) -> Vec<f64> {
         let start = Instant::now();
         for _ in 0..STEPS {
             t = t.wrapping_add(DT_US);
-            spikes += u64::from(n.integrate_and_fire(black_box(input_ua), DT_US, t));
+            spikes += u64::from(n.integrate_and_fire(black_box(input_pa), DT_US, t));
         }
         let elapsed = start.elapsed();
         black_box(&n);
