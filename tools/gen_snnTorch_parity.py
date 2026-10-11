@@ -20,7 +20,8 @@ The set: the two-layer witness shape
 at five weight pairs, each one that a change of the bridge, taken out alone,
 turns red: (1.0, 1.0) the firing rule and the refractory period, (0.3, 1.0)
 the true scale of a drive, (0.05, 1.0) the voltage scale, (1.0, 0.3) the true
-scale of a spiking edge, (2.0, 1.0) the substrate's adaptation, a known miss;
+scale of a spiking edge, (2.0, 1.0) adaptation, which an import in simulation
+units turns off since NIR's LIF has none;
 (0.005, 0.1) at threshold 0.1, which spikes in float exactly as (0.05, 1.0)
 does and holds the voltage scale to the threshold, since its drive is weak;
 a 4 → 3 → 2 graph with fan-in, torch's own initialisation (seed 0) times

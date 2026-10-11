@@ -67,7 +67,7 @@ pub fn preamble() -> &'static str {
 /// `rows` name the trace, and `drive` is its run.
 ///
 /// No state is emitted: a frozen neuron is its parameters, at rest. The
-/// eight setters are written default or not, so a frozen file does not
+/// nine setters are written default or not, so a frozen file does not
 /// move when a default does — the per-type table and the per-grid
 /// scaling are what an old file would otherwise be silently rebound to.
 ///
@@ -145,7 +145,7 @@ pub fn module(
         // is what "the emitted list of setters is complete" means here.
         // It is not the tripwire a field added to `LIFNeuron` trips:
         // that one is `neuron_chain`'s destructure, and behind it
-        // `the_neuron_has_seventeen_fields`, whose neuron is a literal.
+        // `the_neuron_has_eighteen_fields`, whose neuron is a literal.
         // WHAT IT ALONE COVERS, since the test lines in `tests/traces.rs`
         // catch a missing setter in-tree too: the stranger path, where
         // no test line exists, and an earlier error, at regeneration.
@@ -226,10 +226,10 @@ pub fn tail(cases: &[&str]) -> String {
 /// right for every frozen file ever written. THIS DESTRUCTURE IS THE
 /// FIRST TRIPWIRE, and it is only as strong as its bindings' readers: a
 /// binding with no reader can be answered with `..` and the tripwire is
-/// gone. Every one of the seventeen has one — the eight parameters and
+/// gone. Every one of the eighteen has one — the nine parameters and
 /// the three constructor arguments below, the six state fields in the
 /// at-rest assert. The second tripwire does not come through here at
-/// all: it is `the_neuron_has_seventeen_fields`, whose neuron is a
+/// all: it is `the_neuron_has_eighteen_fields`, whose neuron is a
 /// `LIFNeuron { … }` literal, so a field added is the compiler's error
 /// there whatever this pattern says.
 ///
@@ -255,6 +255,7 @@ fn neuron_chain(case: &str, i: usize, n: &LIFNeuron) -> (String, LIFNeuron) {
         resistance_mohm,
         noise_amplitude_pa,
         adaptation_current_pa,
+        adaptation_enabled,
     } = n;
     // A frozen neuron is parameters, at rest: no state is written, so a
     // neuron carrying state would be frozen as another neuron in
@@ -305,6 +306,7 @@ fn neuron_chain(case: &str, i: usize, n: &LIFNeuron) -> (String, LIFNeuron) {
         with_capacitance_pf => *capacitance_pf,
         with_resistance_mohm => *resistance_mohm,
         with_noise_amplitude_pa => *noise_amplitude_pa,
+        with_adaptation_enabled => *adaptation_enabled,
     }
     (text, rebuilt)
 }

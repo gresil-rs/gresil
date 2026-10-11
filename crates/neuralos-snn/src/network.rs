@@ -473,10 +473,11 @@ impl SpikingNeuralNetwork {
         let mut firing_neurons: Vec<u16> = Vec::new();
 
         // Adaptation decay (adaptation ONLY — session F split). MUST run
-        // each step or adaptation accumulates (+2/spike) without bound and
-        // silences the network — a bug that previously made every sustained
-        // run self-quench after ~3 s. Position: pre-integration, phase-
-        // identical to the historical opening loop.
+        // each step or adaptation accumulates (+2/spike while a neuron's
+        // switch is on) without bound and silences the network — a bug
+        // that previously made every sustained run self-quench after ~3 s.
+        // Position: pre-integration, phase-identical to the historical
+        // opening loop.
         for n in &mut self.neurons {
             n.decay_adaptation_current();
         }

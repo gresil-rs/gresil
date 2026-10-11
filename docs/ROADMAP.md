@@ -144,9 +144,9 @@ records it names in `evidence/INDEX.md`. Four lines, in order:
    a connectivity or rewiring probability from 0 to 1, a step that sorts
    the synapses added since the last sort, with no public sort, a
    membrane the network's step can move, the current named in pA, one
-   neuron constructor that names its type and grid, and `LIFNeuron`'s
-   fields behind fourteen getters and the chain are in. Then the
-   rename, the front door, the stamp.
+   neuron constructor that names its type and grid, `LIFNeuron`'s
+   fields behind fifteen getters and the chain, and adaptation a switch
+   per neuron are in. Then the rename, the front door, the stamp.
 3. **0.1.0: the stamp.** The principal's call, once the fourteen checks
    of § 0.1.0 hold again at the final tree, after the rename.
 4. **After 0.1.0: the learning chapter** (`docs/VISION.md` § Realistic

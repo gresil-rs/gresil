@@ -433,8 +433,8 @@ fn inhibitory() -> Run {
 
 /// One excitatory neuron at 3,000 pA, centi-mV, no noise: a spike, two
 /// steps frozen at the reset potential (2 ms refractory at 1 ms steps),
-/// two steps of climb, a spike. The adaptation current (+2 pA per spike,
-/// −1 per step) is the slow drift in the climb.
+/// two steps of climb, a spike. The 2 pA of adaptation each spike adds
+/// decays to 0 in the two frozen steps, so every climb is the same.
 fn refractory() -> Run {
     let net = wired(
         vec![neuron(

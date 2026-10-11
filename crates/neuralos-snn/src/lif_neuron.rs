@@ -303,8 +303,12 @@ pub struct LIFNeuron {
     /// Noise amplitude (pA). `0` = silent, what `new` builds; the
     /// topology builders of `SpikingNeuralNetwork` write 5.
     pub(crate) noise_amplitude_pa: u8,
-    /// Spike-frequency adaptation current (pA). Decays between spikes, jumps on each spike.
+    /// Spike-frequency adaptation current (pA). Decays between spikes, jumps
+    /// on each spike while `adaptation_enabled` is on.
     pub(crate) adaptation_current_pa: i16,
+    /// Whether a spike adds to the adaptation current: on as `new` builds
+    /// it, off for a neuron imported in simulation units.
+    pub(crate) adaptation_enabled: bool,
 }
 
 impl LIFNeuron {
@@ -343,7 +347,7 @@ impl LIFNeuron {
     ///
     /// # The chain
     ///
-    /// This call is the head of the `with_*` chain: it and the eight
+    /// This call is the head of the `with_*` chain: it and the nine
     /// setters below are how a network is written as Rust source
     /// (`fixed::freeze`), so every one of them is
     /// `const`. What `const` costs, in one line: no formatted panic
@@ -389,6 +393,7 @@ impl LIFNeuron {
             resistance_mohm: 100,
             noise_amplitude_pa: 0,
             adaptation_current_pa: 0,
+            adaptation_enabled: true,
         }
     }
 
@@ -396,7 +401,7 @@ impl LIFNeuron {
     /// potential with it**: a neuron is built at rest.
     ///
     /// The one setter that touches two fields, which is why the order the
-    /// eight are called in cannot matter. A second such setter would end
+    /// nine are called in cannot matter. A second such setter would end
     /// that, and the order `fixed::freeze` emits them in would become
     /// load-bearing.
     ///
@@ -527,6 +532,35 @@ impl LIFNeuron {
         self
     }
 
+    /// Whether a spike adds 2 pA to the adaptation current; `new` builds it
+    /// on. NIR's LIF has no adaptation, and a neuron imported in simulation
+    /// units is built with it off. Turned off on a live neuron, it stops
+    /// what a spike adds; the current already there still decays
+    /// ([`decay_adaptation_current`](Self::decay_adaptation_current)).
+    ///
+    /// ```
+    /// use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
+    ///
+    /// let n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt)
+    ///     .with_threshold(-100); // every integrating step fires
+    /// assert!(n.adaptation_enabled());
+    /// let mut on = n.clone();
+    /// let mut off = n.with_adaptation_enabled(false);
+    /// assert!(!off.adaptation_enabled());
+    /// assert!(on.integrate_and_fire(0, 1_000, 0) && off.integrate_and_fire(0, 1_000, 0));
+    /// assert_eq!((on.adaptation_current_pa(), off.adaptation_current_pa()), (2, 0));
+    ///
+    /// // off on a live neuron: its 2 pA still decay
+    /// let mut late = on.with_adaptation_enabled(false);
+    /// late.decay_adaptation_current();
+    /// assert_eq!(late.adaptation_current_pa(), 1);
+    /// ```
+    #[must_use]
+    pub const fn with_adaptation_enabled(mut self, enabled: bool) -> Self {
+        self.adaptation_enabled = enabled;
+        self
+    }
+
     /// The neuron's id: its position in its network, and what seeds its noise.
     #[must_use]
     pub fn id(&self) -> u16 {
@@ -610,6 +644,13 @@ impl LIFNeuron {
     #[must_use]
     pub fn adaptation_current_pa(&self) -> i16 {
         self.adaptation_current_pa
+    }
+
+    /// Whether a spike adds to the adaptation current
+    /// ([`with_adaptation_enabled`](Self::with_adaptation_enabled)).
+    #[must_use]
+    pub fn adaptation_enabled(&self) -> bool {
+        self.adaptation_enabled
     }
 
     /// Integrate the membrane equation for one time step, return `true` if a spike fired.
@@ -705,8 +746,9 @@ impl LIFNeuron {
     ///    membrane goes to `reset_potential`, `refractory_remaining_us` to
     ///    `refractory_period_us`, `last_spike_time_us` to `current_time_us`
     ///    (`a_spike_stamps_its_time`), `adaptation_current_pa` gains 2 pA
-    ///    (saturating), and the step returns `true`. Nothing in this step
-    ///    decays the adaptation:
+    ///    (saturating) if `adaptation_enabled` is on
+    ///    (`adaptation_off_adds_nothing`), and the step returns `true`.
+    ///    Nothing in this step decays the adaptation:
     ///    [`decay_adaptation_current`](Self::decay_adaptation_current) is
     ///    the caller's, and both networks call it once per step. A neuron
     ///    stepped alone without it keeps 2 pA more per spike, forever.
@@ -907,8 +949,10 @@ impl LIFNeuron {
         self.membrane_potential = self.reset_potential;
         self.refractory_remaining_us = self.refractory_period_us;
         self.last_spike_time_us = current_time_us;
-        // Spike-frequency adaptation accumulates per spike.
-        self.adaptation_current_pa = self.adaptation_current_pa.saturating_add(2);
+        // Spike-frequency adaptation accumulates per spike, when it is on.
+        if self.adaptation_enabled {
+            self.adaptation_current_pa = self.adaptation_current_pa.saturating_add(2);
+        }
     }
 
     /// Accumulate synaptic current (pA). Saturating — never overflows.
@@ -926,8 +970,9 @@ impl LIFNeuron {
     /// Decay the spike-frequency adaptation current by 1 pA (linear).
     ///
     /// Called once per step by the network BEFORE integration — without it,
-    /// adaptation accumulates (+2/spike) unboundedly and silences the
-    /// network. Phase-identical to the historical opening-loop position.
+    /// adaptation accumulates (+2/spike while `adaptation_enabled` is on)
+    /// unboundedly and silences the network. Phase-identical to the
+    /// historical opening-loop position.
     ///
     /// (Session F split: the historical `decay_synaptic_current` also
     /// decayed the synaptic accumulator, but that half was structurally
@@ -1703,6 +1748,25 @@ mod tests {
         assert_eq!(n.last_spike_time_us, 5_000, "a silent step stamps nothing");
     }
 
+    /// The switch off: a spike adds nothing to the adaptation current,
+    /// the decay finds nothing to take, and `reset` leaves the switch, a
+    /// parameter, as it was. On, a spike adds 2 and `reset` leaves it on
+    /// (the test below).
+    #[test]
+    fn adaptation_off_adds_nothing() {
+        let mut n = quiet_neuron(22, VoltageResolution::Millivolt).with_adaptation_enabled(false);
+        n.threshold = -100; // force a spike every integrating step
+        n.refractory_period_us = 0;
+        for t in 0..10 {
+            assert!(n.integrate_and_fire(1000, 1000, t * 1000));
+            assert_eq!(n.adaptation_current_pa, 0, "step {t}");
+        }
+        n.decay_adaptation_current();
+        assert_eq!(n.adaptation_current_pa, 0);
+        n.reset();
+        assert!(!n.adaptation_enabled);
+    }
+
     #[test]
     fn spike_adds_exactly_two_adaptation_quanta() {
         let mut n = quiet_neuron(22, VoltageResolution::Millivolt);
@@ -1710,6 +1774,8 @@ mod tests {
         let spiked = n.integrate_and_fire(1000, 1000, 0);
         assert!(spiked);
         assert_eq!(n.adaptation_current_pa, 2, "+2 per spike");
+        n.reset();
+        assert!(n.adaptation_enabled, "reset leaves the switch on");
     }
 
     // ----- The dt/tau formula, and the neuron's exactness over the whole domain -----
@@ -1879,11 +1945,11 @@ mod tests {
     /// says, so answering that pattern with a lazy `..` is no longer
     /// silent (that pattern, the first tripwire, is answerable that way
     /// and the traces, clippy and the size pin above all stay green:
-    /// `LIFNeuron` has three bytes of padding, and a `bool` or a `u16`
-    /// fits).
+    /// `LIFNeuron` has two bytes of padding, the adaptation switch having
+    /// taken one, and a `bool` or a `u16` still fits).
     ///
     /// TWO CHECKS, the literal first. The neuron below is built from a
-    /// `LIFNeuron { … }` literal naming all seventeen fields, so a field
+    /// `LIFNeuron { … }` literal naming all eighteen fields, so a field
     /// added or removed is `E0063` or `E0560` HERE, at the compiler,
     /// with the message below in front of whoever answers it. That is
     /// what the 31 literals of a frozen `frozen.rs` used to give and no
@@ -1910,9 +1976,9 @@ mod tests {
     /// literal above, which the compiler checks. The number can be edited,
     /// like any pin, with the same message in front of whoever edits it.
     ///
-    /// `17` has one home: this test.
+    /// `18` has one home: this test.
     #[test]
-    fn the_neuron_has_seventeen_fields() {
+    fn the_neuron_has_eighteen_fields() {
         // Arbitrary values, not the constructor's (doc above).
         let neuron = LIFNeuron {
             id: 9,
@@ -1932,6 +1998,7 @@ mod tests {
             resistance_mohm: 33,
             noise_amplitude_pa: 7,
             adaptation_current_pa: 6,
+            adaptation_enabled: false,
         };
         let pretty = format!("{neuron:#?}");
         let fields = pretty
@@ -1943,7 +2010,7 @@ mod tests {
             })
             .count();
         assert_eq!(
-            fields, 17,
+            fields, 18,
             "a field was added to or taken from LIFNeuron (and the literal above compiled, \
              so this count is the second word, not the first). Adding one is a decision in \
              `fixed::freeze` (`neuron_chain`'s destructure, and its doc): bind it there \

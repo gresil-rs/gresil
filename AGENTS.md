@@ -346,7 +346,8 @@ exist because careful per-session process still produced drift.
 ## Library behavior to know
 
 `SpikingNeuralNetwork::step()` calls `decay_adaptation_current` each
-step so the `adaptation_current` (which accumulates +2/spike) doesn't
+step so the `adaptation_current` (which accumulates +2/spike while the
+neuron's adaptation is on, as `LIFNeuron::new` builds it) doesn't
 grow unboundedly and silence the network. **If you add new per-step
 logic, preserve this decay** — and preserve the session-F step
 ordering: adaptation decay → integrate (reads last step's pulses) →

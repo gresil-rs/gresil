@@ -915,7 +915,7 @@ pub enum NirUnits {
     /// `v > v_threshold` (membranes are integers), and a threshold at
     /// the membrane's ceiling, which could then never fire, is refused
     /// ([`NirError::PotentialOutOfRange`]). The refractory period is 0,
-    /// since NIR's LIF has none.
+    /// and adaptation is off, since NIR's LIF has neither.
     Simulation,
 }
 
@@ -4713,8 +4713,9 @@ mod std_assembly {
     #[cfg(test)]
     mod sim_units_tests {
         //! `NirUnits::Simulation`: true-scale weights, NIR's firing rule,
-        //! no refractory, a direct edge at one unit a spike, and the
-        //! refusals. The graphs are what `--sim-units` writes at V 10:
+        //! no refractory, no adaptation, a direct edge at one unit a
+        //! spike, and the refusals. The graphs are what `--sim-units`
+        //! writes at V 10:
         //! τ 5 ms, r 50 → 500 MΩ, threshold 1.0 → 10 mV, leak and reset 0.
         use super::super::{
             nir_export, NirBuilder, NirError, NirImport, NirImportOptions, NirLifParams, NirUnits,
@@ -4771,6 +4772,25 @@ mod std_assembly {
 
         fn sim() -> NirImportOptions {
             NirImportOptions::sim_units(100)
+        }
+
+        /// NIR's LIF has no adaptation: a network imported in simulation
+        /// units builds every neuron with it off, a native one with it on,
+        /// as `LIFNeuron::new` builds it.
+        #[test]
+        fn simulation_units_build_neurons_without_adaptation() {
+            let native = NirImportOptions::new(100, VoltageResolution::CentiMillivolt);
+            for (opts, on) in [(sim(), false), (native, true)] {
+                let (net, _, _) = graph(opts, 1.0, Some(0.3), false)
+                    .build_network()
+                    .expect("builds");
+                assert_eq!(net.neurons().len(), 2);
+                assert!(
+                    net.neurons().iter().all(|n| n.adaptation_enabled() == on),
+                    "{:?}",
+                    opts.units
+                );
+            }
         }
 
         /// The units mark rides the export in simulation units only, one
@@ -5000,10 +5020,10 @@ mod std_assembly {
     /// `with_resting_potential`'s doctest.
     ///
     /// In simulation units the threshold is one quantum up, so the
-    /// substrate's `v ≥ threshold` fires on NIR's `v > v_threshold`, and
-    /// the refractory period is 0. The chain builder refuses simulation
-    /// units, so its inline block stays the native mapping this one is
-    /// compared with.
+    /// substrate's `v ≥ threshold` fires on NIR's `v > v_threshold`, the
+    /// refractory period is 0 and adaptation is off. The chain builder
+    /// refuses simulation units, so its inline block stays the native
+    /// mapping this one is compared with.
     fn substrate_neuron(id: u16, p: &NirLif, opts: NirImportOptions) -> LIFNeuron {
         // NIR's LIF has no refractory: 0 in simulation units, the
         // native minimum otherwise
@@ -5020,6 +5040,8 @@ mod std_assembly {
             .with_capacitance_pf(p.capacitance_pf)
             .with_resistance_mohm(p.resistance_mohm)
             .with_noise_amplitude_pa(0) // import is deterministic
+            // NIR's LIF has no adaptation: off in simulation units
+            .with_adaptation_enabled(matches!(opts.units, NirUnits::Native))
     }
 
     /// A weight at true scale in simulation units:
