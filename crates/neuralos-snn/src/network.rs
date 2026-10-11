@@ -326,7 +326,9 @@ impl SpikingNeuralNetwork {
     /// (it would discard the caller's wiring; the stored topology
     /// marker is inert here). The constructor path for imported
     /// models (NIR) whose neuron parameters are not the biological
-    /// defaults.
+    /// defaults. Each neuron is at rest, as `LIFNeuron::new` and the
+    /// `with_*` chain build it, and its id is its position, which indexes
+    /// it and seeds its noise.
     ///
     /// # Errors
     ///
@@ -337,7 +339,11 @@ impl SpikingNeuralNetwork {
     /// `time_step_us`, its `tau_membrane_us` 0 or above
     /// `1000 · time_step_us`; [`Error::MixedVoltageGrids`] unless every
     /// neuron is on one voltage grid, the one the network keeps for its
-    /// stats.
+    /// stats; [`Error::NeuronNotAtRest`] when a neuron carries state: its
+    /// membrane off its resting potential, refractory time left, a current
+    /// or a stamp ([`LIFNeuron::reset`] brings it back);
+    /// [`Error::NeuronIdMismatch`] unless each neuron's id is its position
+    /// in `neurons`.
     pub fn from_neurons(neurons: Vec<LIFNeuron>, time_step_us: u32) -> Result<Self> {
         if !(1..=usize::from(u16::MAX)).contains(&neurons.len()) {
             return Err(Error::NeuronCountOutOfRange);
@@ -351,6 +357,12 @@ impl SpikingNeuralNetwork {
         let resolution = neurons[0].voltage_resolution;
         if neurons.iter().any(|n| n.voltage_resolution != resolution) {
             return Err(Error::MixedVoltageGrids);
+        }
+        if !neurons.iter().all(at_rest) {
+            return Err(Error::NeuronNotAtRest);
+        }
+        if !ids_are_positions(&neurons) {
+            return Err(Error::NeuronIdMismatch);
         }
         let neuron_count = neurons.len() as u16; // exact: at most 65,535
         Ok(Self {
@@ -934,8 +946,9 @@ impl SpikingNeuralNetwork {
     }
 
     /// The neurons, writable, for the crate's own tests: the one way to a
-    /// network on two grids, which `from_neurons` refuses, so the guards
-    /// in `trace::header` and the freezer keep a test each.
+    /// network at clock 0 on two grids, with a neuron that is not at rest,
+    /// or with an id off its position, which `from_neurons` refuses, so the
+    /// guards in `trace::header` and the freezer keep a test each.
     #[cfg(test)]
     pub(crate) fn neurons_mut(&mut self) -> &mut [LIFNeuron] {
         &mut self.neurons
@@ -1201,6 +1214,27 @@ fn membranes_move(neurons: &[LIFNeuron], time_step_us: u32) -> bool {
         .all(|n| dt_over_tau(time_step_us, n.tau_membrane_us) > 0)
 }
 
+/// At rest: the six fields [`LIFNeuron::reset`] writes hold the values it
+/// writes, as `LIFNeuron::new` and the `with_*` chain build a neuron
+/// (`from_neurons`; the freezer writes only neurons at rest).
+fn at_rest(n: &LIFNeuron) -> bool {
+    n.membrane_potential == n.resting_potential
+        && n.refractory_remaining_us == 0
+        && n.last_update_time_us == 0
+        && n.last_spike_time_us == 0
+        && n.synaptic_current_pa == 0
+        && n.adaptation_current_pa == 0
+}
+
+/// Each neuron's id is its position: what indexes it and seeds its noise
+/// (`from_neurons`). Compared in `usize`, so no count of neurons wraps it.
+fn ids_are_positions(neurons: &[LIFNeuron]) -> bool {
+    neurons
+        .iter()
+        .enumerate()
+        .all(|(i, n)| usize::from(n.id) == i)
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::shadow_unrelated)]
@@ -1277,6 +1311,108 @@ mod tests {
             .err(),
             Some(Error::ZeroTimeStep)
         );
+    }
+
+    /// At rest means the six fields `reset` writes, each alone off its
+    /// value: not at rest; `reset` brings each back. The parameters are
+    /// not state: a neuron the chain rewrote is at rest, the membrane
+    /// moving with the resting potential.
+    #[test]
+    fn at_rest_reads_the_six_fields_reset_writes() {
+        let built = || LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
+        assert!(at_rest(&built()));
+        let off: [fn(&mut LIFNeuron); 6] = [
+            |n| n.membrane_potential -= 1,
+            |n| n.refractory_remaining_us = 1,
+            |n| n.last_update_time_us = 1,
+            |n| n.last_spike_time_us = 1,
+            |n| n.synaptic_current_pa = -1,
+            |n| n.adaptation_current_pa = 1,
+        ];
+        for (i, move_it) in off.iter().enumerate() {
+            let mut n = built();
+            move_it(&mut n);
+            assert!(!at_rest(&n), "state field {i}");
+            n.reset();
+            assert!(at_rest(&n), "state field {i}, after reset");
+        }
+        let chained = built()
+            .with_resting_potential(-60)
+            .with_threshold(-40)
+            .with_refractory_period_us(0)
+            .with_adaptation_enabled(false);
+        assert!(at_rest(&chained));
+    }
+
+    /// A neuron that is not at rest, at each place of three: stepped once
+    /// with a current, stepped once at a clock past 0, given a pulse, and
+    /// fired. Refused by name; the same neuron after `reset`, and a
+    /// neuron the chain rewrote, build.
+    #[test]
+    fn from_neurons_refuses_a_neuron_not_at_rest() {
+        let mv = |id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt);
+        let stage: [fn(&mut LIFNeuron); 4] = [
+            |n| {
+                n.integrate_and_fire(600, 1000, 0);
+            },
+            |n| {
+                n.integrate_and_fire(0, 1000, 5000);
+            },
+            |n| n.add_synaptic_current(100),
+            |n| {
+                *n = n.clone().with_threshold(-100);
+                assert!(n.integrate_and_fire(0, 1000, 0));
+            },
+        ];
+        for (s, staged) in stage.iter().enumerate() {
+            for at in 0..3u16 {
+                let mut neurons: Vec<LIFNeuron> = (0..3).map(mv).collect();
+                staged(&mut neurons[usize::from(at)]);
+                assert_eq!(
+                    SpikingNeuralNetwork::from_neurons(neurons.clone(), 1000).err(),
+                    Some(Error::NeuronNotAtRest),
+                    "stage {s} at {at}"
+                );
+                neurons[usize::from(at)].reset();
+                assert!(
+                    SpikingNeuralNetwork::from_neurons(neurons, 1000).is_ok(),
+                    "stage {s} at {at}, after reset"
+                );
+            }
+        }
+        let chained = vec![mv(0).with_resting_potential(-60), mv(1)];
+        assert!(SpikingNeuralNetwork::from_neurons(chained, 1000).is_ok());
+    }
+
+    /// An id off its position: two swapped, every order of three but the
+    /// one in place, a gap and a repeat. In place, it builds.
+    #[test]
+    fn from_neurons_refuses_an_id_off_its_position() {
+        let with_ids = |ids: &[u16]| -> Vec<LIFNeuron> {
+            ids.iter()
+                .map(|&id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+                .collect()
+        };
+        for ids in [
+            &[1, 0][..],
+            &[0, 2, 1],
+            &[1, 0, 2],
+            &[1, 2, 0],
+            &[2, 0, 1],
+            &[2, 1, 0],
+            &[0, 1, 3],
+            &[0, 0, 1],
+            &[1],
+        ] {
+            assert_eq!(
+                SpikingNeuralNetwork::from_neurons(with_ids(ids), 1000).err(),
+                Some(Error::NeuronIdMismatch),
+                "{ids:?}"
+            );
+        }
+        for ids in [&[0][..], &[0, 1, 2]] {
+            assert!(SpikingNeuralNetwork::from_neurons(with_ids(ids), 1000).is_ok());
+        }
     }
 
     /// One grid per network: two grids in either order, and the odd one

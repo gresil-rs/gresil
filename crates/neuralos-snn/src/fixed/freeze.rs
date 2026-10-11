@@ -83,9 +83,10 @@ pub fn preamble() -> &'static str {
 /// a neuron that is not at rest (the assert in `neuron_chain` carries
 /// the reasons it cannot fire on the stranger path); and a neuron whose
 /// `id` is not its position, since the id is what a `FixedNetwork`
-/// indexes it by and what seeds its noise. And when the chain written
-/// for a neuron does not rebuild it, which is this module's own defect
-/// and not the caller's.
+/// indexes it by and what seeds its noise; `from_neurons` refuses both,
+/// so only a network the crate's own tests write reaches them. And when
+/// the chain written for a neuron does not rebuild it, which is this
+/// module's own defect and not the caller's.
 #[must_use]
 pub fn module(
     net: &SpikingNeuralNetwork,
@@ -268,8 +269,11 @@ fn neuron_chain(case: &str, i: usize, n: &LIFNeuron) -> (String, LIFNeuron) {
     // off the network's clock: a network stepped once at time 0 with
     // nothing moving passes this assert (`integrate_and_fire` writes
     // `last_update_time_us = current_time_us`, 0 at the first step), not
-    // the clock's. What this assert alone catches is a neuron handed to
-    // `from_neurons` carrying state, which a clock at 0 does not reveal.
+    // the clock's. A neuron handed to `from_neurons` carrying state, which
+    // a clock at 0 does not reveal, is refused there since round 65
+    // (`Error::NeuronNotAtRest`), so no public path reaches this assert;
+    // it reads its own bindings, the destructure's readers, and its test
+    // stages the case.
     assert!(
         membrane_potential == resting_potential
             && *refractory_remaining_us == 0
@@ -477,13 +481,17 @@ mod tests {
         );
     }
 
+    /// `from_neurons` refuses such a neuron, so the case is put in its
+    /// slot after.
     #[test]
     #[should_panic(expected = "restless, neuron 0: the freezer writes a neuron at rest")]
     fn a_neuron_carrying_state_is_refused() {
-        let mut restless = quiet(0, VoltageResolution::CentiMillivolt);
-        restless.membrane_potential += 1;
-        let neurons = vec![restless, quiet(1, VoltageResolution::CentiMillivolt)];
-        let net = SpikingNeuralNetwork::from_neurons(neurons, 1_000).expect("neurons given");
+        let neurons = vec![
+            quiet(0, VoltageResolution::CentiMillivolt),
+            quiet(1, VoltageResolution::CentiMillivolt),
+        ];
+        let mut net = SpikingNeuralNetwork::from_neurons(neurons, 1_000).expect("at rest");
+        net.neurons_mut()[0].membrane_potential += 1;
         let _ = module(
             &net,
             "restless",
@@ -494,14 +502,17 @@ mod tests {
         );
     }
 
+    /// `from_neurons` refuses such ids, so the two neurons swap places
+    /// after.
     #[test]
     #[should_panic(expected = "swapped, neuron 0: a neuron's id is its position")]
     fn an_id_off_its_position_is_refused() {
         let neurons = vec![
-            quiet(1, VoltageResolution::CentiMillivolt),
             quiet(0, VoltageResolution::CentiMillivolt),
+            quiet(1, VoltageResolution::CentiMillivolt),
         ];
-        let net = SpikingNeuralNetwork::from_neurons(neurons, 1_000).expect("neurons given");
+        let mut net = SpikingNeuralNetwork::from_neurons(neurons, 1_000).expect("in place");
+        net.neurons_mut().swap(0, 1);
         let _ = module(
             &net,
             "swapped",

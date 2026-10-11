@@ -336,11 +336,22 @@ fn section_b(cases: &mut Cases) {
                 (true, true) if n == 0 => {
                     Rule::Refused(&[Error::NeuronCountOutOfRange, Error::ZeroTimeStep])
                 }
+                // past 65,536 neurons a `u16` id wraps: off its position too,
+                // with a step or without
+                (true, true) if n > 65_536 => Rule::Refused(&[
+                    Error::NeuronCountOutOfRange,
+                    Error::ZeroTimeStep,
+                    Error::FrozenMembrane,
+                    Error::NeuronIdMismatch,
+                ]),
                 (true, true) => Rule::Refused(&[
                     Error::NeuronCountOutOfRange,
                     Error::ZeroTimeStep,
                     Error::FrozenMembrane,
                 ]),
+                (true, false) if n > 65_536 => {
+                    Rule::Refused(&[Error::NeuronCountOutOfRange, Error::NeuronIdMismatch])
+                }
                 (true, false) => Rule::Refused(&[Error::NeuronCountOutOfRange]),
                 (false, true) => Rule::Refused(&[Error::ZeroTimeStep, Error::FrozenMembrane]),
                 (false, false) => Rule::Builds,
@@ -384,6 +395,85 @@ fn section_b(cases: &mut Cases) {
                     net.step(&[3000; 3]).map(|_| ())
                 });
             }
+        }
+    }
+    // A neuron not at rest, by the public API, at each place of three; the
+    // same after `reset`, and a neuron the chain rewrote, are at rest.
+    // a name, whether the neuron is at rest after, how it is staged
+    type Stage = (&'static str, bool, fn(&mut LIFNeuron));
+    let stages: [Stage; 6] = [
+        ("stepped", false, |n| {
+            n.integrate_and_fire(600, 1000, 0);
+        }),
+        ("clocked", false, |n| {
+            n.integrate_and_fire(0, 1000, 5000);
+        }),
+        ("pulsed", false, |n| n.add_synaptic_current(-100)),
+        ("fired", false, |n| {
+            *n = n.clone().with_threshold(-100);
+            n.integrate_and_fire(0, 1000, 0);
+        }),
+        ("fired-reset", true, |n| {
+            *n = n.clone().with_threshold(-100);
+            n.integrate_and_fire(0, 1000, 0);
+            n.reset();
+        }),
+        ("chained", true, |n| {
+            *n = n.clone().with_resting_potential(-60)
+        }),
+    ];
+    for (name, at_rest, stage) in stages {
+        for at in 0..3usize {
+            let rule = if at_rest {
+                Rule::Builds
+            } else {
+                Rule::Refused(&[Error::NeuronNotAtRest])
+            };
+            cases.check(&format!("B/rest/{name}/at={at}"), rule, || {
+                let mut neurons: Vec<LIFNeuron> = (0..3)
+                    .map(|id| {
+                        LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt)
+                    })
+                    .collect();
+                stage(&mut neurons[at]);
+                let mut net = SpikingNeuralNetwork::from_neurons(neurons, 1000)?;
+                net.step(&[3000; 3]).map(|_| ())
+            });
+        }
+    }
+    // Ids: every order of three, a gap, a repeat; in place, it builds. A
+    // neuron off its position that is also not at rest: either name.
+    for ids in [
+        [0u16, 1, 2],
+        [0, 2, 1],
+        [1, 0, 2],
+        [1, 2, 0],
+        [2, 0, 1],
+        [2, 1, 0],
+        [0, 1, 3],
+        [0, 0, 1],
+    ] {
+        for stepped in [false, true] {
+            let in_place = ids.iter().zip(0u16..).all(|(&id, i)| id == i);
+            let rule = match (in_place, stepped) {
+                (true, false) => Rule::Builds,
+                (true, true) => Rule::Refused(&[Error::NeuronNotAtRest]),
+                (false, false) => Rule::Refused(&[Error::NeuronIdMismatch]),
+                (false, true) => Rule::Refused(&[Error::NeuronIdMismatch, Error::NeuronNotAtRest]),
+            };
+            cases.check(&format!("B/id/{ids:?}/stepped={stepped}"), rule, || {
+                let mut neurons: Vec<LIFNeuron> = ids
+                    .iter()
+                    .map(|&id| {
+                        LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt)
+                    })
+                    .collect();
+                if stepped {
+                    neurons[2].integrate_and_fire(600, 1000, 0);
+                }
+                let mut net = SpikingNeuralNetwork::from_neurons(neurons, 1000)?;
+                net.step(&[3000; 3]).map(|_| ())
+            });
         }
     }
     let grids = [
@@ -569,7 +659,7 @@ fn every_constructor_case_follows_its_rule() {
     section_f(&mut cases);
     section_g_refused(&mut cases);
     let plasticity = usize::from(cfg!(feature = "unstable-stdp"));
-    cases.assert_kept(1909 + 60 + 84 + 9 + 6 + plasticity + 12 + 5);
+    cases.assert_kept(1909 + 94 + 84 + 9 + 6 + plasticity + 12 + 5);
 }
 
 /// The cases at 65,535 neurons that build: two layer lists that sum to

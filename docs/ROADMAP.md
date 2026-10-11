@@ -145,8 +145,9 @@ records it names in `evidence/INDEX.md`. Four lines, in order:
    the synapses added since the last sort, with no public sort, a
    membrane the network's step can move, the current named in pA, one
    neuron constructor that names its type and grid, `LIFNeuron`'s
-   fields behind fifteen getters and the chain, and adaptation a switch
-   per neuron are in. Then the rename, the front door, the stamp.
+   fields behind fifteen getters and the chain, adaptation a switch per
+   neuron, and a neuron at rest in its place at `from_neurons` are in.
+   Then the rename, the front door, the stamp.
 3. **0.1.0: the stamp.** The principal's call, once the fourteen checks
    of § 0.1.0 hold again at the final tree, after the rename.
 4. **After 0.1.0: the learning chapter** (`docs/VISION.md` § Realistic
