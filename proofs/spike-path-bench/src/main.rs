@@ -27,10 +27,10 @@ fn run(arm: &str, input_pa: i16, force: bool) -> Vec<f64> {
     let mut ns_per_step = Vec::with_capacity(REPS);
     for rep in 1..=REPS {
         let mut n = LIFNeuron::new(1, NeuronType::Excitatory, VoltageResolution::Millivolt);
-        n.noise_amplitude_pa = 0;
         if force {
-            n.threshold = neuralos_snn::lif_neuron::MEMBRANE_MV_MIN;
-            n.refractory_period_us = 0;
+            n = n
+                .with_threshold(neuralos_snn::lif_neuron::MEMBRANE_MV_MIN)
+                .with_refractory_period_us(0);
         }
         let mut t: u32 = 0;
         let mut spikes: u64 = 0;

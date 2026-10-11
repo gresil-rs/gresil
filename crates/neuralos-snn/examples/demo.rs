@@ -46,7 +46,7 @@ fn run_demo() {
     let exc_count = net
         .neurons()
         .iter()
-        .filter(|n| n.neuron_type == NeuronType::Excitatory)
+        .filter(|n| n.neuron_type() == NeuronType::Excitatory)
         .count();
     let inh_count = NEURON_COUNT as usize - exc_count;
     println!(

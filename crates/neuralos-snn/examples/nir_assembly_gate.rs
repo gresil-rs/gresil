@@ -179,12 +179,12 @@ fn main() {
             .iter()
             .any(|s| s.neuron_id == 0);
         if fired_a0 && moved_at.is_none() {
-            if net.neurons()[2].membrane_potential != -7_000 {
+            if net.neurons()[2].membrane_potential() != -7_000 {
                 fail("b0 unmoved on the spike step — the one-step delay is the contract");
             }
             moved_at = Some(t);
         } else if moved_at.is_some_and(|m| t == m + 1)
-            && net.neurons()[2].membrane_potential != -6_990
+            && net.neurons()[2].membrane_potential() != -6_990
         {
             fail("b0 must sit at exactly -6990 one step after a0's spike (+10 quanta)");
         }
@@ -192,7 +192,7 @@ fn main() {
     if moved_at.is_none() {
         fail("a0 must fire within 80 steps");
     }
-    if net.neurons()[3].membrane_potential != -7_000 {
+    if net.neurons()[3].membrane_potential() != -7_000 {
         fail("b1 unmoved — a1 never fires (identity element mapping)");
     }
     if !net.synapses().iter().all(|s| s.weight == EDGE_PULSE_QUANTA) {

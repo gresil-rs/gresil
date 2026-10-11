@@ -1,16 +1,17 @@
 //! Spike recorder: the bounded spike-timestamp history a caller keeps when
 //! it wants one.
 //!
-//! [`LIFNeuron`](crate::lif_neuron::LIFNeuron) keeps no history. It stamps
-//! `last_spike_time_us` and returns `true` from `integrate_and_fire` on a
-//! spike; a caller that wants the spike times records them:
+//! [`LIFNeuron`](crate::lif_neuron::LIFNeuron) keeps no history: it
+//! returns `true` from `integrate_and_fire` on a spike, and a caller that
+//! wants the spike times records them:
 //!
 //! ```
 //! use neuralos_snn::spike_recorder::SpikeRecorder;
 //! use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
 //!
-//! let mut n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
-//! n.threshold = -100; // the membrane floor: every integrating step fires
+//! // the membrane floor: every integrating step fires
+//! let mut n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt)
+//!     .with_threshold(-100);
 //! let mut rec = SpikeRecorder::new();
 //! for step in 0..4_u32 {
 //!     let t = step * 1_000;

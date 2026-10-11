@@ -120,6 +120,12 @@ recorded. `leg-a.log` and `leg-a-alpha8.log` keep `uA` as printed, and
 `leg-b.log`, which lists the suite by test name, keeps the test's old
 name as it ran. The "300 µA drive" of this section, above, is 300 pA.
 
+Since round 65 four checks reach their starting state through the
+public API, where the unit tests they cite write the fields: the leak
+from −90 and from −20 and the adaptation decay from 3, by the step and
+the chain, and the centi-mV floor from rest, where its test starts at
+−9,999. A comment at each says how; each keeps its name and its value.
+
 ## Leg B — user-mode, the REAL suite (the wire crosses)
 
 Full workspace test suite of the crate — NOT a subset — built static

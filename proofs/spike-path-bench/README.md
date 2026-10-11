@@ -29,6 +29,12 @@ name and is compared against the pinned log, never written over it
 (round 27's pair is `host-bench-r27-alpha6.log` and
 `host-bench-r27-alpha7.log`, commands in that evidence README).
 
+Since round 65 the source is written to the API from that round on:
+one constructor, the `with_*` chain, no field written. No tree before
+it compiles it, so an older arm runs its own commit's copy of this
+harness, as the evidence README's round-27 and round-33 rebuilds do (a
+worktree, or `git archive <sha> … proofs/spike-path-bench`).
+
 The committed `Cargo.lock` named the spine at alpha.6 for that run
 (alpha.7 since round 27, alpha.8 since round 33); in the alpha.5
 worktree cargo re-resolves the path dependency to alpha.5 (no

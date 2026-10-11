@@ -93,7 +93,7 @@ impl SimRunner {
         let neuron_color = net
             .neurons()
             .iter()
-            .map(|n| match n.neuron_type {
+            .map(|n| match n.neuron_type() {
                 NeuronType::Inhibitory => I_SPIKE,
                 // Excitatory, and a type this crate does not know, draw as excitatory.
                 _ => E_SPIKE,
@@ -300,6 +300,25 @@ mod tests {
             runner.net.synapse_count()
         );
         assert!(text.ends_with(&counts), "{text}");
+    }
+
+    /// Each neuron's spike color follows its type, read through
+    /// `neuron_type()`: an inhibitory neuron draws `I_SPIKE`, any other
+    /// `E_SPIKE`, and the balanced network has both.
+    #[test]
+    fn spike_color_follows_the_neuron_type() {
+        let r = SimRunner::new(80, 1000).expect("80 neurons valid");
+        let mut drawn = (0_usize, 0_usize);
+        for (n, color) in r.net.neurons().iter().zip(&r.neuron_color) {
+            if n.neuron_type() == NeuronType::Inhibitory {
+                assert_eq!(*color, I_SPIKE, "neuron {}", n.id());
+                drawn.1 += 1;
+            } else {
+                assert_eq!(*color, E_SPIKE, "neuron {}", n.id());
+                drawn.0 += 1;
+            }
+        }
+        assert!(drawn.0 > 0 && drawn.1 > 0, "both types drawn: {drawn:?}");
     }
 
     #[test]

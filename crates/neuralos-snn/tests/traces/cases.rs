@@ -159,7 +159,7 @@ pub fn render(case: &Case) -> String {
         let membranes: Vec<String> = net
             .neurons()
             .iter()
-            .map(|n| n.membrane_potential.to_string())
+            .map(|n| n.membrane_potential().to_string())
             .collect();
         out.push_str(&format!(
             "{step} {time_us} | {} | {}\n",
@@ -174,9 +174,7 @@ pub fn render(case: &Case) -> String {
 /// and `LIFNeuron::new` 0; a case that wants silence builds its neurons
 /// here and hands them to `from_neurons`.
 fn neuron(id: u16, kind: NeuronType, res: VoltageResolution, noise_pa: u8) -> LIFNeuron {
-    let mut n = LIFNeuron::new(id, kind, res);
-    n.noise_amplitude_pa = noise_pa;
-    n
+    LIFNeuron::new(id, kind, res).with_noise_amplitude_pa(noise_pa)
 }
 
 /// A network from given neurons and the given edges, which its first step
@@ -250,13 +248,13 @@ pub const CASES: &[Case] = &[
 /// steady state, the largest current to the ceiling, the smallest to the
 /// floor, then nothing, back toward rest.
 fn neuron_reference() -> Run {
-    let mut n = neuron(
+    let n = neuron(
         0,
         NeuronType::Excitatory,
         VoltageResolution::CentiMillivolt,
         0,
-    );
-    n.threshold = i16::MAX;
+    )
+    .with_threshold(i16::MAX);
     let net = wired(vec![n], &[]);
     Run {
         net,
@@ -496,8 +494,8 @@ fn plasticity_off() -> Run {
 /// truncation slows it), the smallest pins it at the −100 mV floor, and
 /// nothing again.
 fn saturation_floor_ceiling() -> Run {
-    let mut n = neuron(0, NeuronType::Excitatory, VoltageResolution::Millivolt, 0);
-    n.threshold = i16::MAX;
+    let n =
+        neuron(0, NeuronType::Excitatory, VoltageResolution::Millivolt, 0).with_threshold(i16::MAX);
     let net = wired(vec![n], &[]);
     Run {
         net,

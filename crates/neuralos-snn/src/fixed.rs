@@ -131,11 +131,7 @@ impl<const N: usize, const S: usize> FixedNetwork<N, S> {
     /// ```
     /// use neuralos_snn::{FixedNetwork, FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
     ///
-    /// let quiet = |id| {
-    ///     let mut n = LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt);
-    ///     n.noise_amplitude_pa = 0;
-    ///     n
-    /// };
+    /// let quiet = |id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt);
     /// let synapse = [FixedSynapse { pre: 0, post: 1, pulse_pa: 400 }];
     /// let mut fired = [false; 2];
     ///
@@ -143,21 +139,21 @@ impl<const N: usize, const S: usize> FixedNetwork<N, S> {
     /// let mut net = FixedNetwork::new([quiet(0), quiet(1)], synapse, 1_000);
     /// net.step(&[3_000, 0], &mut fired);
     /// assert_eq!(fired, [true, false]);
-    /// assert_eq!(net.neurons()[1].membrane_potential, -70); // not yet
+    /// assert_eq!(net.neurons()[1].membrane_potential(), -70); // not yet
     /// net.step(&[0, 0], &mut fired);
-    /// assert_eq!(net.neurons()[1].membrane_potential, -68); // one step later
+    /// assert_eq!(net.neurons()[1].membrane_potential(), -68); // one step later
     ///
-    /// // The same, `post` refractory through step 1.
-    /// let mut post = quiet(1);
-    /// post.refractory_remaining_us = 2_000;
-    /// let mut net = FixedNetwork::new([quiet(0), post], synapse, 1_000);
-    /// net.step(&[3_000, 0], &mut fired);
-    /// assert_eq!(net.neurons()[1].synaptic_current_pa, 400); // delivered
+    /// // The same, `post` firing at step 0 too: refractory through step 2.
+    /// let mut net = FixedNetwork::new([quiet(0), quiet(1)], synapse, 1_000);
+    /// net.step(&[3_000, 3_000], &mut fired);
+    /// assert_eq!(fired, [true, true]);
+    /// assert_eq!(net.neurons()[1].synaptic_current_pa(), 400); // delivered
     /// net.step(&[0, 0], &mut fired); // not read, then cleared
-    /// assert_eq!(net.neurons()[1].synaptic_current_pa, 0);
-    /// assert_eq!(net.neurons()[1].refractory_remaining_us, 0);
-    /// net.step(&[0, 0], &mut fired); // integrates, and nothing is left
-    /// assert_eq!(net.neurons()[1].membrane_potential, -70);
+    /// assert_eq!(net.neurons()[1].synaptic_current_pa(), 0);
+    /// net.step(&[0, 0], &mut fired); // the period's last silent step
+    /// assert_eq!(net.neurons()[1].refractory_remaining_us(), 0);
+    /// net.step(&[0, 0], &mut fired); // integrates, and nothing is left:
+    /// assert_eq!(net.neurons()[1].membrane_potential(), -80); // read, -78
     /// ```
     pub fn step(&mut self, input: &[i16; N], fired: &mut [bool; N]) {
         for n in &mut self.neurons {

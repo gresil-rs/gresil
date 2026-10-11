@@ -136,9 +136,8 @@ fn ck_slice<T: PartialEq + core::fmt::Debug>(name: &str, got: &[T], want: &[T]) 
 }
 
 fn quiet_neuron(id: u16, r: VoltageResolution) -> LIFNeuron {
-    let mut n = LIFNeuron::new(id, NeuronType::Excitatory, r);
-    n.noise_amplitude_pa = 0;
-    n
+    // built silent: the constructor's noise amplitude is 0
+    LIFNeuron::new(id, NeuronType::Excitatory, r)
 }
 
 fn lin_sentinel() -> NirLinear {
@@ -190,13 +189,13 @@ fn lif_checks() {
     for (k, &want) in [-67, -65, -63, -61, -59, -57].iter().enumerate() {
         let spiked = n.integrate_and_fire(600, 1000, 0);
         ck_bool_s(name, TRACE_TAGS[k], !spiked);
-        cks_or(name, TRACE_TAGS[k], n.membrane_potential, want);
+        cks_or(name, TRACE_TAGS[k], n.membrane_potential(), want);
     }
     let spiked = n.integrate_and_fire(600, 1000, 0);
     ck_bool("lif::millivolt_trace step7 spikes", spiked);
     ck(
         "lif::millivolt_trace step7 reset",
-        n.membrane_potential,
+        n.membrane_potential(),
         -80,
     );
 
@@ -204,79 +203,92 @@ fn lif_checks() {
     mv.integrate_and_fire(12, 1000, 0);
     ck(
         "lif::the_dead_zone_12pa_pair mV",
-        mv.membrane_potential,
+        mv.membrane_potential(),
         -70,
     );
     let mut cmv = quiet_neuron(13, VoltageResolution::CentiMillivolt);
     cmv.integrate_and_fire(12, 1000, 0);
     ck(
         "lif::the_dead_zone_12pa_pair centi",
-        cmv.membrane_potential,
+        cmv.membrane_potential(),
         -7_000 + 6,
     );
 
+    // The unit test writes the two membranes; here the step stages them.
+    // At dt = tau the move is the current term, I·100/1000 mV: -200 pA
+    // from rest gives -90.
     let mut n = quiet_neuron(23, VoltageResolution::Millivolt);
-    n.membrane_potential = -90;
+    let _ = n.integrate_and_fire(-200, 20_000, 0);
     let _ = n.integrate_and_fire(0, 20_000, 20_000);
     ck(
         "lif::leak_convergence from below",
-        n.membrane_potential,
-        n.resting_potential,
+        n.membrane_potential(),
+        n.resting_potential(),
     );
-    n.membrane_potential = -20;
+    // +500 pA from rest gives -20, past the threshold: the chain lifts
+    // it out of reach for that one step and puts it back.
+    n = n.with_threshold(i16::MAX);
+    let _ = n.integrate_and_fire(500, 20_000, 30_000);
+    n = n.with_threshold(-55);
     let _ = n.integrate_and_fire(0, 20_000, 40_000);
     ck(
         "lif::leak_convergence from above",
-        n.membrane_potential,
-        n.resting_potential,
+        n.membrane_potential(),
+        n.resting_potential(),
     );
     let _ = n.integrate_and_fire(0, 20_000, 60_000);
     ck(
         "lif::leak_convergence stays at rest",
-        n.membrane_potential,
-        n.resting_potential,
+        n.membrane_potential(),
+        n.resting_potential(),
     );
 
-    let mut n = quiet_neuron(21, VoltageResolution::Millivolt);
-    n.adaptation_current_pa = 3;
+    // The unit test writes 3; here two spikes add 2 each and one decay
+    // takes 1.
+    let mut n = quiet_neuron(21, VoltageResolution::Millivolt)
+        .with_threshold(-100)
+        .with_refractory_period_us(0);
+    let _ = n.integrate_and_fire(0, 1000, 0);
+    let _ = n.integrate_and_fire(0, 1000, 1000);
+    n.decay_adaptation_current();
     n.decay_adaptation_current();
     ck(
         "lif::adaptation_decay 3->2",
-        n.adaptation_current_pa,
+        n.adaptation_current_pa(),
         2,
     );
     n.decay_adaptation_current();
-    ck("lif::adaptation_decay 2->1", n.adaptation_current_pa, 1);
+    ck("lif::adaptation_decay 2->1", n.adaptation_current_pa(), 1);
     n.decay_adaptation_current();
-    ck("lif::adaptation_decay 1->0", n.adaptation_current_pa, 0);
+    ck("lif::adaptation_decay 1->0", n.adaptation_current_pa(), 0);
     n.decay_adaptation_current();
     ck(
         "lif::adaptation_decay floor 0",
-        n.adaptation_current_pa,
+        n.adaptation_current_pa(),
         0,
     );
 
-    let mut n = quiet_neuron(22, VoltageResolution::Millivolt);
-    n.threshold = -100;
+    let mut n = quiet_neuron(22, VoltageResolution::Millivolt).with_threshold(-100);
     let spiked = n.integrate_and_fire(1000, 1000, 0);
     ck_bool("lif::spike_adds_two_quanta spiked", spiked);
     ck(
         "lif::spike_adds_two_quanta +2",
-        n.adaptation_current_pa,
+        n.adaptation_current_pa(),
         2,
     );
 
     let n = quiet_neuron(16, VoltageResolution::CentiMillivolt);
-    ck("lif::centi_mode membrane", n.membrane_potential, -7_000);
-    ck("lif::centi_mode resting", n.resting_potential, -7_000);
-    ck("lif::centi_mode threshold", n.threshold, -5_500);
-    ck("lif::centi_mode reset", n.reset_potential, -8_000);
+    ck("lif::centi_mode membrane", n.membrane_potential(), -7_000);
+    ck("lif::centi_mode resting", n.resting_potential(), -7_000);
+    ck("lif::centi_mode threshold", n.threshold(), -5_500);
+    ck("lif::centi_mode reset", n.reset_potential(), -8_000);
+    // The unit test starts at -9,999; from rest the same step reaches
+    // the floor too, -7,000 - 15,000 clamped to -10,000.
     let mut m = quiet_neuron(17, VoltageResolution::CentiMillivolt);
-    m.membrane_potential = -9_999;
     m.integrate_and_fire(-30_000, 1000, 0);
     ck_bool(
         "lif::centi_mode clamp at scaled floor",
-        m.membrane_potential >= -10_000,
+        m.membrane_potential() >= -10_000,
     );
 
     let mut n = quiet_neuron(18, VoltageResolution::Millivolt);
@@ -285,27 +297,27 @@ fn lif_checks() {
     }
     ck(
         "lif::rectification sticks at -59",
-        n.membrane_potential,
+        n.membrane_potential(),
         -59,
     );
     n.integrate_and_fire(300, 1000, 100);
     ck(
         "lif::rectification stays stuck",
-        n.membrane_potential,
+        n.membrane_potential(),
         -59,
     );
     n.add_synaptic_current(12);
     n.integrate_and_fire(300, 1000, 101);
     ck(
         "lif::rectification +12pa ratchets",
-        n.membrane_potential,
+        n.membrane_potential(),
         -58,
     );
     n.add_synaptic_current(-12);
     n.integrate_and_fire(300, 1000, 102);
     ck(
         "lif::rectification -12pa absorbed",
-        n.membrane_potential,
+        n.membrane_potential(),
         -58,
     );
 }
