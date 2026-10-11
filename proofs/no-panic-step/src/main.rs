@@ -54,7 +54,7 @@ const SYNAPSES: [FixedSynapse; 6] = [
 ];
 
 fn neuron(id: u16, kind: NeuronType) -> LIFNeuron {
-    LIFNeuron::new_with_type_resolution(id, kind, VoltageResolution::CentiMillivolt)
+    LIFNeuron::new(id, kind, VoltageResolution::CentiMillivolt)
 }
 
 #[unsafe(no_mangle)]

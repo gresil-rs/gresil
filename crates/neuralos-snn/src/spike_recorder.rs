@@ -7,9 +7,9 @@
 //!
 //! ```
 //! use neuralos_snn::spike_recorder::SpikeRecorder;
-//! use neuralos_snn::LIFNeuron;
+//! use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
 //!
-//! let mut n = LIFNeuron::new(0);
+//! let mut n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
 //! n.threshold = -100; // the membrane floor: every integrating step fires
 //! let mut rec = SpikeRecorder::new();
 //! for step in 0..4_u32 {
@@ -218,7 +218,7 @@ fn isqrt_u64(n: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lif_neuron::LIFNeuron;
+    use crate::lif_neuron::{LIFNeuron, NeuronType, VoltageResolution};
     use proptest::prelude::*;
 
     // ----- 2026-09-10: the ring replaced heapless::Vec. The oracle is the
@@ -357,7 +357,7 @@ mod tests {
         /// A neuron's recorded history never exceeds MAX_SPIKE_HISTORY.
         #[test]
         fn prop_history_never_exceeds_capacity(id in 0u16..=10) {
-            let mut n = LIFNeuron::new(id);
+            let mut n = LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt);
             let mut rec = SpikeRecorder::new();
             n.threshold = -100;
             for i in 0..1000_u32 {

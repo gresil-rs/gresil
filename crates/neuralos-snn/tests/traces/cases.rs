@@ -171,10 +171,10 @@ pub fn render(case: &Case) -> String {
 }
 
 /// A neuron with the noise set. A topology builder gives its neurons 5 pA
-/// and a neuron constructor 0; a case that wants silence builds its neurons
+/// and `LIFNeuron::new` 0; a case that wants silence builds its neurons
 /// here and hands them to `from_neurons`.
 fn neuron(id: u16, kind: NeuronType, res: VoltageResolution, noise_pa: u8) -> LIFNeuron {
-    let mut n = LIFNeuron::new_with_type_resolution(id, kind, res);
+    let mut n = LIFNeuron::new(id, kind, res);
     n.noise_amplitude_pa = noise_pa;
     n
 }
@@ -280,7 +280,7 @@ fn neuron_reference() -> Run {
 /// noise at 5, as before round 61, it was `0b78b456`).
 fn one_neuron_board() -> Run {
     let net = wired(
-        vec![LIFNeuron::new_with_type_resolution(
+        vec![LIFNeuron::new(
             0,
             NeuronType::Excitatory,
             VoltageResolution::CentiMillivolt,

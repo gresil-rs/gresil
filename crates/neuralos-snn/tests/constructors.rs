@@ -346,7 +346,15 @@ fn section_b(cases: &mut Cases) {
                 (false, false) => Rule::Builds,
             };
             cases.check(&format!("B/from/n={n}/dt={dt}"), rule, || {
-                let neurons = (0..n).map(|id| LIFNeuron::new(id as u16)).collect();
+                let neurons = (0..n)
+                    .map(|id| {
+                        LIFNeuron::new(
+                            id as u16,
+                            NeuronType::Excitatory,
+                            VoltageResolution::Millivolt,
+                        )
+                    })
+                    .collect();
                 let mut net = SpikingNeuralNetwork::from_neurons(neurons, dt)?;
                 let mut input = vec![0i16; n];
                 input[n - 1] = 3000;
@@ -368,7 +376,8 @@ fn section_b(cases: &mut Cases) {
                 cases.check(&format!("B/tau/dt={dt}/tau={tau}/at={at}"), rule, || {
                     let neurons = (0..3u16)
                         .map(|id| {
-                            LIFNeuron::new(id).with_tau_membrane_us(if id == at { tau } else { dt })
+                            LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt)
+                                .with_tau_membrane_us(if id == at { tau } else { dt })
                         })
                         .collect();
                     let mut net = SpikingNeuralNetwork::from_neurons(neurons, dt)?;
@@ -392,9 +401,7 @@ fn section_b(cases: &mut Cases) {
             cases.check(&format!("B/grid/{order:?}"), rule, || {
                 let neurons = (0u16..)
                     .zip(&order)
-                    .map(|(id, &grid)| {
-                        LIFNeuron::new_with_type_resolution(id, NeuronType::Excitatory, grid)
-                    })
+                    .map(|(id, &grid)| LIFNeuron::new(id, NeuronType::Excitatory, grid))
                     .collect();
                 let mut net = SpikingNeuralNetwork::from_neurons(neurons, 1000)?;
                 net.step(&[]).map(|_| ())
@@ -417,7 +424,11 @@ fn section_c(cases: &mut Cases) {
                 Rule::Builds
             };
             cases.check(&format!("C/div/d={d}/w={w}"), rule, || {
-                let neurons = (0..2).map(LIFNeuron::new).collect();
+                let neurons = (0..2)
+                    .map(|id| {
+                        LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt)
+                    })
+                    .collect();
                 let mut net = SpikingNeuralNetwork::from_neurons(neurons, 1000)?;
                 net.set_synaptic_input_divisor(d)?;
                 net.add_synapse(0, 1, w)?;
@@ -430,7 +441,9 @@ fn section_c(cases: &mut Cases) {
 
 /// Three neurons, wired.
 fn net3(edges: &[(u16, u16, i16)]) -> Result<SpikingNeuralNetwork, Error> {
-    let neurons = (0..3).map(LIFNeuron::new).collect();
+    let neurons = (0..3)
+        .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+        .collect();
     let mut net = SpikingNeuralNetwork::from_neurons(neurons, 1000)?;
     for &(pre, post, weight) in edges {
         net.add_synapse(pre, post, weight)?;

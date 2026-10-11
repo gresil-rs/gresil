@@ -246,8 +246,8 @@ fn neuron_chain(case: &str, i: usize, n: &LIFNeuron) -> (String, LIFNeuron) {
         reset_potential,
         voltage_resolution,
         tau_membrane_us,
-        tau_refractory_us,
-        refractory_time_us,
+        refractory_period_us,
+        refractory_remaining_us,
         last_update_time_us,
         last_spike_time_us,
         synaptic_current_pa,
@@ -271,7 +271,7 @@ fn neuron_chain(case: &str, i: usize, n: &LIFNeuron) -> (String, LIFNeuron) {
     // `from_neurons` carrying state, which a clock at 0 does not reveal.
     assert!(
         membrane_potential == resting_potential
-            && *refractory_time_us == 0
+            && *refractory_remaining_us == 0
             && *last_update_time_us == 0
             && *last_spike_time_us == 0
             && *synaptic_current_pa == 0
@@ -279,10 +279,10 @@ fn neuron_chain(case: &str, i: usize, n: &LIFNeuron) -> (String, LIFNeuron) {
         "{case}, neuron {i}: the freezer writes a neuron at rest, before the first step"
     );
     let mut text = format!(
-        "LIFNeuron::new_with_type_resolution({id}, NeuronType::{neuron_type:?}, \
+        "LIFNeuron::new({id}, NeuronType::{neuron_type:?}, \
          VoltageResolution::{voltage_resolution:?})"
     );
-    let mut rebuilt = LIFNeuron::new_with_type_resolution(*id, *neuron_type, *voltage_resolution);
+    let mut rebuilt = LIFNeuron::new(*id, *neuron_type, *voltage_resolution);
     // ONE LIST for the two halves. `stringify!` writes the setter's name
     // into the text and the same name is called on the rebuild, so a
     // renamed setter cannot part from the text it writes, and a setter
@@ -301,7 +301,7 @@ fn neuron_chain(case: &str, i: usize, n: &LIFNeuron) -> (String, LIFNeuron) {
         with_threshold => *threshold,
         with_reset_potential => *reset_potential,
         with_tau_membrane_us => *tau_membrane_us,
-        with_tau_refractory_us => *tau_refractory_us,
+        with_refractory_period_us => *refractory_period_us,
         with_capacitance_pf => *capacitance_pf,
         with_resistance_mohm => *resistance_mohm,
         with_noise_amplitude_pa => *noise_amplitude_pa,
@@ -316,7 +316,7 @@ mod tests {
 
     /// A neuron at rest with no noise, on `grid`.
     fn quiet(id: u16, grid: VoltageResolution) -> LIFNeuron {
-        let mut n = LIFNeuron::new_with_type_resolution(id, NeuronType::Excitatory, grid);
+        let mut n = LIFNeuron::new(id, NeuronType::Excitatory, grid);
         n.noise_amplitude_pa = 0;
         n
     }

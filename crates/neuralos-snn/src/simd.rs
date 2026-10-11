@@ -190,7 +190,7 @@
 //!   `reset_potential` when it fires. The batch's membrane is the pre-reset
 //!   value, and it writes no history and starts no refractory period.
 //! - **The refractory period.** `integrate_and_fire` skips integration entirely
-//!   while `refractory_time_us > 0`. The batch has no such state.
+//!   while `refractory_remaining_us > 0`. The batch has no such state.
 //! - **The resistance type.** `resistance_mohm` is `u16` on the neuron and
 //!   `resistance` is `&[i16]` here (§ The SoA seam). The batch accepts a
 //!   negative resistance no `LIFNeuron` can hold, and cannot hold the top half
@@ -854,7 +854,7 @@ mod tests {
     #![allow(clippy::shadow_unrelated)]
     #![allow(clippy::cast_precision_loss)] // test counters are tiny; usize→f64 is lossless in practice
     use super::*;
-    use crate::lif_neuron::{dt_over_tau, LIFNeuron, VoltageResolution};
+    use crate::lif_neuron::{dt_over_tau, LIFNeuron, NeuronType, VoltageResolution};
     use proptest::prelude::*;
 
     /// Equivalence-domain bound on `|input_current × resistance|` (module doc
@@ -1824,7 +1824,11 @@ mod tests {
                         for &(dt_us, tau_us) in
                             &[(1000u32, 20_000u32), (500, 20_000), (100, 10_000)]
                         {
-                            let mut n = LIFNeuron::new(0);
+                            let mut n = LIFNeuron::new(
+                                0,
+                                NeuronType::Excitatory,
+                                VoltageResolution::Millivolt,
+                            );
                             n.voltage_resolution = VoltageResolution::Millivolt;
                             n.membrane_potential = mp;
                             n.resting_potential = rp;
@@ -1834,7 +1838,7 @@ mod tests {
                             n.noise_amplitude_pa = 0;
                             n.synaptic_current_pa = 0;
                             n.adaptation_current_pa = 0;
-                            n.refractory_time_us = 0;
+                            n.refractory_remaining_us = 0;
                             let fired = n.integrate_and_fire(input, dt_us, 0);
                             assert!(!fired, "i16::MAX threshold must be unreachable");
 
@@ -2488,7 +2492,7 @@ mod tests {
             let exact = crate::lif_neuron::dt_over_tau(dt_us, tau_us);
 
             let neuron = |tau: u32, dt: u32| {
-                let mut n = LIFNeuron::new(0);
+                let mut n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
                 n.voltage_resolution = VoltageResolution::Millivolt;
                 n.membrane_potential = mp;
                 n.resting_potential = rp;
@@ -2498,7 +2502,7 @@ mod tests {
                 n.noise_amplitude_pa = 0;
                 n.synaptic_current_pa = 0;
                 n.adaptation_current_pa = 0;
-                n.refractory_time_us = 0;
+                n.refractory_remaining_us = 0;
                 let _ = n.integrate_and_fire(input, dt, 0);
                 n.membrane_potential
             };
@@ -2542,7 +2546,7 @@ mod tests {
         }
 
         // The witness, spelled out.
-        let mut n = LIFNeuron::new(0);
+        let mut n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
         n.voltage_resolution = VoltageResolution::Millivolt;
         n.membrane_potential = -100;
         n.resting_potential = -70;
@@ -2619,7 +2623,7 @@ mod tests {
                 .expect("tau_us <= 1e6 and dt_ratio <= 1e4, so dt_us <= 1e7");
 
             let fixture = |threshold: i16| {
-                let mut n = LIFNeuron::new(0);
+                let mut n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
                 n.voltage_resolution = VoltageResolution::Millivolt;
                 n.membrane_potential = mp;
                 n.resting_potential = rp;
@@ -2630,7 +2634,7 @@ mod tests {
                 n.noise_amplitude_pa = 0;
                 n.synaptic_current_pa = 0;
                 n.adaptation_current_pa = 0;
-                n.refractory_time_us = 0;
+                n.refractory_remaining_us = 0;
                 n
             };
 
@@ -2699,7 +2703,7 @@ mod tests {
                 // `the_batch_diverges_from_the_neuron_by_exactly_its_own_clamp`,
                 // every one of which keeps both halves strictly inside the
                 // grid. This arm widens the search; it does not hold the pin.
-                let mut clamped = LIFNeuron::new(0);
+                let mut clamped = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
                 clamped.voltage_resolution = VoltageResolution::Millivolt;
                 clamped.membrane_potential = mp;
                 clamped.resting_potential = rp;
@@ -2708,7 +2712,7 @@ mod tests {
                 clamped.noise_amplitude_pa = 0;
                 clamped.synaptic_current_pa = 0;
                 clamped.adaptation_current_pa = 0;
-                clamped.refractory_time_us = 0;
+                clamped.refractory_remaining_us = 0;
                 // tau chosen so the exact factor IS the clamp bound.
                 clamped.tau_membrane_us = 1_000_000;
                 let _ = clamped.integrate_and_fire(input, BOUND_STEP_US, 0);

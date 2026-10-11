@@ -356,9 +356,10 @@ sessions' findings; see the transmission tests in `network.rs`). There
 is also a `set_plasticity_enabled(bool)` toggle, behind the
 `unstable-stdp` feature: a network starts with plasticity OFF, feature
 or not, so a default build does not learn, and the visualizer's
-sustained-firing mode is that default. And an opt-in
-centi-mV `VoltageResolution` grid (default mV is bit-identical —
-pinned by tests).
+sustained-firing mode is that default. And two `VoltageResolution`
+grids: `SpikingNeuralNetwork::new` builds on mV, bit-identical to the
+record (pinned by tests), the centi-mV one is opt-in, and
+`LIFNeuron::new` takes its grid, with no default.
 
 ## Do not
 

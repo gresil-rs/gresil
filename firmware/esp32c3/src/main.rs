@@ -45,7 +45,7 @@
 //! the neuron fires a few times and goes silent for good (verified on the
 //! host: 6 spikes then dark on this grid and input).
 //!
-//! Grid and input: centi-millivolt grid, 160 pA. On the default millivolt
+//! Grid and input: centi-millivolt grid, 160 pA. On the millivolt
 //! grid 160 pA truncates to ΔV = 0 every step and the neuron never fires
 //! (`above_threshold_current_blind_on_mv_spikes_on_centi` in
 //! `lif_neuron.rs`); on the centi grid the same current fires, first spike
@@ -149,7 +149,7 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 esp_bootloader_esp_idf::esp_app_desc!();
 
 fn neuron(id: u16) -> LIFNeuron {
-    LIFNeuron::new_with_type_resolution(
+    LIFNeuron::new(
         id,
         NeuronType::Excitatory,
         VoltageResolution::CentiMillivolt,

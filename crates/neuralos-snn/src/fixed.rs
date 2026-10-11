@@ -129,10 +129,10 @@ impl<const N: usize, const S: usize> FixedNetwork<N, S> {
     /// nothing, and the clear drops the pulse: it is lost, not deferred.
     ///
     /// ```
-    /// use neuralos_snn::{FixedNetwork, FixedSynapse, LIFNeuron};
+    /// use neuralos_snn::{FixedNetwork, FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
     ///
     /// let quiet = |id| {
-    ///     let mut n = LIFNeuron::new(id);
+    ///     let mut n = LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt);
     ///     n.noise_amplitude_pa = 0;
     ///     n
     /// };
@@ -149,13 +149,13 @@ impl<const N: usize, const S: usize> FixedNetwork<N, S> {
     ///
     /// // The same, `post` refractory through step 1.
     /// let mut post = quiet(1);
-    /// post.refractory_time_us = 2_000;
+    /// post.refractory_remaining_us = 2_000;
     /// let mut net = FixedNetwork::new([quiet(0), post], synapse, 1_000);
     /// net.step(&[3_000, 0], &mut fired);
     /// assert_eq!(net.neurons()[1].synaptic_current_pa, 400); // delivered
     /// net.step(&[0, 0], &mut fired); // not read, then cleared
     /// assert_eq!(net.neurons()[1].synaptic_current_pa, 0);
-    /// assert_eq!(net.neurons()[1].refractory_time_us, 0);
+    /// assert_eq!(net.neurons()[1].refractory_remaining_us, 0);
     /// net.step(&[0, 0], &mut fired); // integrates, and nothing is left
     /// assert_eq!(net.neurons()[1].membrane_potential, -70);
     /// ```
@@ -308,7 +308,7 @@ mod tests {
 
     /// An excitatory neuron on the mV grid, no noise.
     fn quiet(id: u16) -> LIFNeuron {
-        let mut n = LIFNeuron::new(id);
+        let mut n = LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt);
         n.noise_amplitude_pa = 0;
         n
     }
@@ -318,7 +318,7 @@ mod tests {
     fn state(n: &LIFNeuron) -> (i16, u32, u32, u32, i16, i16) {
         (
             n.membrane_potential,
-            n.refractory_time_us,
+            n.refractory_remaining_us,
             n.last_update_time_us,
             n.last_spike_time_us,
             n.synaptic_current_pa,
@@ -354,7 +354,7 @@ mod tests {
     #[test]
     fn a_clock_past_the_u32_boundary_gives_the_same_noise() {
         let noisy = |id: u16| {
-            let mut n = LIFNeuron::new_with_type_resolution(
+            let mut n = LIFNeuron::new(
                 id,
                 NeuronType::Excitatory,
                 VoltageResolution::CentiMillivolt,
@@ -454,7 +454,7 @@ mod tests {
     fn chain_3() -> SpikingNeuralNetwork {
         let neurons = (0..3)
             .map(|id| {
-                let mut n = LIFNeuron::new_with_type_resolution(
+                let mut n = LIFNeuron::new(
                     id,
                     NeuronType::Excitatory,
                     VoltageResolution::CentiMillivolt,
@@ -562,9 +562,13 @@ mod tests {
             (1, 3, 40),
             (0, 1, 125),
         ];
-        let mut net =
-            SpikingNeuralNetwork::from_neurons((0..4).map(LIFNeuron::new).collect(), 1_000)
-                .expect("four neurons, 1 ms");
+        let mut net = SpikingNeuralNetwork::from_neurons(
+            (0..4)
+                .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+                .collect(),
+            1_000,
+        )
+        .expect("four neurons, 1 ms");
         for &(pre, post, weight) in &edges {
             net.add_synapse(pre, post, weight)
                 .expect("ids in range, no self edge");
@@ -612,9 +616,13 @@ mod tests {
     #[cfg(feature = "std")]
     #[test]
     fn from_network_divides_at_the_largest_divisor() {
-        let mut net =
-            SpikingNeuralNetwork::from_neurons((0..3).map(LIFNeuron::new).collect(), 1_000)
-                .expect("three neurons, 1 ms");
+        let mut net = SpikingNeuralNetwork::from_neurons(
+            (0..3)
+                .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+                .collect(),
+            1_000,
+        )
+        .expect("three neurons, 1 ms");
         net.add_synapse(0, 1, i16::MIN).expect("ids in range");
         net.add_synapse(1, 2, i16::MAX).expect("ids in range");
         net.finalize_synapses();
@@ -632,9 +640,13 @@ mod tests {
     #[cfg(feature = "std")]
     #[test]
     fn try_from_refuses_plasticity_and_other_sizes() {
-        let mut net =
-            SpikingNeuralNetwork::from_neurons((0..3).map(LIFNeuron::new).collect(), 1_000)
-                .expect("three neurons, 1 ms");
+        let mut net = SpikingNeuralNetwork::from_neurons(
+            (0..3)
+                .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+                .collect(),
+            1_000,
+        )
+        .expect("three neurons, 1 ms");
         net.add_synapse(0, 1, 100).expect("ids in range");
         net.add_synapse(1, 2, 100).expect("ids in range");
         net.finalize_synapses();

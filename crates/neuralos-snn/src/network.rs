@@ -290,8 +290,7 @@ impl SpikingNeuralNetwork {
                 NeuronType::Inhibitory
             };
             neurons.push(
-                LIFNeuron::new_with_type_resolution(id, nt, resolution)
-                    .with_noise_amplitude_pa(BUILT_NEURON_NOISE_PA),
+                LIFNeuron::new(id, nt, resolution).with_noise_amplitude_pa(BUILT_NEURON_NOISE_PA),
             );
         }
 
@@ -1231,7 +1230,9 @@ mod tests {
     /// 0 and the first step panicked in the CSR.
     #[test]
     fn from_neurons_takes_65_535_neurons_and_refuses_one_more() {
-        let most = (0..u16::MAX).map(LIFNeuron::new).collect();
+        let most = (0..u16::MAX)
+            .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+            .collect();
         let mut net = SpikingNeuralNetwork::from_neurons(most, 1000).expect("the most neurons");
         assert_eq!(net.neuron_count(), 65_535);
         let mut drive = vec![0; 65_535];
@@ -1243,7 +1244,9 @@ mod tests {
             .map(|s| s.neuron_id)
             .collect();
         assert_eq!(fired, [65_534]);
-        let one_more = (0..=u16::MAX).map(LIFNeuron::new).collect();
+        let one_more = (0..=u16::MAX)
+            .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+            .collect();
         assert_eq!(
             SpikingNeuralNetwork::from_neurons(one_more, 1000).err(),
             Some(Error::NeuronCountOutOfRange)
@@ -1262,7 +1265,15 @@ mod tests {
             Some(Error::NeuronCountOutOfRange)
         );
         assert_eq!(
-            SpikingNeuralNetwork::from_neurons(vec![LIFNeuron::new(0)], 0).err(),
+            SpikingNeuralNetwork::from_neurons(
+                vec![LIFNeuron::new(
+                    0,
+                    NeuronType::Excitatory,
+                    VoltageResolution::Millivolt
+                )],
+                0
+            )
+            .err(),
             Some(Error::ZeroTimeStep)
         );
     }
@@ -1277,9 +1288,7 @@ mod tests {
         let on = |grids: &[VoltageResolution]| -> Vec<LIFNeuron> {
             (0u16..)
                 .zip(grids)
-                .map(|(id, &grid)| {
-                    LIFNeuron::new_with_type_resolution(id, NeuronType::Excitatory, grid)
-                })
+                .map(|(id, &grid)| LIFNeuron::new(id, NeuronType::Excitatory, grid))
                 .collect()
         };
         for grids in [
@@ -1345,7 +1354,8 @@ mod tests {
                 for at in 0..3u16 {
                     let neurons = (0..3u16)
                         .map(|id| {
-                            LIFNeuron::new(id).with_tau_membrane_us(if id == at { tau } else { dt })
+                            LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt)
+                                .with_tau_membrane_us(if id == at { tau } else { dt })
                         })
                         .collect();
                     let moves = tau != 0 && u64::from(tau) <= longest;
@@ -1727,7 +1737,7 @@ mod tests {
     fn a_neuron_past_the_input_slice_gets_no_current() {
         let neurons = (0..2)
             .map(|id| {
-                LIFNeuron::new(id)
+                LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt)
                     .with_tau_membrane_us(1_000)
                     .with_resistance_mohm(10_000)
             })
@@ -2715,9 +2725,13 @@ mod tests {
             (1, 3, 40),
             (0, 1, 125),
         ];
-        let mut net =
-            SpikingNeuralNetwork::from_neurons((0..4).map(LIFNeuron::new).collect(), 1_000)
-                .expect("four neurons, 1 ms");
+        let mut net = SpikingNeuralNetwork::from_neurons(
+            (0..4)
+                .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+                .collect(),
+            1_000,
+        )
+        .expect("four neurons, 1 ms");
         for &(pre, post, weight) in &edges {
             net.add_synapse(pre, post, weight)
                 .expect("ids in range, no self edge");
@@ -2838,7 +2852,7 @@ mod tests {
             .map(|n| {
                 (
                     n.membrane_potential,
-                    n.refractory_time_us,
+                    n.refractory_remaining_us,
                     n.last_update_time_us,
                     n.last_spike_time_us,
                     n.synaptic_current_pa,
@@ -3123,9 +3137,13 @@ mod tests {
     fn wiring(c: u64) -> (SpikingNeuralNetwork, Vec<Act>) {
         let (n, mut edges) = case_edges(c);
         let half = edges.len() / 2;
-        let mut net =
-            SpikingNeuralNetwork::from_neurons((0..n).map(LIFNeuron::new).collect(), 1000)
-                .expect("3 to 8 neurons");
+        let mut net = SpikingNeuralNetwork::from_neurons(
+            (0..n)
+                .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+                .collect(),
+            1000,
+        )
+        .expect("3 to 8 neurons");
         let (first, rest) = edges.split_at(half);
         let acts: Vec<Act> = match c % WIRINGS {
             0 => adds(&edges).chain([Act::Sort]).collect(),
@@ -3209,9 +3227,13 @@ mod tests {
     /// clean; `build_topology` leaves it clean too.
     #[test]
     fn a_step_sorts_what_was_added_since_the_last_sort() {
-        let mut net =
-            SpikingNeuralNetwork::from_neurons((0..3).map(LIFNeuron::new).collect(), 1000)
-                .expect("three neurons");
+        let mut net = SpikingNeuralNetwork::from_neurons(
+            (0..3)
+                .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+                .collect(),
+            1000,
+        )
+        .expect("three neurons");
         assert!(!net.synapse_matrix.is_dirty(), "built clean");
         net.add_synapse(1, 2, 500).expect("ids in range");
         net.add_synapse(0, 1, 500).expect("ids in range");
@@ -3443,7 +3465,7 @@ mod tests {
         for n in &mut net.neurons {
             n.noise_amplitude_pa = 0;
         }
-        net.neurons[1].refractory_time_us = 2_000;
+        net.neurons[1].refractory_remaining_us = 2_000;
         net.add_synapse(0, 1, 2000).expect("edge");
         net.finalize_synapses();
 
@@ -3454,7 +3476,7 @@ mod tests {
         net.step(&[0, 0]).expect("step 1");
         assert_eq!(net.neurons[1].membrane_potential, -70, "refractory");
         assert_eq!(net.neurons[1].synaptic_current_pa, 0, "cleared unread");
-        assert_eq!(net.neurons[1].refractory_time_us, 0);
+        assert_eq!(net.neurons[1].refractory_remaining_us, 0);
 
         net.step(&[0, 0]).expect("step 2");
         assert_eq!(
@@ -3544,8 +3566,15 @@ mod tests {
                 );
             }
         }
-        let given =
-            SpikingNeuralNetwork::from_neurons(vec![LIFNeuron::new(0)], 1000).expect("builds");
+        let given = SpikingNeuralNetwork::from_neurons(
+            vec![LIFNeuron::new(
+                0,
+                NeuronType::Excitatory,
+                VoltageResolution::Millivolt,
+            )],
+            1000,
+        )
+        .expect("builds");
         assert_eq!(given.neurons()[0].noise_amplitude_pa, 0);
     }
 
@@ -3563,12 +3592,8 @@ mod tests {
         // `first` fires, then `gap` steps later the other (gap 0: it alone).
         let change = |start_us: u64, first: usize, gap: u64| -> i16 {
             let quiet = |id| {
-                LIFNeuron::new_with_type_resolution(
-                    id,
-                    NeuronType::Excitatory,
-                    VoltageResolution::Millivolt,
-                )
-                .with_noise_amplitude_pa(0)
+                LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt)
+                    .with_noise_amplitude_pa(0)
             };
             let mut net =
                 SpikingNeuralNetwork::from_neurons(vec![quiet(0), quiet(1)], 1_000).expect("two");
@@ -3942,7 +3967,7 @@ mod tests {
             // tau=dt → ΔV = leak + (I−A)·R/1000 per step
             for n in &mut net.neurons {
                 n.noise_amplitude_pa = 0;
-                n.tau_refractory_us = 0;
+                n.refractory_period_us = 0;
                 n.tau_membrane_us = 1000;
                 n.resistance_mohm = 1000;
             }
@@ -4024,7 +4049,7 @@ mod tests {
         net1.build_topology().expect("empty build");
         for n in &mut net1.neurons {
             n.noise_amplitude_pa = 0;
-            n.tau_refractory_us = 0;
+            n.refractory_period_us = 0;
             n.tau_membrane_us = 1000;
             n.resistance_mohm = 1000;
             n.membrane_potential = -56;
@@ -4056,7 +4081,7 @@ mod tests {
         net2.build_topology().expect("empty build");
         for n in &mut net2.neurons {
             n.noise_amplitude_pa = 0;
-            n.tau_refractory_us = 0;
+            n.refractory_period_us = 0;
             n.tau_membrane_us = 1000;
             n.resistance_mohm = 1000;
             n.membrane_potential = -56;

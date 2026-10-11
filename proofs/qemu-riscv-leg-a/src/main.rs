@@ -136,7 +136,7 @@ fn ck_slice<T: PartialEq + core::fmt::Debug>(name: &str, got: &[T], want: &[T]) 
 }
 
 fn quiet_neuron(id: u16, r: VoltageResolution) -> LIFNeuron {
-    let mut n = LIFNeuron::new_with_type_resolution(id, NeuronType::Excitatory, r);
+    let mut n = LIFNeuron::new(id, NeuronType::Excitatory, r);
     n.noise_amplitude_pa = 0;
     n
 }

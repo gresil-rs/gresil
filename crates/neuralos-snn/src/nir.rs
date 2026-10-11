@@ -2448,13 +2448,13 @@ mod std_assembly {
         /// mapping): τ=20 ms, R=100 MΩ, −70/−55/−80 V, deterministic.
         fn substrate_neuron(id: u16, res: VoltageResolution) -> LIFNeuron {
             let s = res.scale() as i16;
-            let mut n = LIFNeuron::new_with_type_resolution(id, NeuronType::Excitatory, res);
+            let mut n = LIFNeuron::new(id, NeuronType::Excitatory, res);
             n.resting_potential = -70 * s;
             n.membrane_potential = -70 * s;
             n.threshold = -55 * s;
             n.reset_potential = -80 * s;
             n.tau_membrane_us = 20_000;
-            n.tau_refractory_us = 1_000;
+            n.refractory_period_us = 1_000;
             n.resistance_mohm = 100;
             n.capacitance_pf = 200;
             n.noise_amplitude_pa = 0;
@@ -2530,10 +2530,16 @@ mod std_assembly {
         /// builders: `build_chain_network` (frozen pins) and
         /// `build_network` must produce the same neurons, the same
         /// encoder output, and the same 100-step spike raster — the
-        /// general path subsumes the chain, proven bit-exact.
+        /// general path subsumes the chain, proven bit-exact. On both
+        /// grids, so each builder's is read: the default options' mV and
+        /// the centi-mV one.
         #[test]
         fn chain_equivalence_both_builders_bit_exact() {
-            let opts = NirImportOptions::default();
+            chain_equivalence(NirImportOptions::default());
+            chain_equivalence(centi());
+        }
+
+        fn chain_equivalence(opts: NirImportOptions) {
             let g = NirImport::from_json(CHAIN, opts).expect("chain imports");
             let (mut net1, enc1) = g.build_chain_network().expect("chain builder");
             let (mut net2, enc2, rep2) = g.build_network().expect("general builder");
@@ -3839,17 +3845,13 @@ mod std_assembly {
                     .lifs
                     .get(pop.offset + id)
                     .ok_or(NirError::MissingField("lif"))?;
-                let mut n = LIFNeuron::new_with_type_resolution(
-                    id as u16,
-                    NeuronType::Excitatory,
-                    self.opts.resolution,
-                );
+                let mut n = LIFNeuron::new(id as u16, NeuronType::Excitatory, self.opts.resolution);
                 n.resting_potential = p.leak_q;
                 n.membrane_potential = p.leak_q;
                 n.threshold = p.threshold_q;
                 n.reset_potential = p.reset_q;
                 n.tau_membrane_us = p.tau_us;
-                n.tau_refractory_us = 1_000; // NIR LIF has no refractory → minimum
+                n.refractory_period_us = 1_000; // NIR LIF has no refractory → minimum
                 n.resistance_mohm = p.resistance_mohm;
                 n.capacitance_pf = p.capacitance_pf;
                 n.noise_amplitude_pa = 0; // import is deterministic
@@ -4921,13 +4923,13 @@ mod std_assembly {
                 .expect("builds");
             let n = &net.neurons()[0];
             assert_eq!(n.threshold, 1_001, "10 mV is 1,000 quanta, one up");
-            assert_eq!(n.tau_refractory_us, 0);
+            assert_eq!(n.refractory_period_us, 0);
             let native = NirImportOptions::new(100, VoltageResolution::CentiMillivolt);
             let (net, _, _) = graph(native, 1.0, None, false)
                 .build_network()
                 .expect("builds");
             let n = &net.neurons()[0];
-            assert_eq!((n.threshold, n.tau_refractory_us), (1_000, 1_000));
+            assert_eq!((n.threshold, n.refractory_period_us), (1_000, 1_000));
         }
 
         #[test]
@@ -5009,12 +5011,12 @@ mod std_assembly {
             NirUnits::Native => (p.threshold_q, 1_000),
             NirUnits::Simulation => (p.threshold_q.saturating_add(1), 0), // NIR's strict `>`
         };
-        LIFNeuron::new_with_type_resolution(id, NeuronType::Excitatory, opts.resolution)
+        LIFNeuron::new(id, NeuronType::Excitatory, opts.resolution)
             .with_resting_potential(p.leak_q) // the membrane with it: built at rest
             .with_threshold(threshold)
             .with_reset_potential(p.reset_q)
             .with_tau_membrane_us(p.tau_us)
-            .with_tau_refractory_us(refractory_us)
+            .with_refractory_period_us(refractory_us)
             .with_capacitance_pf(p.capacitance_pf)
             .with_resistance_mohm(p.resistance_mohm)
             .with_noise_amplitude_pa(0) // import is deterministic
