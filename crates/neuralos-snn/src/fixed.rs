@@ -328,7 +328,7 @@ mod tests {
     }
 
     /// The clock runs past 2^32 μs, where it used to saturate, and the
-    /// neurons are handed its low 32 bits.
+    /// neurons are handed its low 32 bits, all 32 of them.
     #[test]
     fn the_clock_runs_past_the_u32_ceiling() {
         let mut net = FixedNetwork::new([quiet(0)], [], 1_000);
@@ -336,6 +336,8 @@ mod tests {
         let mut fired = [false];
         net.step(&[0], &mut fired);
         assert_eq!(net.time_us(), u64::from(u32::MAX) + 600);
+        // The first step ran at 2^32 - 401: its stamp keeps bit 31.
+        assert_eq!(net.neurons()[0].last_update_time_us, u32::MAX - 400);
         net.step(&[0], &mut fired);
         assert_eq!(net.time_us(), u64::from(u32::MAX) + 1_600);
         // The second step ran at 2^32 + 599: the neuron's stamp is 599.
