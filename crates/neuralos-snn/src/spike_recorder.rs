@@ -65,6 +65,11 @@ impl SpikeRecorder {
 
     /// Append `t_us` as the newest entry; drop the oldest when full.
     ///
+    /// `t_us` is 32 bits, like the clock
+    /// [`LIFNeuron::integrate_and_fire`](crate::lif_neuron::LIFNeuron::integrate_and_fire)
+    /// is handed: from a network's `u64` clock, a `Spike::time_us`, record its
+    /// low 32 bits, which wrap at 2^32 μs (71.6 min).
+    ///
     /// Both stores index with `& (MAX_SPIKE_HISTORY - 1)`: the same slot as
     /// `%` and as the bare `head` (a power of two, asserted beside the
     /// constant; `head` stays below it), and a bound the optimizer reads from
@@ -96,8 +101,8 @@ impl SpikeRecorder {
         self.len == 0
     }
 
-    /// Entries oldest to newest. Indexes the buffer itself: the checked
-    /// `get` is test-only.
+    /// Entries oldest to newest, the 32-bit times [`record`](Self::record)
+    /// was given. Indexes the buffer itself: the checked `get` is test-only.
     pub fn iter(&self) -> impl Iterator<Item = u32> + '_ {
         (0..self.len).map(move |i| self.buf[(self.head + i) % MAX_SPIKE_HISTORY])
     }

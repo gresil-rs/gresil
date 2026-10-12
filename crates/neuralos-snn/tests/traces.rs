@@ -78,10 +78,11 @@ fn first_difference(have: &str, want: &str) -> Option<(usize, String, String)> {
     unreachable!("the texts differ, so some line does")
 }
 
-/// One parsed row.
+/// One parsed row. The time is the `u64` the writer prints, as wide as the
+/// networks' clock.
 struct Row {
     step: u32,
-    time_us: u32,
+    time_us: u64,
     ids: Vec<u16>,
     membranes: Vec<i16>,
 }
@@ -93,12 +94,12 @@ fn rows(text: &str) -> Vec<Row> {
             let fields: Vec<&str> = line.split(" | ").collect();
             assert_eq!(fields.len(), 3, "three bar-separated fields: {line:?}");
             let mut head = fields[0].split(' ');
-            let mut num = |what: &str| -> u32 {
+            let mut num = |what: &str| -> u64 {
                 head.next()
                     .and_then(|s| s.parse().ok())
                     .unwrap_or_else(|| panic!("{what} in {line:?}"))
             };
-            let step = num("step");
+            let step = u32::try_from(num("step")).expect("a step fits u32");
             let time_us = num("time_us");
             assert!(head.next().is_none(), "step and time only: {line:?}");
             let ids = fields[1]
@@ -195,7 +196,7 @@ fn every_header_describes_its_rows() {
         for r in &rows {
             assert_eq!(
                 r.time_us,
-                r.step * dt_us,
+                u64::from(r.step) * u64::from(dt_us),
                 "{}: time is step × dt",
                 case.name
             );
