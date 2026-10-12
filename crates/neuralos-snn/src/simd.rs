@@ -40,10 +40,10 @@
 //! grid a steady current below ~200 pA at rest moves the membrane by exactly
 //! zero forever ([`crate::lif_neuron`] § the dead zone), so a ≤2 mV
 //! approximation sits inside the grid's own blindness. The older phrasing here
-//! compared a millivolt error against the ±5 pA noise amplitude of a built
-//! network's neurons, which are different units and not comparable. The scalar
-//! reference here uses exact `/1000`. The correctness test asserts the two
-//! agree within ±2 mV per neuron, not bit-exact.
+//! compared a millivolt error against the default noise amplitude of the time,
+//! ±5 pA, which are different units and not comparable. The scalar reference
+//! here uses exact `/1000`. The correctness test asserts the two agree within
+//! ±2 mV per neuron, not bit-exact.
 //!
 //! ## Corrected 2026-08-30: the two divisions must round the same way
 //!
