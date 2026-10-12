@@ -79,6 +79,8 @@ before it, the firmware `.text` re-pinned and the board fold read again
 # needs full URLs), and the explanatory header on the Gitea file. Nothing
 # else — any third difference is drift, and one of them has stopped being
 # a mirror.
+tools/units.sh                                   # the unit gate (round 66): the current is in pA, and no line outside the frozen places the script lists writes it otherwise; no build
+tools/evidence-sums.sh                           # the evidence gate (round 66): every checksum manifest under evidence/ verifies, four read by the script's table (ruled 2026-10-12); needs the full history
 cargo fmt    --all -- --check                    # formatting gate (2026-09-02): rustfmt under the pinned toolchain, default config
 cargo check  --workspace --all-targets
 cargo test   --workspace                          # offline; the count is the CI log's (one number, one home) + 5 rt model-gated #[ignore]
