@@ -99,6 +99,33 @@ line); its two header lines, `# date:` (the file's mtime) and
 `# commit:`, were prepended at PR G (round 34) to the capture of sha
 `ab189be96472f449646b8ff7c936c9c69bb9e9f956535de500ff40e35e8720d4`.
 
+Since round 65 (2026-10-11) leg A prints the current in pA, as the
+library names it, and the unit test two of its checks cite is
+`the_dead_zone_12pa_pair`. Eight printed lines differ from `leg-a.log`,
+each in its unit alone, old → new:
+
+| `leg-a.log` | since round 65 |
+|---|---|
+| `ok [ 15] lif::the_dead_zone_12ua_pair mV` | `ok [ 15] lif::the_dead_zone_12pa_pair mV` |
+| `ok [ 16] lif::the_dead_zone_12ua_pair centi` | `ok [ 16] lif::the_dead_zone_12pa_pair centi` |
+| `ok [ 33] lif::rectification +12ua ratchets` | `ok [ 33] lif::rectification +12pa ratchets` |
+| `ok [ 34] lif::rectification -12ua absorbed` | `ok [ 34] lif::rectification -12pa absorbed` |
+| `n0 mV  +600uA` | `n0 mV  +600pA` |
+| `n1 mV  +300uA` | `n1 mV  +300pA` |
+| `n2 cmV +300uA (same drive as n1, finer ruler)` | `n2 cmV +300pA (same drive as n1, finer ruler)` |
+| `n3 cmV  +12uA` | `n3 cmV  +12pA` |
+
+Every value, every raster row and every other printed line are as
+recorded. `leg-a.log` and `leg-a-alpha8.log` keep `uA` as printed, and
+`leg-b.log`, which lists the suite by test name, keeps the test's old
+name as it ran. The "300 µA drive" of this section, above, is 300 pA.
+
+Since round 65 four checks reach their starting state through the
+public API, where the unit tests they cite write the fields: the leak
+from −90 and from −20 and the adaptation decay from 3, by the step and
+the chain, and the centi-mV floor from rest, where its test starts at
+−9,999. A comment at each says how; each keeps its name and its value.
+
 ## Leg B — user-mode, the REAL suite (the wire crosses)
 
 Full workspace test suite of the crate — NOT a subset — built static

@@ -323,9 +323,9 @@ emit_graph(
 
 # merge: 2 Inputs -> 2 Linears -> ONE LIF population -> 1 Output.
 # D6-aware drive math (absmax renormalization!): tensor absmax 1.0
-# pins row 0's 0.25 entry to q=8192, so feature x=1 encodes to 81 uA
+# pins row 0's 0.25 entry to q=8192, so feature x=1 encodes to 81 pA
 # per branch — V_ss-rest = 810 centi-quanta stalls below the 1500
-# threshold gap, while the summed fan-in (162 uA, V_ss-rest 1620)
+# threshold gap, while the summed fan-in (162 pA, V_ss-rest 1620)
 # crosses: single stalls, merge fires. Row 1 (weight 1.0, q=32767)
 # is the always-hot control; the gate drives x=[1,0].
 MERGE_W = np.array([[0.25, 0.0], [0.0, 1.0]])

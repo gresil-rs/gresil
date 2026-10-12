@@ -255,18 +255,18 @@ fn the_reference_vector_matches_the_neuron_model() {
             case.name
         );
         let n = &net.neurons()[0];
-        assert_eq!(n.noise_amplitude_ua, 0, "{}: no noise term", case.name);
-        assert_eq!(n.threshold, i16::MAX, "{}: no spike term", case.name);
+        assert_eq!(n.noise_amplitude_pa(), 0, "{}: no noise term", case.name);
+        assert_eq!(n.threshold(), i16::MAX, "{}: no spike term", case.name);
         assert_eq!(net.synapse_count(), 0, "{}: no synaptic term", case.name);
 
         let text = read(case);
         let header = text.lines().next().expect("a header");
         let dt_us: i128 = field(header, "dt_us").parse().expect("dt_us");
-        let s = i128::from(n.voltage_resolution.scale());
-        let rest = i128::from(n.resting_potential);
-        let r = i128::from(n.resistance_mohm);
-        let tau = i128::from(n.tau_membrane_us);
-        let mut v = i128::from(n.membrane_potential);
+        let s = i128::from(n.voltage_resolution().scale());
+        let rest = i128::from(n.resting_potential());
+        let r = i128::from(n.resistance_mohm());
+        let tau = i128::from(n.tau_membrane_us());
+        let mut v = i128::from(n.membrane_potential());
 
         // The membrane equation with no width limit anywhere: the same
         // arithmetic the neuron documents, in i128, which cannot overflow,
@@ -413,9 +413,11 @@ fn every_plasticity_off_case_steps_as_the_std_network() {
                 assert_eq!(got, want, "{} step {step}: the spikes", case.name);
                 for (f, s) in fixed.neurons().iter().zip(net.neurons()) {
                     assert_eq!(
-                        f.membrane_potential, s.membrane_potential,
+                        f.membrane_potential(),
+                        s.membrane_potential(),
                         "{} step {step}: neuron {}",
-                        case.name, s.id
+                        case.name,
+                        s.id()
                     );
                 }
             }

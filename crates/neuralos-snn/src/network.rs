@@ -202,7 +202,7 @@ pub struct SpikingNeuralNetwork {
     voltage_resolution: VoltageResolution,
     /// Synaptic transmission divisor — **THE coupling knob** (R4(ii),
     /// 2026-08-20). Each presynaptic spike injects
-    /// `weight / synaptic_input_divisor` μA into the postsynaptic neuron.
+    /// `weight / synaptic_input_divisor` pA into the postsynaptic neuron.
     ///
     /// This is the constant the session-E/F redesign fork turns on (ISA
     /// 2026-08-18, "coupling constant / in-vivo drive / balanced
@@ -214,17 +214,17 @@ pub struct SpikingNeuralNetwork {
     synaptic_input_divisor: u16,
 }
 
-/// The noise amplitude (μA) a topology builder gives the neurons it makes: the
+/// The noise amplitude (pA) a topology builder gives the neurons it makes: the
 /// amplitude every neuron had by default until round 61, so a network built by
 /// [`SpikingNeuralNetwork::new`] runs as it always did. A neuron built by its
 /// own constructor has none.
-const BUILT_NEURON_NOISE_UA: u8 = 5;
+const BUILT_NEURON_NOISE_PA: u8 = 5;
 
 impl SpikingNeuralNetwork {
     /// Construct a network with `neuron_count` neurons, `time_step_us` simulation
     /// step, and the given `topology`. Neurons are created with the biological
     /// 80/20 E/I ratio, or with the ratio a `Balanced` topology gives.
-    /// Each has noise amplitude 5 μA (`BUILT_NEURON_NOISE_UA`), unlike a neuron
+    /// Each has noise amplitude 5 pA (`BUILT_NEURON_NOISE_PA`), unlike a neuron
     /// from `LIFNeuron::new`, which is silent; [`from_neurons`](Self::from_neurons)
     /// takes neurons as given.
     ///
@@ -246,7 +246,7 @@ impl SpikingNeuralNetwork {
 
     /// [`new`](Self::new) with an explicit voltage grid for every neuron —
     /// [`VoltageResolution::CentiMillivolt`] opens the sub-mV regime (dead
-    /// zone ≈ 2 μA) where the ternary substrate's ±12 μA recurrent pulses
+    /// zone ≈ 2 pA) where the ternary substrate's ±12 pA recurrent pulses
     /// move the membrane. All downstream behavior (drive, STDP, plasticity)
     /// is grid-independent; only membrane arithmetic granularity changes.
     ///
@@ -290,8 +290,7 @@ impl SpikingNeuralNetwork {
                 NeuronType::Inhibitory
             };
             neurons.push(
-                LIFNeuron::new_with_type_resolution(id, nt, resolution)
-                    .with_noise_amplitude_ua(BUILT_NEURON_NOISE_UA),
+                LIFNeuron::new(id, nt, resolution).with_noise_amplitude_pa(BUILT_NEURON_NOISE_PA),
             );
         }
 
@@ -327,7 +326,9 @@ impl SpikingNeuralNetwork {
     /// (it would discard the caller's wiring; the stored topology
     /// marker is inert here). The constructor path for imported
     /// models (NIR) whose neuron parameters are not the biological
-    /// defaults.
+    /// defaults. Each neuron is at rest, as `LIFNeuron::new` and the
+    /// `with_*` chain build it, and its id is its position, which indexes
+    /// it and seeds its noise.
     ///
     /// # Errors
     ///
@@ -338,7 +339,11 @@ impl SpikingNeuralNetwork {
     /// `time_step_us`, its `tau_membrane_us` 0 or above
     /// `1000 · time_step_us`; [`Error::MixedVoltageGrids`] unless every
     /// neuron is on one voltage grid, the one the network keeps for its
-    /// stats.
+    /// stats; [`Error::NeuronNotAtRest`] when a neuron carries state: its
+    /// membrane off its resting potential, refractory time left, a current
+    /// or a stamp ([`LIFNeuron::reset`] brings it back);
+    /// [`Error::NeuronIdMismatch`] unless each neuron's id is its position
+    /// in `neurons`.
     pub fn from_neurons(neurons: Vec<LIFNeuron>, time_step_us: u32) -> Result<Self> {
         if !(1..=usize::from(u16::MAX)).contains(&neurons.len()) {
             return Err(Error::NeuronCountOutOfRange);
@@ -352,6 +357,12 @@ impl SpikingNeuralNetwork {
         let resolution = neurons[0].voltage_resolution;
         if neurons.iter().any(|n| n.voltage_resolution != resolution) {
             return Err(Error::MixedVoltageGrids);
+        }
+        if !neurons.iter().all(at_rest) {
+            return Err(Error::NeuronNotAtRest);
+        }
+        if !ids_are_positions(&neurons) {
+            return Err(Error::NeuronIdMismatch);
         }
         let neuron_count = neurons.len() as u16; // exact: at most 65,535
         Ok(Self {
@@ -428,7 +439,7 @@ impl SpikingNeuralNetwork {
     ///
     /// # Order
     ///
-    /// 1. Every neuron's adaptation current decays by 1 μA toward 0: one at
+    /// 1. Every neuron's adaptation current decays by 1 pA toward 0: one at
     ///    or under 0 stays ([`LIFNeuron::decay_adaptation_current`]).
     /// 2. Every neuron integrates, in id order, at the current time: step 0
     ///    runs at time 0. Its current is `input_currents[id]` plus the pulses
@@ -436,7 +447,7 @@ impl SpikingNeuralNetwork {
     ///    § Semantics). A missing entry of `input_currents` reads as 0 and an
     ///    entry past the last neuron is ignored.
     /// 3. Every neuron's synaptic current is cleared.
-    /// 4. Each neuron that fired, in id order, adds `weight / divisor` μA to
+    /// 4. Each neuron that fired, in id order, adds `weight / divisor` pA to
     ///    each of its targets, in the CSR's order: the division truncates
     ///    toward zero, the add saturates in `i16`
     ///    ([`synaptic_input_divisor`](Self::synaptic_input_divisor)).
@@ -474,10 +485,11 @@ impl SpikingNeuralNetwork {
         let mut firing_neurons: Vec<u16> = Vec::new();
 
         // Adaptation decay (adaptation ONLY — session F split). MUST run
-        // each step or adaptation accumulates (+2/spike) without bound and
-        // silences the network — a bug that previously made every sustained
-        // run self-quench after ~3 s. Position: pre-integration, phase-
-        // identical to the historical opening loop.
+        // each step or adaptation accumulates (+2/spike while a neuron's
+        // switch is on) without bound and silences the network — a bug
+        // that previously made every sustained run self-quench after ~3 s.
+        // Position: pre-integration, phase-identical to the historical
+        // opening loop.
         for n in &mut self.neurons {
             n.decay_adaptation_current();
         }
@@ -495,8 +507,8 @@ impl SpikingNeuralNetwork {
         // (`LIFNeuron::integrate_and_fire` § Semantics item 1).
         let now_us = self.current_time_us as u32;
         for (idx, neuron) in self.neurons.iter_mut().enumerate() {
-            let current_ua = input_currents.get(idx).copied().unwrap_or(0);
-            if neuron.integrate_and_fire(current_ua, self.time_step_us, now_us) {
+            let current_pa = input_currents.get(idx).copied().unwrap_or(0);
+            if neuron.integrate_and_fire(current_pa, self.time_step_us, now_us) {
                 let neuron_id = idx as u16;
                 let spike = Spike {
                     neuron_id,
@@ -767,7 +779,7 @@ impl SpikingNeuralNetwork {
 
     /// Set the synaptic transmission divisor — **THE coupling knob** (see
     /// [`synaptic_input_divisor`](Self::synaptic_input_divisor)). Each
-    /// presynaptic spike injects `weight / divisor` μA postsynaptically.
+    /// presynaptic spike injects `weight / divisor` pA postsynaptically.
     /// Default `10` (the historical bare constant); smaller = stronger
     /// coupling.
     ///
@@ -934,8 +946,9 @@ impl SpikingNeuralNetwork {
     }
 
     /// The neurons, writable, for the crate's own tests: the one way to a
-    /// network on two grids, which `from_neurons` refuses, so the guards
-    /// in `trace::header` and the freezer keep a test each.
+    /// network at clock 0 on two grids, with a neuron that is not at rest,
+    /// or with an id off its position, which `from_neurons` refuses, so the
+    /// guards in `trace::header` and the freezer keep a test each.
     #[cfg(test)]
     pub(crate) fn neurons_mut(&mut self) -> &mut [LIFNeuron] {
         &mut self.neurons
@@ -1201,6 +1214,27 @@ fn membranes_move(neurons: &[LIFNeuron], time_step_us: u32) -> bool {
         .all(|n| dt_over_tau(time_step_us, n.tau_membrane_us) > 0)
 }
 
+/// At rest: the six fields [`LIFNeuron::reset`] writes hold the values it
+/// writes, as `LIFNeuron::new` and the `with_*` chain build a neuron
+/// (`from_neurons`; the freezer writes only neurons at rest).
+fn at_rest(n: &LIFNeuron) -> bool {
+    n.membrane_potential == n.resting_potential
+        && n.refractory_remaining_us == 0
+        && n.last_update_time_us == 0
+        && n.last_spike_time_us == 0
+        && n.synaptic_current_pa == 0
+        && n.adaptation_current_pa == 0
+}
+
+/// Each neuron's id is its position: what indexes it and seeds its noise
+/// (`from_neurons`). Compared in `usize`, so no count of neurons wraps it.
+fn ids_are_positions(neurons: &[LIFNeuron]) -> bool {
+    neurons
+        .iter()
+        .enumerate()
+        .all(|(i, n)| usize::from(n.id) == i)
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::shadow_unrelated)]
@@ -1231,7 +1265,9 @@ mod tests {
     /// 0 and the first step panicked in the CSR.
     #[test]
     fn from_neurons_takes_65_535_neurons_and_refuses_one_more() {
-        let most = (0..u16::MAX).map(LIFNeuron::new).collect();
+        let most = (0..u16::MAX)
+            .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+            .collect();
         let mut net = SpikingNeuralNetwork::from_neurons(most, 1000).expect("the most neurons");
         assert_eq!(net.neuron_count(), 65_535);
         let mut drive = vec![0; 65_535];
@@ -1243,7 +1279,9 @@ mod tests {
             .map(|s| s.neuron_id)
             .collect();
         assert_eq!(fired, [65_534]);
-        let one_more = (0..=u16::MAX).map(LIFNeuron::new).collect();
+        let one_more = (0..=u16::MAX)
+            .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+            .collect();
         assert_eq!(
             SpikingNeuralNetwork::from_neurons(one_more, 1000).err(),
             Some(Error::NeuronCountOutOfRange)
@@ -1262,9 +1300,119 @@ mod tests {
             Some(Error::NeuronCountOutOfRange)
         );
         assert_eq!(
-            SpikingNeuralNetwork::from_neurons(vec![LIFNeuron::new(0)], 0).err(),
+            SpikingNeuralNetwork::from_neurons(
+                vec![LIFNeuron::new(
+                    0,
+                    NeuronType::Excitatory,
+                    VoltageResolution::Millivolt
+                )],
+                0
+            )
+            .err(),
             Some(Error::ZeroTimeStep)
         );
+    }
+
+    /// At rest means the six fields `reset` writes, each alone off its
+    /// value: not at rest; `reset` brings each back. The parameters are
+    /// not state: a neuron the chain rewrote is at rest, the membrane
+    /// moving with the resting potential.
+    #[test]
+    fn at_rest_reads_the_six_fields_reset_writes() {
+        let built = || LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
+        assert!(at_rest(&built()));
+        let off: [fn(&mut LIFNeuron); 6] = [
+            |n| n.membrane_potential -= 1,
+            |n| n.refractory_remaining_us = 1,
+            |n| n.last_update_time_us = 1,
+            |n| n.last_spike_time_us = 1,
+            |n| n.synaptic_current_pa = -1,
+            |n| n.adaptation_current_pa = 1,
+        ];
+        for (i, move_it) in off.iter().enumerate() {
+            let mut n = built();
+            move_it(&mut n);
+            assert!(!at_rest(&n), "state field {i}");
+            n.reset();
+            assert!(at_rest(&n), "state field {i}, after reset");
+        }
+        let chained = built()
+            .with_resting_potential(-60)
+            .with_threshold(-40)
+            .with_refractory_period_us(0)
+            .with_adaptation_enabled(false);
+        assert!(at_rest(&chained));
+    }
+
+    /// A neuron that is not at rest, at each place of three: stepped once
+    /// with a current, stepped once at a clock past 0, given a pulse, and
+    /// fired. Refused by name; the same neuron after `reset`, and a
+    /// neuron the chain rewrote, build.
+    #[test]
+    fn from_neurons_refuses_a_neuron_not_at_rest() {
+        let mv = |id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt);
+        let stage: [fn(&mut LIFNeuron); 4] = [
+            |n| {
+                n.integrate_and_fire(600, 1000, 0);
+            },
+            |n| {
+                n.integrate_and_fire(0, 1000, 5000);
+            },
+            |n| n.add_synaptic_current(100),
+            |n| {
+                *n = n.clone().with_threshold(-100);
+                assert!(n.integrate_and_fire(0, 1000, 0));
+            },
+        ];
+        for (s, staged) in stage.iter().enumerate() {
+            for at in 0..3u16 {
+                let mut neurons: Vec<LIFNeuron> = (0..3).map(mv).collect();
+                staged(&mut neurons[usize::from(at)]);
+                assert_eq!(
+                    SpikingNeuralNetwork::from_neurons(neurons.clone(), 1000).err(),
+                    Some(Error::NeuronNotAtRest),
+                    "stage {s} at {at}"
+                );
+                neurons[usize::from(at)].reset();
+                assert!(
+                    SpikingNeuralNetwork::from_neurons(neurons, 1000).is_ok(),
+                    "stage {s} at {at}, after reset"
+                );
+            }
+        }
+        let chained = vec![mv(0).with_resting_potential(-60), mv(1)];
+        assert!(SpikingNeuralNetwork::from_neurons(chained, 1000).is_ok());
+    }
+
+    /// An id off its position: two swapped, every order of three but the
+    /// one in place, a gap and a repeat. In place, it builds.
+    #[test]
+    fn from_neurons_refuses_an_id_off_its_position() {
+        let with_ids = |ids: &[u16]| -> Vec<LIFNeuron> {
+            ids.iter()
+                .map(|&id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+                .collect()
+        };
+        for ids in [
+            &[1, 0][..],
+            &[0, 2, 1],
+            &[1, 0, 2],
+            &[1, 2, 0],
+            &[2, 0, 1],
+            &[2, 1, 0],
+            &[0, 1, 3],
+            &[0, 0, 1],
+            &[1],
+        ] {
+            assert_eq!(
+                SpikingNeuralNetwork::from_neurons(with_ids(ids), 1000).err(),
+                Some(Error::NeuronIdMismatch),
+                "{ids:?}"
+            );
+        }
+        for ids in [&[0][..], &[0, 1, 2]] {
+            assert!(SpikingNeuralNetwork::from_neurons(with_ids(ids), 1000).is_ok());
+        }
     }
 
     /// One grid per network: two grids in either order, and the odd one
@@ -1277,9 +1425,7 @@ mod tests {
         let on = |grids: &[VoltageResolution]| -> Vec<LIFNeuron> {
             (0u16..)
                 .zip(grids)
-                .map(|(id, &grid)| {
-                    LIFNeuron::new_with_type_resolution(id, NeuronType::Excitatory, grid)
-                })
+                .map(|(id, &grid)| LIFNeuron::new(id, NeuronType::Excitatory, grid))
                 .collect()
         };
         for grids in [
@@ -1345,7 +1491,8 @@ mod tests {
                 for at in 0..3u16 {
                     let neurons = (0..3u16)
                         .map(|id| {
-                            LIFNeuron::new(id).with_tau_membrane_us(if id == at { tau } else { dt })
+                            LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt)
+                                .with_tau_membrane_us(if id == at { tau } else { dt })
                         })
                         .collect();
                     let moves = tau != 0 && u64::from(tau) <= longest;
@@ -1720,6 +1867,25 @@ mod tests {
         assert_eq!(net.current_time_us(), 2000);
     }
 
+    /// A neuron past the end of `input_currents` gets 0 pA, as a 0 in the
+    /// slice would give it: a membrane that 1 pA would move (10 GΩ, and
+    /// τ = dt) stays at rest through a step with an empty slice.
+    #[test]
+    fn a_neuron_past_the_input_slice_gets_no_current() {
+        let neurons = (0..2)
+            .map(|id| {
+                LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt)
+                    .with_tau_membrane_us(1_000)
+                    .with_resistance_mohm(10_000)
+            })
+            .collect();
+        let mut net = SpikingNeuralNetwork::from_neurons(neurons, 1_000).unwrap();
+        net.step(&[]).unwrap();
+        for n in net.neurons() {
+            assert_eq!(n.membrane_potential, n.resting_potential, "neuron {}", n.id);
+        }
+    }
+
     #[test]
     fn step_with_strong_input_produces_spikes() {
         let mut net =
@@ -1937,8 +2103,8 @@ mod tests {
                 SpikingNeuralNetwork::new(4, 1000, NetworkTopology::Random { connectivity: 0.0 })
                     .expect("valid");
             net.build_topology().expect("build");
-            net.neurons[1].noise_amplitude_ua = 0;
-            net.neurons[2].noise_amplitude_ua = 0;
+            net.neurons[1].noise_amplitude_pa = 0;
+            net.neurons[2].noise_amplitude_pa = 0;
             net.add_synapse(1, 2, 0).expect("add");
             if sorted {
                 net.finalize_synapses();
@@ -2346,8 +2512,8 @@ mod tests {
             },
         )
         .expect("valid");
-        net.neurons[0].noise_amplitude_ua = 0;
-        net.neurons[1].noise_amplitude_ua = 0;
+        net.neurons[0].noise_amplitude_pa = 0;
+        net.neurons[1].noise_amplitude_pa = 0;
         net.add_synapse(0, 1, 100).expect("synapse");
 
         net.neurons[0].last_spike_time_us = 1_000;
@@ -2372,8 +2538,8 @@ mod tests {
             },
         )
         .expect("valid");
-        net.neurons[0].noise_amplitude_ua = 0;
-        net.neurons[1].noise_amplitude_ua = 0;
+        net.neurons[0].noise_amplitude_pa = 0;
+        net.neurons[1].noise_amplitude_pa = 0;
         net.add_synapse(0, 1, 100).expect("synapse");
         net.finalize_synapses(); // the rows read below are the sort's
 
@@ -2392,7 +2558,7 @@ mod tests {
             }
         }
         assert_eq!(
-            net.neurons[1].synaptic_current_ua,
+            net.neurons[1].synaptic_current_pa,
             updated_weight / divisor,
             "propagation must use the updated synapse weight"
         );
@@ -2408,13 +2574,13 @@ mod tests {
             },
         )
         .expect("valid");
-        net.neurons[0].noise_amplitude_ua = 0;
-        net.neurons[1].noise_amplitude_ua = 0;
+        net.neurons[0].noise_amplitude_pa = 0;
+        net.neurons[1].noise_amplitude_pa = 0;
         net.add_synapse(0, 1, 100).expect("synapse");
         #[cfg(feature = "unstable-stdp")]
         net.set_plasticity_enabled(true);
 
-        // Four steps: at 1000 μA the post fires at step 2 and the pre at
+        // Four steps: at 1000 pA the post fires at step 2 and the pre at
         // step 3, the first pairing (LTD). One step pairs nothing.
         for _ in 0..4 {
             let _ = net.step(&[1000, 1000]).expect("plasticity step");
@@ -2460,8 +2626,8 @@ mod tests {
             },
         )
         .expect("valid");
-        net.neurons[0].noise_amplitude_ua = 0;
-        net.neurons[1].noise_amplitude_ua = 0;
+        net.neurons[0].noise_amplitude_pa = 0;
+        net.neurons[1].noise_amplitude_pa = 0;
         net.add_synapse(0, 1, 100).expect("synapse");
         // finalize() builds the reverse CSR so incoming(post) resolves the
         // pre→post edge for the LTP pass.
@@ -2513,8 +2679,8 @@ mod tests {
             },
         )
         .expect("valid");
-        net.neurons[0].noise_amplitude_ua = 0;
-        net.neurons[1].noise_amplitude_ua = 0;
+        net.neurons[0].noise_amplitude_pa = 0;
+        net.neurons[1].noise_amplitude_pa = 0;
         net.add_synapse(0, 1, 100).expect("synapse");
         net.synapse_matrix.finalize();
 
@@ -2547,8 +2713,8 @@ mod tests {
             },
         )
         .expect("valid");
-        net.neurons[0].noise_amplitude_ua = 0;
-        net.neurons[1].noise_amplitude_ua = 0;
+        net.neurons[0].noise_amplitude_pa = 0;
+        net.neurons[1].noise_amplitude_pa = 0;
         net.add_synapse(0, 1, 100).expect("synapse");
         net.synapse_matrix.finalize();
 
@@ -2696,9 +2862,13 @@ mod tests {
             (1, 3, 40),
             (0, 1, 125),
         ];
-        let mut net =
-            SpikingNeuralNetwork::from_neurons((0..4).map(LIFNeuron::new).collect(), 1_000)
-                .expect("four neurons, 1 ms");
+        let mut net = SpikingNeuralNetwork::from_neurons(
+            (0..4)
+                .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+                .collect(),
+            1_000,
+        )
+        .expect("four neurons, 1 ms");
         for &(pre, post, weight) in &edges {
             net.add_synapse(pre, post, weight)
                 .expect("ids in range, no self edge");
@@ -2793,10 +2963,10 @@ mod tests {
         }
     }
 
-    /// The drive of step `t` on `n` neurons: neuron 0 at 400 μA, which
-    /// fires it on its own, every other at 100 μA plus 0 to 150 μA, which
+    /// The drive of step `t` on `n` neurons: neuron 0 at 400 pA, which
+    /// fires it on its own, every other at 100 pA plus 0 to 150 pA, which
     /// fires none of them. It holds an excitatory neuron at −70 to −64 mV,
-    /// where one pulse fires it from about 1,600 to 2,900 μA, by the
+    /// where one pulse fires it from about 1,600 to 2,900 pA, by the
     /// membrane and the drive; an inhibitory one, in a built topology,
     /// climbs to −54 mV, 4 mV under its threshold.
     fn drive(seed: u64, t: u32, n: usize) -> Vec<i16> {
@@ -2819,11 +2989,11 @@ mod tests {
             .map(|n| {
                 (
                     n.membrane_potential,
-                    n.refractory_time_us,
+                    n.refractory_remaining_us,
                     n.last_update_time_us,
                     n.last_spike_time_us,
-                    n.synaptic_current_ua,
-                    n.adaptation_current_ua,
+                    n.synaptic_current_pa,
+                    n.adaptation_current_pa,
                 )
             })
             .collect()
@@ -3042,7 +3212,7 @@ mod tests {
     const SEED: u64 = 1;
 
     /// Case `c`: 3 to 8 neurons and two or more distinct pairs in random
-    /// order, weights 200 to 2,000 μA.
+    /// order, weights 200 to 2,000 pA.
     fn case_edges(case: u64) -> (u16, Vec<(u16, u16, i16)>) {
         let mut rng = Rng::new(SEED.wrapping_add(case));
         let neurons = 3 + rng.below(6) as u16;
@@ -3104,9 +3274,13 @@ mod tests {
     fn wiring(c: u64) -> (SpikingNeuralNetwork, Vec<Act>) {
         let (n, mut edges) = case_edges(c);
         let half = edges.len() / 2;
-        let mut net =
-            SpikingNeuralNetwork::from_neurons((0..n).map(LIFNeuron::new).collect(), 1000)
-                .expect("3 to 8 neurons");
+        let mut net = SpikingNeuralNetwork::from_neurons(
+            (0..n)
+                .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+                .collect(),
+            1000,
+        )
+        .expect("3 to 8 neurons");
         let (first, rest) = edges.split_at(half);
         let acts: Vec<Act> = match c % WIRINGS {
             0 => adds(&edges).chain([Act::Sort]).collect(),
@@ -3190,9 +3364,13 @@ mod tests {
     /// clean; `build_topology` leaves it clean too.
     #[test]
     fn a_step_sorts_what_was_added_since_the_last_sort() {
-        let mut net =
-            SpikingNeuralNetwork::from_neurons((0..3).map(LIFNeuron::new).collect(), 1000)
-                .expect("three neurons");
+        let mut net = SpikingNeuralNetwork::from_neurons(
+            (0..3)
+                .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+                .collect(),
+            1000,
+        )
+        .expect("three neurons");
         assert!(!net.synapse_matrix.is_dirty(), "built clean");
         net.add_synapse(1, 2, 500).expect("ids in range");
         net.add_synapse(0, 1, 500).expect("ids in range");
@@ -3339,8 +3517,8 @@ mod tests {
     fn transmission_is_live_one_step_delayed_centimv() {
         // 2 neurons ⇒ neuron 0 E, neuron 1 I (exc_count truncates to 1).
         // Centi grid, noise off. Pre driven to fire on step 0 (E on centi:
-        // 3000 μA ⇒ delta_v 1500 quanta ⇒ −7000+1500 = −5500 = threshold).
-        // A +125-weight spike injects +12 μA (weight / default divisor 10,
+        // 3000 pA ⇒ delta_v 1500 quanta ⇒ −7000+1500 = −5500 = threshold).
+        // A +125-weight spike injects +12 pA (weight / default divisor 10,
         // truncating);
         // I-type integration: current_term = 12·100·100/1000 = 120 cV,
         // delta_v = 100·120/1000 = 12 quanta ⇒ post −7000 → −6988 exactly
@@ -3355,7 +3533,7 @@ mod tests {
         .expect("constructs");
         net.build_topology().expect("empty build");
         for n in &mut net.neurons {
-            n.noise_amplitude_ua = 0;
+            n.noise_amplitude_pa = 0;
         }
         net.add_synapse(0, 1, 125).expect("edge");
         net.finalize_synapses();
@@ -3377,16 +3555,16 @@ mod tests {
     #[test]
     fn transmission_is_live_one_step_delayed_mv_strong_weight() {
         // Same pin on the DEFAULT mV grid with a strong weight: 2000 →
-        // +200 μA pulse. I-type mV: current_term = 200·100/1000 = 20,
+        // +200 pA pulse. I-type mV: current_term = 200·100/1000 = 20,
         // delta_v = 100·20/1000 = 2 mV ⇒ post −70 → −68 one step after pre.
-        // (A single ±12 μA pulse cannot move an mV-grid I neuron — dead
-        // zone ~100 μA; that sensitivity belongs to the centi grid.)
+        // (A single ±12 pA pulse cannot move an mV-grid I neuron — dead
+        // zone ~100 pA; that sensitivity belongs to the centi grid.)
         let mut net =
             SpikingNeuralNetwork::new(2, 1000, NetworkTopology::Random { connectivity: 0.0 })
                 .expect("constructs");
         net.build_topology().expect("empty build");
         for n in &mut net.neurons {
-            n.noise_amplitude_ua = 0;
+            n.noise_amplitude_pa = 0;
         }
         net.add_synapse(0, 1, 2000).expect("edge");
         net.finalize_synapses();
@@ -3395,7 +3573,7 @@ mod tests {
         assert_eq!(
             spikes.len(),
             1,
-            "pre fires on step 0 (E mV: 3000 μA ⇒ +15 mV)"
+            "pre fires on step 0 (E mV: 3000 pA ⇒ +15 mV)"
         );
         assert_eq!(
             net.neurons[1].membrane_potential, -70,
@@ -3410,7 +3588,7 @@ mod tests {
     }
 
     /// The exception to the one-step delay: a `post` refractory at the step
-    /// that would read the pulse. mV grid, the +200 μA pulse of the test
+    /// that would read the pulse. mV grid, the +200 pA pulse of the test
     /// above, which moves a listening `post` to −68. Here `post` is
     /// refractory for two steps from step 0: the pulse sits in its
     /// accumulator through step 1, unread, and step 1's clear drops it.
@@ -3422,20 +3600,20 @@ mod tests {
                 .expect("constructs");
         net.build_topology().expect("empty build");
         for n in &mut net.neurons {
-            n.noise_amplitude_ua = 0;
+            n.noise_amplitude_pa = 0;
         }
-        net.neurons[1].refractory_time_us = 2_000;
+        net.neurons[1].refractory_remaining_us = 2_000;
         net.add_synapse(0, 1, 2000).expect("edge");
         net.finalize_synapses();
 
         let spikes = net.step(&[3000, 0]).expect("step 0");
         assert_eq!(spikes.len(), 1, "pre fires on step 0");
-        assert_eq!(net.neurons[1].synaptic_current_ua, 200, "delivered");
+        assert_eq!(net.neurons[1].synaptic_current_pa, 200, "delivered");
 
         net.step(&[0, 0]).expect("step 1");
         assert_eq!(net.neurons[1].membrane_potential, -70, "refractory");
-        assert_eq!(net.neurons[1].synaptic_current_ua, 0, "cleared unread");
-        assert_eq!(net.neurons[1].refractory_time_us, 0);
+        assert_eq!(net.neurons[1].synaptic_current_pa, 0, "cleared unread");
+        assert_eq!(net.neurons[1].refractory_remaining_us, 0);
 
         net.step(&[0, 0]).expect("step 2");
         assert_eq!(
@@ -3445,7 +3623,7 @@ mod tests {
     }
 
     /// The step divides by `divisor as i16`: from 32,768 the cast wrapped
-    /// negative (65,534 is `-2`, and a +2000 weight delivered −1000 μA),
+    /// negative (65,534 is `-2`, and a +2000 weight delivered −1000 pA),
     /// and 65,535, `-1`, overflowed on a weight of `i16::MIN`, a panic in
     /// the step. The setter refuses each, and the divisor it had stays.
     #[test]
@@ -3464,7 +3642,7 @@ mod tests {
     }
 
     /// 32,767, the largest divisor, divides a weight of `i16::MIN` in
-    /// `i16`: the pulse truncates to −1 μA, where 65,535 panicked.
+    /// `i16`: the pulse truncates to −1 pA, where 65,535 panicked.
     #[test]
     fn the_largest_divisor_steps_the_weight_i16_min() {
         let mut net =
@@ -3472,7 +3650,7 @@ mod tests {
                 .expect("constructs");
         net.build_topology().expect("empty build");
         for n in &mut net.neurons {
-            n.noise_amplitude_ua = 0; // 3000 μA lands ON the threshold: pre fires
+            n.noise_amplitude_pa = 0; // 3000 pA lands ON the threshold: pre fires
         }
         net.set_synaptic_input_divisor(32_767)
             .expect("the largest divisor");
@@ -3481,7 +3659,7 @@ mod tests {
         net.finalize_synapses();
         let spikes = net.step(&[3000, 0]).expect("step 0");
         assert_eq!(spikes.len(), 1, "pre fires on step 0");
-        assert_eq!(net.neurons[1].synaptic_current_ua, -1);
+        assert_eq!(net.neurons[1].synaptic_current_pa, -1);
     }
 
     /// The clock runs past 2^32 μs, where it used to saturate: the neurons are
@@ -3520,14 +3698,21 @@ mod tests {
                     SpikingNeuralNetwork::new_with_voltage_resolution(10, 1000, topology, res)
                         .expect("builds");
                 assert!(
-                    net.neurons().iter().all(|n| n.noise_amplitude_ua == 5),
+                    net.neurons().iter().all(|n| n.noise_amplitude_pa == 5),
                     "{res:?}"
                 );
             }
         }
-        let given =
-            SpikingNeuralNetwork::from_neurons(vec![LIFNeuron::new(0)], 1000).expect("builds");
-        assert_eq!(given.neurons()[0].noise_amplitude_ua, 0);
+        let given = SpikingNeuralNetwork::from_neurons(
+            vec![LIFNeuron::new(
+                0,
+                NeuronType::Excitatory,
+                VoltageResolution::Millivolt,
+            )],
+            1000,
+        )
+        .expect("builds");
+        assert_eq!(given.neurons()[0].noise_amplitude_pa, 0);
     }
 
     /// STDP does the same past 2^32 μs as at the start: the three pairings the
@@ -3544,12 +3729,8 @@ mod tests {
         // `first` fires, then `gap` steps later the other (gap 0: it alone).
         let change = |start_us: u64, first: usize, gap: u64| -> i16 {
             let quiet = |id| {
-                LIFNeuron::new_with_type_resolution(
-                    id,
-                    NeuronType::Excitatory,
-                    VoltageResolution::Millivolt,
-                )
-                .with_noise_amplitude_ua(0)
+                LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt)
+                    .with_noise_amplitude_pa(0)
             };
             let mut net =
                 SpikingNeuralNetwork::from_neurons(vec![quiet(0), quiet(1)], 1_000).expect("two");
@@ -3601,7 +3782,7 @@ mod tests {
         // together in the accumulator ⇒ integrated as ONE summed current
         // next step (the σ-accumulation the channel physics runs on).
         // 3 neurons ⇒ 0,1 E; 2 I. Post = neuron 2 (I-type). Weights 125 each
-        // ⇒ 2 × +12 = +24 μA; centi I: current_term = 24·100·100/1000 = 240,
+        // ⇒ 2 × +12 = +24 pA; centi I: current_term = 24·100·100/1000 = 240,
         // delta_v = 100·240/1000 = 24 quanta ⇒ −7000 → −6976.
         let mut net = SpikingNeuralNetwork::new_with_voltage_resolution(
             3,
@@ -3612,7 +3793,7 @@ mod tests {
         .expect("constructs");
         net.build_topology().expect("empty build");
         for n in &mut net.neurons {
-            n.noise_amplitude_ua = 0;
+            n.noise_amplitude_pa = 0;
         }
         net.add_synapse(0, 2, 125).expect("edge a");
         net.add_synapse(1, 2, 125).expect("edge b");
@@ -3650,8 +3831,8 @@ mod tests {
 
     #[test]
     fn sub_dead_zone_drive_spikes_only_in_centimillivolt_network() {
-        // Network-level dead-zone proof: 160 μA sustained (above the ~150 μA
-        // E threshold current, below the mV grid's 200 μA dead zone from
+        // Network-level dead-zone proof: 160 pA sustained (above the ~150 pA
+        // E threshold current, below the mV grid's 200 pA dead zone from
         // rest). Same drive, same noise seeds — only the grid differs.
         // 5 neurons ⇒ exc_count = 4 (neuron 0 is Excitatory; the I neurons
         // sit at V_ss −54 mV < their −50 threshold and stay silent in both
@@ -3662,13 +3843,13 @@ mod tests {
                 .expect("constructs");
         mv.build_topology().expect("build");
         for n in &mut mv.neurons {
-            n.noise_amplitude_ua = 0;
+            n.noise_amplitude_pa = 0;
         }
         let mut mv_spikes = 0;
         for _ in 0..100 {
             mv_spikes += mv.step(&drive()).expect("step").len();
         }
-        assert_eq!(mv_spikes, 0, "mV grid: blind to 160 μA from rest");
+        assert_eq!(mv_spikes, 0, "mV grid: blind to 160 pA from rest");
 
         let mut cmv = SpikingNeuralNetwork::new_with_voltage_resolution(
             5,
@@ -3679,13 +3860,13 @@ mod tests {
         .expect("constructs");
         cmv.build_topology().expect("build");
         for n in &mut cmv.neurons {
-            n.noise_amplitude_ua = 0;
+            n.noise_amplitude_pa = 0;
         }
         let mut cmv_spikes = 0;
         for _ in 0..100 {
             cmv_spikes += cmv.step(&drive()).expect("step").len();
         }
-        assert!(cmv_spikes >= 1, "centi grid: 160 μA fires the E neurons");
+        assert!(cmv_spikes >= 1, "centi grid: 160 pA fires the E neurons");
     }
 
     // ----- Property tests (Cardano-grade rigor) -----
@@ -3837,7 +4018,7 @@ mod tests {
     fn divisor_five_doubles_the_transmitted_pulse_centimv() {
         // Same derivation as transmission_is_live_one_step_delayed_centimv,
         // divisor 5 instead of the default 10: a +125-weight spike injects
-        // 125/5 = +25 μA; I-type centi integration:
+        // 125/5 = +25 pA; I-type centi integration:
         // current_term = 25·100·100/1000 = 250 cV,
         // delta_v = 100·250/1000 = 25 quanta ⇒ post −7000 → −6975 exactly
         // one step after the pre spike. The knob moves the coupling,
@@ -3851,7 +4032,7 @@ mod tests {
         .expect("constructs");
         net.build_topology().expect("empty build");
         for n in &mut net.neurons {
-            n.noise_amplitude_ua = 0;
+            n.noise_amplitude_pa = 0;
         }
         net.add_synapse(0, 1, 125).expect("edge");
         net.finalize_synapses();
@@ -3882,12 +4063,12 @@ mod tests {
         .expect("constructs");
         net.build_topology().expect("empty build");
         for n in &mut net.neurons {
-            n.noise_amplitude_ua = 0;
+            n.noise_amplitude_pa = 0;
         }
         let (mut max_adaptation, mut late_spikes) = (0_i16, 0_usize);
         for step in 0..6_000 {
             let spikes = net.step(&[600, 0]).expect("step");
-            max_adaptation = max_adaptation.max(net.neurons[0].adaptation_current_ua);
+            max_adaptation = max_adaptation.max(net.neurons[0].adaptation_current_pa);
             if step >= 5_000 {
                 late_spikes += spikes.len();
             }
@@ -3899,7 +4080,7 @@ mod tests {
         );
         assert!(
             max_adaptation < 500,
-            "adaptation must equilibrate under the 600 μA drive (peaked at {max_adaptation})"
+            "adaptation must equilibrate under the 600 pA drive (peaked at {max_adaptation})"
         );
     }
 
@@ -3922,8 +4103,8 @@ mod tests {
             // deterministic constants: noise off, no refractory,
             // tau=dt → ΔV = leak + (I−A)·R/1000 per step
             for n in &mut net.neurons {
-                n.noise_amplitude_ua = 0;
-                n.tau_refractory_us = 0;
+                n.noise_amplitude_pa = 0;
+                n.refractory_period_us = 0;
                 n.tau_membrane_us = 1000;
                 n.resistance_mohm = 1000;
             }
@@ -3987,7 +4168,7 @@ mod tests {
         // computes ΔV = 1 − A_effective:
         //   membrane −56, threshold −55 (SET — default is −50),
         //   resting −70 (leak −14),
-        //   R = 1000 mΩ, tau = dt = 1000 μs, drive 15 μA
+        //   R = 1000 mΩ, tau = dt = 1000 μs, drive 15 pA
         //     → current_term = (15 − A)·1000/1000 = 15 − A
         //     → ΔV = 1000·(−14 + 15 − A)/1000 = 1 − A
         // A_start = 1: decay-first → integrate sees 0 → ΔV = +1 →
@@ -4004,14 +4185,14 @@ mod tests {
         .expect("constructs");
         net1.build_topology().expect("empty build");
         for n in &mut net1.neurons {
-            n.noise_amplitude_ua = 0;
-            n.tau_refractory_us = 0;
+            n.noise_amplitude_pa = 0;
+            n.refractory_period_us = 0;
             n.tau_membrane_us = 1000;
             n.resistance_mohm = 1000;
             n.membrane_potential = -56;
             n.threshold = -55;
         }
-        net1.neurons[0].adaptation_current_ua = 1;
+        net1.neurons[0].adaptation_current_pa = 1;
         let spikes1 = net1.step(&[15]).expect("step A=1");
         assert_eq!(
             spikes1.len(),
@@ -4023,7 +4204,7 @@ mod tests {
             "spike resets to reset potential"
         );
         assert_eq!(
-            net1.neurons[0].adaptation_current_ua, 2,
+            net1.neurons[0].adaptation_current_pa, 2,
             "decay 1→0 then +2 on spike"
         );
 
@@ -4036,14 +4217,14 @@ mod tests {
         .expect("constructs");
         net2.build_topology().expect("empty build");
         for n in &mut net2.neurons {
-            n.noise_amplitude_ua = 0;
-            n.tau_refractory_us = 0;
+            n.noise_amplitude_pa = 0;
+            n.refractory_period_us = 0;
             n.tau_membrane_us = 1000;
             n.resistance_mohm = 1000;
             n.membrane_potential = -56;
             n.threshold = -55;
         }
-        net2.neurons[0].adaptation_current_ua = 2;
+        net2.neurons[0].adaptation_current_pa = 2;
         let spikes2 = net2.step(&[15]).expect("step A=2");
         assert_eq!(
             spikes2.len(),
@@ -4052,7 +4233,7 @@ mod tests {
         );
         assert_eq!(net2.neurons[0].membrane_potential, -56, "ΔV = 0 exactly");
         assert_eq!(
-            net2.neurons[0].adaptation_current_ua, 1,
+            net2.neurons[0].adaptation_current_pa, 1,
             "decay 2→1, no spike"
         );
     }
@@ -4073,7 +4254,7 @@ mod tests {
                     .expect("constructs");
             net.build_topology().expect("empty build");
             for neuron in &mut net.neurons {
-                neuron.noise_amplitude_ua = 0;
+                neuron.noise_amplitude_pa = 0;
             }
             let spikes = net.step(&[]).expect("step at zero input");
             assert_eq!(spikes.len(), 0, "n = {n}: zero input fires nothing");

@@ -20,7 +20,7 @@ slint::include_modules!();
 struct Controls {
     running: AtomicBool,
     learning: AtomicBool,
-    input_drive_ua: AtomicI16,
+    input_drive_pa: AtomicI16,
     step_once: AtomicBool,
 }
 
@@ -36,8 +36,8 @@ fn main() -> Result<(), slint::PlatformError> {
         .expect("balanced 128-neuron network must construct");
     app.set_header_text(format!("Balanced E/I · {} neurons", NEURON_COUNT).into());
     app.set_stats_text("Running…".into());
-    // 600 μA: above the balanced network's self-quenching threshold so firing
-    // is visibly sustained on open. (300 μA quiets to ~1.6 Hz as inhibition
+    // 600 pA: above the balanced network's self-quenching threshold so firing
+    // is visibly sustained on open. (300 pA quiets to ~1.6 Hz as inhibition
     // wins — interesting to explore by sliding down, but a bad default.)
     app.set_input_drive(600.0);
     app.set_running(true); // alive on open — the point of a microscope is to see the thing
@@ -47,7 +47,7 @@ fn main() -> Result<(), slint::PlatformError> {
     let controls = Arc::new(Controls {
         running: AtomicBool::new(true),
         learning: AtomicBool::new(false),
-        input_drive_ua: AtomicI16::new(600),
+        input_drive_pa: AtomicI16::new(600),
         step_once: AtomicBool::new(false),
     });
     {
@@ -98,7 +98,7 @@ fn main() -> Result<(), slint::PlatformError> {
     {
         let controls = controls.clone();
         app.on_drive_edited(move |v| {
-            controls.input_drive_ua.store(v as i16, Ordering::Relaxed);
+            controls.input_drive_pa.store(v as i16, Ordering::Relaxed);
         });
     }
 
@@ -126,7 +126,7 @@ fn main() -> Result<(), slint::PlatformError> {
                 || controls.step_once.swap(false, Ordering::Relaxed);
 
             if should_step {
-                let drive = controls.input_drive_ua.load(Ordering::Relaxed);
+                let drive = controls.input_drive_pa.load(Ordering::Relaxed);
                 runner.tick(drive);
                 let stats = runner.stats_text();
                 let (rw, rh, rbytes) = runner.raster_display();

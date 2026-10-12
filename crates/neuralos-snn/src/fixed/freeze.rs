@@ -67,7 +67,7 @@ pub fn preamble() -> &'static str {
 /// `rows` name the trace, and `drive` is its run.
 ///
 /// No state is emitted: a frozen neuron is its parameters, at rest. The
-/// eight setters are written default or not, so a frozen file does not
+/// nine setters are written default or not, so a frozen file does not
 /// move when a default does — the per-type table and the per-grid
 /// scaling are what an old file would otherwise be silently rebound to.
 ///
@@ -83,9 +83,10 @@ pub fn preamble() -> &'static str {
 /// a neuron that is not at rest (the assert in `neuron_chain` carries
 /// the reasons it cannot fire on the stranger path); and a neuron whose
 /// `id` is not its position, since the id is what a `FixedNetwork`
-/// indexes it by and what seeds its noise. And when the chain written
-/// for a neuron does not rebuild it, which is this module's own defect
-/// and not the caller's.
+/// indexes it by and what seeds its noise; `from_neurons` refuses both,
+/// so only a network the crate's own tests write reaches them. And when
+/// the chain written for a neuron does not rebuild it, which is this
+/// module's own defect and not the caller's.
 #[must_use]
 pub fn module(
     net: &SpikingNeuralNetwork,
@@ -145,7 +146,7 @@ pub fn module(
         // is what "the emitted list of setters is complete" means here.
         // It is not the tripwire a field added to `LIFNeuron` trips:
         // that one is `neuron_chain`'s destructure, and behind it
-        // `the_neuron_has_seventeen_fields`, whose neuron is a literal.
+        // `the_neuron_has_eighteen_fields`, whose neuron is a literal.
         // WHAT IT ALONE COVERS, since the test lines in `tests/traces.rs`
         // catch a missing setter in-tree too: the stranger path, where
         // no test line exists, and an earlier error, at regeneration.
@@ -186,7 +187,7 @@ pub fn module(
         for s in &synapses {
             out.push_str(&format!(
                 "        FixedSynapse::new({}, {}, {}),\n",
-                s.pre, s.post, s.pulse_ua
+                s.pre, s.post, s.pulse_pa
             ));
         }
         out.push_str("    ];\n");
@@ -226,10 +227,10 @@ pub fn tail(cases: &[&str]) -> String {
 /// right for every frozen file ever written. THIS DESTRUCTURE IS THE
 /// FIRST TRIPWIRE, and it is only as strong as its bindings' readers: a
 /// binding with no reader can be answered with `..` and the tripwire is
-/// gone. Every one of the seventeen has one — the eight parameters and
+/// gone. Every one of the eighteen has one — the nine parameters and
 /// the three constructor arguments below, the six state fields in the
 /// at-rest assert. The second tripwire does not come through here at
-/// all: it is `the_neuron_has_seventeen_fields`, whose neuron is a
+/// all: it is `the_neuron_has_eighteen_fields`, whose neuron is a
 /// `LIFNeuron { … }` literal, so a field added is the compiler's error
 /// there whatever this pattern says.
 ///
@@ -246,15 +247,16 @@ fn neuron_chain(case: &str, i: usize, n: &LIFNeuron) -> (String, LIFNeuron) {
         reset_potential,
         voltage_resolution,
         tau_membrane_us,
-        tau_refractory_us,
-        refractory_time_us,
+        refractory_period_us,
+        refractory_remaining_us,
         last_update_time_us,
         last_spike_time_us,
-        synaptic_current_ua,
+        synaptic_current_pa,
         capacitance_pf,
         resistance_mohm,
-        noise_amplitude_ua,
-        adaptation_current_ua,
+        noise_amplitude_pa,
+        adaptation_current_pa,
+        adaptation_enabled,
     } = n;
     // A frozen neuron is parameters, at rest: no state is written, so a
     // neuron carrying state would be frozen as another neuron in
@@ -267,22 +269,25 @@ fn neuron_chain(case: &str, i: usize, n: &LIFNeuron) -> (String, LIFNeuron) {
     // off the network's clock: a network stepped once at time 0 with
     // nothing moving passes this assert (`integrate_and_fire` writes
     // `last_update_time_us = current_time_us`, 0 at the first step), not
-    // the clock's. What this assert alone catches is a neuron handed to
-    // `from_neurons` carrying state, which a clock at 0 does not reveal.
+    // the clock's. A neuron handed to `from_neurons` carrying state, which
+    // a clock at 0 does not reveal, is refused there since round 65
+    // (`Error::NeuronNotAtRest`), so no public path reaches this assert;
+    // it reads its own bindings, the destructure's readers, and its test
+    // stages the case.
     assert!(
         membrane_potential == resting_potential
-            && *refractory_time_us == 0
+            && *refractory_remaining_us == 0
             && *last_update_time_us == 0
             && *last_spike_time_us == 0
-            && *synaptic_current_ua == 0
-            && *adaptation_current_ua == 0,
+            && *synaptic_current_pa == 0
+            && *adaptation_current_pa == 0,
         "{case}, neuron {i}: the freezer writes a neuron at rest, before the first step"
     );
     let mut text = format!(
-        "LIFNeuron::new_with_type_resolution({id}, NeuronType::{neuron_type:?}, \
+        "LIFNeuron::new({id}, NeuronType::{neuron_type:?}, \
          VoltageResolution::{voltage_resolution:?})"
     );
-    let mut rebuilt = LIFNeuron::new_with_type_resolution(*id, *neuron_type, *voltage_resolution);
+    let mut rebuilt = LIFNeuron::new(*id, *neuron_type, *voltage_resolution);
     // ONE LIST for the two halves. `stringify!` writes the setter's name
     // into the text and the same name is called on the rebuild, so a
     // renamed setter cannot part from the text it writes, and a setter
@@ -301,10 +306,11 @@ fn neuron_chain(case: &str, i: usize, n: &LIFNeuron) -> (String, LIFNeuron) {
         with_threshold => *threshold,
         with_reset_potential => *reset_potential,
         with_tau_membrane_us => *tau_membrane_us,
-        with_tau_refractory_us => *tau_refractory_us,
+        with_refractory_period_us => *refractory_period_us,
         with_capacitance_pf => *capacitance_pf,
         with_resistance_mohm => *resistance_mohm,
-        with_noise_amplitude_ua => *noise_amplitude_ua,
+        with_noise_amplitude_pa => *noise_amplitude_pa,
+        with_adaptation_enabled => *adaptation_enabled,
     }
     (text, rebuilt)
 }
@@ -316,8 +322,8 @@ mod tests {
 
     /// A neuron at rest with no noise, on `grid`.
     fn quiet(id: u16, grid: VoltageResolution) -> LIFNeuron {
-        let mut n = LIFNeuron::new_with_type_resolution(id, NeuronType::Excitatory, grid);
-        n.noise_amplitude_ua = 0;
+        let mut n = LIFNeuron::new(id, NeuronType::Excitatory, grid);
+        n.noise_amplitude_pa = 0;
         n
     }
 
@@ -475,13 +481,17 @@ mod tests {
         );
     }
 
+    /// `from_neurons` refuses such a neuron, so the case is put in its
+    /// slot after.
     #[test]
     #[should_panic(expected = "restless, neuron 0: the freezer writes a neuron at rest")]
     fn a_neuron_carrying_state_is_refused() {
-        let mut restless = quiet(0, VoltageResolution::CentiMillivolt);
-        restless.membrane_potential += 1;
-        let neurons = vec![restless, quiet(1, VoltageResolution::CentiMillivolt)];
-        let net = SpikingNeuralNetwork::from_neurons(neurons, 1_000).expect("neurons given");
+        let neurons = vec![
+            quiet(0, VoltageResolution::CentiMillivolt),
+            quiet(1, VoltageResolution::CentiMillivolt),
+        ];
+        let mut net = SpikingNeuralNetwork::from_neurons(neurons, 1_000).expect("at rest");
+        net.neurons_mut()[0].membrane_potential += 1;
         let _ = module(
             &net,
             "restless",
@@ -492,14 +502,17 @@ mod tests {
         );
     }
 
+    /// `from_neurons` refuses such ids, so the two neurons swap places
+    /// after.
     #[test]
     #[should_panic(expected = "swapped, neuron 0: a neuron's id is its position")]
     fn an_id_off_its_position_is_refused() {
         let neurons = vec![
-            quiet(1, VoltageResolution::CentiMillivolt),
             quiet(0, VoltageResolution::CentiMillivolt),
+            quiet(1, VoltageResolution::CentiMillivolt),
         ];
-        let net = SpikingNeuralNetwork::from_neurons(neurons, 1_000).expect("neurons given");
+        let mut net = SpikingNeuralNetwork::from_neurons(neurons, 1_000).expect("in place");
+        net.neurons_mut().swap(0, 1);
         let _ = module(
             &net,
             "swapped",

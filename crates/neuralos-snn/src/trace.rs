@@ -200,8 +200,7 @@ mod tests {
     /// its slot: `from_neurons` refuses two grids, so a network on two is
     /// one only the crate itself builds.
     fn on_grids(grids: &[VoltageResolution]) -> SpikingNeuralNetwork {
-        let neuron =
-            |id, grid| LIFNeuron::new_with_type_resolution(id, NeuronType::Excitatory, grid);
+        let neuron = |id, grid| LIFNeuron::new(id, NeuronType::Excitatory, grid);
         let first = (0u16..).zip(grids).map(|(id, _)| neuron(id, grids[0]));
         let mut net = SpikingNeuralNetwork::from_neurons(first.collect(), 500).expect("one grid");
         for ((id, &grid), slot) in (0u16..).zip(grids).zip(net.neurons_mut()) {
@@ -214,7 +213,18 @@ mod tests {
     #[test]
     fn a_time_past_the_u32_range_prints_whole() {
         let mut out = String::new();
-        row(&mut out, 7, 5_000_000_000, &[false], &[LIFNeuron::new(0)]).expect("a String");
+        row(
+            &mut out,
+            7,
+            5_000_000_000,
+            &[false],
+            &[LIFNeuron::new(
+                0,
+                NeuronType::Excitatory,
+                VoltageResolution::Millivolt,
+            )],
+        )
+        .expect("a String");
         assert!(out.starts_with("7 5000000000 | "), "{out:?}");
         assert!(out.ends_with('\n'), "{out:?}");
     }
@@ -268,13 +278,7 @@ mod tests {
     #[test]
     fn n_counts_every_neuron_at_the_cap() {
         let neurons = (0..u16::MAX)
-            .map(|id| {
-                LIFNeuron::new_with_type_resolution(
-                    id,
-                    NeuronType::Excitatory,
-                    VoltageResolution::Millivolt,
-                )
-            })
+            .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
             .collect();
         let net = SpikingNeuralNetwork::from_neurons(neurons, 1_000).expect("neurons given");
         assert!(header(&net, "big", Kind::Regression, 1, Rows::All)

@@ -60,7 +60,7 @@ pub struct SimRunner {
     net: SpikingNeuralNetwork,
     /// Per-neuron spike color (E or I), precomputed once at construction.
     neuron_color: Vec<[u8; 4]>,
-    /// Reused input-current buffer (one μA value per neuron), avoiding per-tick alloc.
+    /// Reused input-current buffer (one pA value per neuron), avoiding per-tick alloc.
     inputs: Vec<i16>,
     /// Ring buffer: `RASTER_COLS` columns × `rows` rows, RGBA bytes, row-major.
     /// Column `head` is the oldest (next to be overwritten); `(head-1)` is newest.
@@ -93,7 +93,7 @@ impl SimRunner {
         let neuron_color = net
             .neurons()
             .iter()
-            .map(|n| match n.neuron_type {
+            .map(|n| match n.neuron_type() {
                 NeuronType::Inhibitory => I_SPIKE,
                 // Excitatory, and a type this crate does not know, draw as excitatory.
                 _ => E_SPIKE,
@@ -154,14 +154,14 @@ impl SimRunner {
         self.net.plasticity_enabled()
     }
 
-    /// Advance the sim one step with a uniform input drive (μA). Writes the
+    /// Advance the sim one step with a uniform input drive (pA). Writes the
     /// resulting spike column into the raster ring at `head` and advances head.
     ///
     /// `step()` only errors on index/param violations that cannot occur in
     /// steady-state stepping (correctly-sized inputs, valid indices); any such
     /// error is swallowed as a no-spike frame rather than panicking the UI.
-    pub fn tick(&mut self, input_drive_ua: i16) {
-        self.inputs.fill(input_drive_ua);
+    pub fn tick(&mut self, input_drive_pa: i16) {
+        self.inputs.fill(input_drive_pa);
         let spikes = self.net.step(&self.inputs).unwrap_or_default();
 
         // Overwrite the oldest column with the new frame: background first,
@@ -300,6 +300,25 @@ mod tests {
             runner.net.synapse_count()
         );
         assert!(text.ends_with(&counts), "{text}");
+    }
+
+    /// Each neuron's spike color follows its type, read through
+    /// `neuron_type()`: an inhibitory neuron draws `I_SPIKE`, any other
+    /// `E_SPIKE`, and the balanced network has both.
+    #[test]
+    fn spike_color_follows_the_neuron_type() {
+        let r = SimRunner::new(80, 1000).expect("80 neurons valid");
+        let mut drawn = (0_usize, 0_usize);
+        for (n, color) in r.net.neurons().iter().zip(&r.neuron_color) {
+            if n.neuron_type() == NeuronType::Inhibitory {
+                assert_eq!(*color, I_SPIKE, "neuron {}", n.id());
+                drawn.1 += 1;
+            } else {
+                assert_eq!(*color, E_SPIKE, "neuron {}", n.id());
+                drawn.0 += 1;
+            }
+        }
+        assert!(drawn.0 > 0 && drawn.1 > 0, "both types drawn: {drawn:?}");
     }
 
     #[test]

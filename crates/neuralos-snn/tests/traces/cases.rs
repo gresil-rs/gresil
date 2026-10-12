@@ -56,7 +56,7 @@ pub struct Case {
     pub build: fn() -> Run,
 }
 
-/// A built network and its drive: the input currents (μA per neuron) of a
+/// A built network and its drive: the input currents (pA per neuron) of a
 /// given step.
 pub struct Run {
     pub net: SpikingNeuralNetwork,
@@ -159,7 +159,7 @@ pub fn render(case: &Case) -> String {
         let membranes: Vec<String> = net
             .neurons()
             .iter()
-            .map(|n| n.membrane_potential.to_string())
+            .map(|n| n.membrane_potential().to_string())
             .collect();
         out.push_str(&format!(
             "{step} {time_us} | {} | {}\n",
@@ -170,13 +170,11 @@ pub fn render(case: &Case) -> String {
     out
 }
 
-/// A neuron with the noise set. A topology builder gives its neurons 5 μA
-/// and a neuron constructor 0; a case that wants silence builds its neurons
+/// A neuron with the noise set. A topology builder gives its neurons 5 pA
+/// and `LIFNeuron::new` 0; a case that wants silence builds its neurons
 /// here and hands them to `from_neurons`.
-fn neuron(id: u16, kind: NeuronType, res: VoltageResolution, noise_ua: u8) -> LIFNeuron {
-    let mut n = LIFNeuron::new_with_type_resolution(id, kind, res);
-    n.noise_amplitude_ua = noise_ua;
-    n
+fn neuron(id: u16, kind: NeuronType, res: VoltageResolution, noise_pa: u8) -> LIFNeuron {
+    LIFNeuron::new(id, kind, res).with_noise_amplitude_pa(noise_pa)
 }
 
 /// A network from given neurons and the given edges, which its first step
@@ -246,17 +244,17 @@ pub const CASES: &[Case] = &[
 /// The reference vector: one excitatory neuron on the centi-mV grid, no
 /// noise, the threshold out of reach (so the vector is the integration
 /// alone, and the oracle needs no spike, reset, refractory or adaptation
-/// term). The drive walks four regimes: the board's 160 μA toward its
+/// term). The drive walks four regimes: the board's 160 pA toward its
 /// steady state, the largest current to the ceiling, the smallest to the
 /// floor, then nothing, back toward rest.
 fn neuron_reference() -> Run {
-    let mut n = neuron(
+    let n = neuron(
         0,
         NeuronType::Excitatory,
         VoltageResolution::CentiMillivolt,
         0,
-    );
-    n.threshold = i16::MAX;
+    )
+    .with_threshold(i16::MAX);
     let net = wired(vec![n], &[]);
     Run {
         net,
@@ -272,7 +270,7 @@ fn neuron_reference() -> Run {
 }
 
 /// The firmware's neuron (`firmware/esp32c3/src/main.rs`): excitatory,
-/// centi-mV grid, the constructor's noise (0), 160 μA, one step per ms for
+/// centi-mV grid, the constructor's noise (0), 160 pA, one step per ms for
 /// 10,000 steps. The network's step does what the firmware's `step` does
 /// (adaptation decay, then integrate at `step × DT_US`), so the spike
 /// rows fold to the board's record: 147 spikes, the first at step 55,
@@ -280,7 +278,7 @@ fn neuron_reference() -> Run {
 /// noise at 5, as before round 61, it was `0b78b456`).
 fn one_neuron_board() -> Run {
     let net = wired(
-        vec![LIFNeuron::new_with_type_resolution(
+        vec![LIFNeuron::new(
             0,
             NeuronType::Excitatory,
             VoltageResolution::CentiMillivolt,
@@ -294,9 +292,9 @@ fn one_neuron_board() -> Run {
 }
 
 /// Three excitatory neurons in a line, centi-mV, no noise, divisor 1 and
-/// 5,000-weight edges: a 5,000 μA pulse lifts a neuron from anywhere
+/// 5,000-weight edges: a 5,000 pA pulse lifts a neuron from anywhere
 /// above its reset to threshold in one step. Neuron 0 is driven at
-/// 600 μA and fires every ten steps or so; 1 fires the step after 0, and
+/// 600 pA and fires every ten steps or so; 1 fires the step after 0, and
 /// 2 the step after 1.
 fn chain_3() -> Run {
     let ns = (0..3)
@@ -318,14 +316,14 @@ fn chain_3() -> Run {
 }
 
 /// The `Feedforward` topology builder, layers 3-3-2, on the centi-mV
-/// grid with the builder's noise, 5 μA (the builder's neurons cannot be
+/// grid with the builder's noise, 5 pA (the builder's neurons cannot be
 /// reached before the first step; the LFSR is deterministic). Divisor 1,
-/// so the builder's 100-weight edges land as 100 μA pulses, +50 quanta
+/// so the builder's 100-weight edges land as 100 pA pulses, +50 quanta
 /// on an excitatory neuron. The first layer is driven to fire every ten
-/// steps or so; the second is biased at 148 μA, where the grid's
+/// steps or so; the second is biased at 148 pA, where the grid's
 /// truncation parks it about 40 quanta under threshold and one pulse
 /// fires it; the third, the two inhibitory neurons (ids 6 and 7, the
-/// 80/20 split), at 199 μA, the same idea on its own threshold. A spiked
+/// 80/20 split), at 199 pA, the same idea on its own threshold. A spiked
 /// neuron takes most of a hundred steps to climb back, so the deeper
 /// layers fire twice in the window and the first fourteen times.
 fn feedforward_8() -> Run {
@@ -346,7 +344,7 @@ fn feedforward_8() -> Run {
 
 /// Session F's pin on the mV grid (`network.rs`,
 /// `transmission_is_live_one_step_delayed_mv_strong_weight`): an
-/// excitatory neuron fires at step 0 on 3,000 μA, and its 2,000-weight
+/// excitatory neuron fires at step 0 on 3,000 pA, and its 2,000-weight
 /// edge moves the inhibitory neuron by +2 mV exactly one step later,
 /// not on the spike's own step. Silent after step 0. Plasticity off: the
 /// pin is transmission, here and in `centi-mv-grid`.
@@ -372,7 +370,7 @@ fn recurrent_transmission() -> Run {
 
 /// The same pin on the centi-mV grid
 /// (`transmission_is_live_one_step_delayed_centimv`): a 125-weight edge,
-/// a +12 μA pulse, and the inhibitory neuron moves −7,000 → −6,988, sub-mV
+/// a +12 pA pulse, and the inhibitory neuron moves −7,000 → −6,988, sub-mV
 /// motion the mV grid cannot show.
 fn centi_mv_grid() -> Run {
     let net = wired(
@@ -405,8 +403,8 @@ fn centi_mv_grid() -> Run {
 }
 
 /// An inhibitory neuron (0) with a −10,000-weight edge onto an excitatory
-/// one (1), both driven at 250 μA, centi-mV, no noise, divisor 10. Alone,
-/// neuron 1 would fire every twelve steps or so; each −1,000 μA pulse
+/// one (1), both driven at 250 pA, centi-mV, no noise, divisor 10. Alone,
+/// neuron 1 would fire every twelve steps or so; each −1,000 pA pulse
 /// knocks it down by about 500 quanta, and it fires three times in the
 /// window against neuron 0's five.
 fn inhibitory() -> Run {
@@ -433,10 +431,10 @@ fn inhibitory() -> Run {
     }
 }
 
-/// One excitatory neuron at 3,000 μA, centi-mV, no noise: a spike, two
+/// One excitatory neuron at 3,000 pA, centi-mV, no noise: a spike, two
 /// steps frozen at the reset potential (2 ms refractory at 1 ms steps),
-/// two steps of climb, a spike. The adaptation current (+2 μA per spike,
-/// −1 per step) is the slow drift in the climb.
+/// two steps of climb, a spike. The 2 pA of adaptation each spike adds
+/// decays to 0 in the two frozen steps, so every climb is the same.
 fn refractory() -> Run {
     let net = wired(
         vec![neuron(
@@ -454,7 +452,7 @@ fn refractory() -> Run {
 }
 
 /// Two excitatory neurons, centi-mV, no noise, one 1,000-weight edge at
-/// divisor 1 (a +500-quanta pulse), 0 driven at 600 μA and 1 at 200 μA so
+/// divisor 1 (a +500-quanta pulse), 0 driven at 600 pA and 1 at 200 pA so
 /// both fire and pair. With STDP on the weight drifts by a few units per
 /// pairing, and each unit is visible in neuron 1's membrane on the pulse
 /// steps; with it off the two traces part at the first pairing.
@@ -496,8 +494,8 @@ fn plasticity_off() -> Run {
 /// truncation slows it), the smallest pins it at the −100 mV floor, and
 /// nothing again.
 fn saturation_floor_ceiling() -> Run {
-    let mut n = neuron(0, NeuronType::Excitatory, VoltageResolution::Millivolt, 0);
-    n.threshold = i16::MAX;
+    let n =
+        neuron(0, NeuronType::Excitatory, VoltageResolution::Millivolt, 0).with_threshold(i16::MAX);
     let net = wired(vec![n], &[]);
     Run {
         net,
@@ -531,7 +529,7 @@ fn nir_chain_fixture() -> Run {
 /// and −1,500 snapped by `ternarize_weights` to ±γ with γ = 1,600 (the
 /// mean magnitude), divisor 1: neuron 1 takes +8 mV per spike of 0,
 /// neuron 2 takes +8 from 0 and −8 from 1. Neurons 1 and 2 are biased at
-/// 300 μA so they fire on their own and the pulses move their timing.
+/// 300 pA so they fire on their own and the pulses move their timing.
 fn ternary_weights() -> Run {
     let ns = (0..3)
         .map(|id| neuron(id, NeuronType::Excitatory, VoltageResolution::Millivolt, 0))

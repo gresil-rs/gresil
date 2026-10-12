@@ -4,9 +4,9 @@ slug: 20260815-125500_neuralos-v2
 project: NeuralOS v2
 phase: complete
 progress: 88/88
-head: "main@0862564 (PR #60 merged 2026-10-10 02:59 UTC: round 63, tier 2, the constructor holes: `build_topology` refuses a `Random` connectivity or a `SmallWorld` rewiring probability outside 0 to 1, NaN included, with `ProbabilityOutOfRange`, BREAKING; `new` reserves nothing; SmallWorld sums `i + offset` wide; `Random` stores no list of every pair; mirror synced, branch deleted) · alpha.8 stamped 2026-09-14 (`docs/releases/v0.1.0-alpha.8.md` § Stamped); the tree is ahead of it by rounds 34 to 63 (D8, the spiking Linear edge; `trace::row`, and the freezer behind `unstable-freeze`; `nir2json --freeze`; the firmware's stranger slot and `stranger.sh`, check 7; capacity, the bar `44·N + 6·S ≤ 262,144` measured at its two corners on the C3, check 8; the README's first example a doctest with `missing_docs` on and the default build forbidding `unsafe`, checks 10 and 12; the `audit` job scanning the firmware's own lock, which ticks no check; `integrate_and_fire` § Semantics and the step's § Order with the one-step delay, check 11; STDP behind `unstable-stdp` and plasticity off at construction, check 9; the membrane average the mean of all neurons; the CSR agreeing with the synapse list; the frozen file built by constructors; the error types' 0.1.0 shape; the public enums' 0.1.0 shape; what stops being public; § Practical next moves the chapter, which ticks no check; the closed bridge chapter behind `unstable-bridge`, which ticks no check; the root and the paths, with `simd` on the exact `i64` factor, which ticks no check; the batch by name, `simd` on a `LIFBatch` and checked off x86, which ticks no check; NIR at true scale under `--sim-units`, with its parity test against snnTorch, which ticks no check; the converter surface, the units mark and `--drive` with the report, which ticks no check; Affine under `--sim-units` and the input in thousandths, with a trained model in the parity set, which ticks no check; the mutation pass and the close-out check, which ticks no check; the import's memory with the weights, which ticks no check; the NIR round trip, C and an object's own keys, which ticks no check; the NIR mutation loop, which ticks no check; the NIR overflow fix, which ticks no check; the `.nir` file fix, which ticks no check; the networks' clock and the noise default, which ticks no check; the refusals, which ticks no check; the constructor holes, which ticks no check), alpha.9 open; the fourteen checks hold, and 0.1.0 is the principal's call · wrote-from: work/stale-csr, round 64 (tier 2, BREAKING three times: a step sorts the synapses added since the last sort, `finalize` right on any state and the bump gone, `Error::StaleCsr` gone; `finalize_synapses` crate-private, `stats.total_synapses` set by `add_synapse`; `new` and `from_neurons` refuse a membrane that cannot move, `FrozenMembrane`; the two tests at 65,535 neurons run in debug; no trace, frozen file or firmware `.text` moves; reviewed once, blocking 0, its four cosmetic findings and the rulings of 2026-10-10 built, the series rebuilt once; four commits and this, not pushed; no check ticks) · open(session): the landing, the push and the PR, each on the principal's word · next-work: ROADMAP § Practical next moves"
+head: "main@320c994 (PR #61 merged 2026-10-10 23:51 UTC: round 64, tier 2, the stale CSR: a step sorts the synapses added since the last sort, `Error::StaleCsr` gone; `finalize_synapses` crate-private; `new` and `from_neurons` refuse a membrane that cannot move, `FrozenMembrane`; BREAKING three times; mirror synced, branch deleted) · alpha.8 stamped 2026-09-14 (`docs/releases/v0.1.0-alpha.8.md` § Stamped); the tree is ahead of it by rounds 34 to 64 (D8, the spiking Linear edge; `trace::row`, and the freezer behind `unstable-freeze`; `nir2json --freeze`; the firmware's stranger slot and `stranger.sh`, check 7; capacity, the bar `44·N + 6·S ≤ 262,144` measured at its two corners on the C3, check 8; the README's first example a doctest with `missing_docs` on and the default build forbidding `unsafe`, checks 10 and 12; the `audit` job scanning the firmware's own lock, which ticks no check; `integrate_and_fire` § Semantics and the step's § Order with the one-step delay, check 11; STDP behind `unstable-stdp` and plasticity off at construction, check 9; the membrane average the mean of all neurons; the CSR agreeing with the synapse list; the frozen file built by constructors; the error types' 0.1.0 shape; the public enums' 0.1.0 shape; what stops being public; § Practical next moves the chapter, which ticks no check; the closed bridge chapter behind `unstable-bridge`, which ticks no check; the root and the paths, with `simd` on the exact `i64` factor, which ticks no check; the batch by name, `simd` on a `LIFBatch` and checked off x86, which ticks no check; NIR at true scale under `--sim-units`, with its parity test against snnTorch, which ticks no check; the converter surface, the units mark and `--drive` with the report, which ticks no check; Affine under `--sim-units` and the input in thousandths, with a trained model in the parity set, which ticks no check; the mutation pass and the close-out check, which ticks no check; the import's memory with the weights, which ticks no check; the NIR round trip, C and an object's own keys, which ticks no check; the NIR mutation loop, which ticks no check; the NIR overflow fix, which ticks no check; the `.nir` file fix, which ticks no check; the networks' clock and the noise default, which ticks no check; the refusals, which ticks no check; the constructor holes, which ticks no check; the stale CSR, which ticks no check), alpha.9 open; the fourteen checks hold, and 0.1.0 is the principal's call · wrote-from: work/lifneuron-c, round 65 (tier 2, BREAKING five times: the current in pA, in the printed labels outside the closed chapter too, `pulse_ua` and the noise setter renamed; one constructor `new(id, neuron_type, grid)`, no default grid, the refractory pair named; the 17 fields crate-private, read by fourteen getters; an adaptation switch per neuron, off for `--sim-units` imports, with its getter; `from_neurons` refuses a neuron not at rest and an id off its position; two traces and the frozen file move at commit 4, the firmware `.text` at commits 1 and 4; the brief's four Calls ruled 2026-10-11 and built, the series rebuilt on them; reviewed once, its 22 findings ruled and fixed, the series rebuilt again; five commits and this, not pushed; no check ticks) · open(session): the landing, the push and the PR, each on the principal's word · next-work: ROADMAP § Practical next moves"
 started: 2026-08-15T12:55:00Z
-updated: 2026-10-10T21:43:00Z
+updated: 2026-10-11T21:14:00Z
 principal_stated_goal: "Session I: the null-ladder adjudication — BRANCH B (unattributed perturbation); P5 on infrastructure + method"
 ---
 
@@ -10333,3 +10333,36 @@ maps any `from_neurons` refusal to `BufferOverflow`, which the new
 variant cannot reach; the smoke's tier 1 writes before it makes its
 folder. No check ticks. **Guards.** 1: appended; 2: rt's harness edited
 by ruling, the examples and the smoke agree; 3: not in play.
+
+## Close-out (round 65 — C, the 17 fields: the current in pA, one constructor, the fields crate-private, an adaptation switch, two doors; tier 2 — 2026-10-11)
+
+Branch `work/lifneuron-c` from `main@320c994`, tier 2, built in scratch,
+reviewed once, five times BREAKING: `bdabd86` the current in pA, in the
+printed labels outside the closed chapter too, `pulse_ua` and the noise
+setter renamed; `3d31028` `new(id, neuron_type, grid)` the one
+constructor, no `Default`, the refractory pair named; `24043cc` the 17
+fields crate-private, fourteen getters; `f25b26f` an adaptation switch
+per neuron, off for `--sim-units` imports, `DIGITS` firing and silent
+apart; `3ba9055` `from_neurons` refusing a neuron not at rest and an id
+off its position; this. **Rulings** (philo, 2026-10-10 and 11): sitting
+1, 2a and 2b, the brief's four Calls, 3 (b) over its lean, and the
+review's 22 findings; all built. **Falsifiers**: 38 hand mutants, 33
+red, 5 green by design (two legal orders of the rules; a `u16` compare
+no list reaches; two equivalents); the constructor differential 0 red in
+1,740 cases, red under seven faults; the tip's parity pins red on the
+pin's library; `frozen.rs` without its `true` lines replays every trace.
+**The pass** over the series: 208 mutants, 151 caught, 10 missed: 8 the
+visualizer's `main`, 2 equivalent. **Measured** at the pin and the tip:
+GUARD 2's 7 examples, from the pin to commit 1 the two ruled lines
+apart, unit only, then byte for byte, their control red; rt's smoke, its
+verdict at both; leg A 175 of 175, apart from its log in the eight ruled
+labels, the gate in its contract line; the trace replay at the tip, 14
+cases, 0 red; the API, 28 items gone, 22 new, as ruled; the harness, two
+instructions per spike from commit 4, the neuron 44 B; the digits' exact
+trains 101 to 143 of 155 and 1 to 11 of 25. **Moved**: two traces and
+`frozen.rs` at commit 4; the firmware `.text` at commits 1 (the banner)
+and 4 (the switch). **Counts**: unit tests 320 to 329 with the three
+features, doctests 18 to 20. **Record-only**: a string's change moves
+`.text`; no trace case lets adaptation move a value of a neuron that has
+it on. No check ticks. **Guards.** 1: appended; 2: the closed chapter's
+labels kept, its examples and the smoke agree; 3: not in play.

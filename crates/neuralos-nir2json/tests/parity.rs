@@ -13,8 +13,8 @@
 //! spike reaches the next layer on the next step
 //! (`SpikingNeuralNetwork::step` § Order), over the steps both runs can
 //! show. A known miss is named with its reason and pinned by its counts,
-//! the trained model's by each layer's count of exact trains, so a fix
-//! shows here as a change.
+//! the trained model's by each layer's count of exact trains, firing and
+//! silent apart, so a fix shows here as a change.
 
 use std::path::{Path, PathBuf};
 
@@ -23,43 +23,37 @@ use neuralos_snn::nir::{NirImport, NirImportOptions, Thousandths};
 
 /// The graphs the bridge does not yet run spike for spike: name, the
 /// spike count of each neuron here, and why.
-const KNOWN_MISSES: &[(&str, &[usize], &str)] = &[
-    (
-        "w2.0_1.0_b0.98",
-        &[1_250, 624],
-        "the substrate's adaptation adds 2 a spike and NIR's LIF has none: \
-         a neuron that should fire on every step fires less often",
-    ),
-    (
-        "fan_in_16_8_4_b0.9_random",
-        &[148, 342, 124, 429, 67, 0, 610, 87, 543, 0, 64, 27],
-        "fan-in under random input: five trains differ, each count within one \
-         of snnTorch's; the substrate's adaptation moves two of them, and three \
-         differ without it",
-    ),
-];
+const KNOWN_MISSES: &[(&str, &[usize], &str)] = &[(
+    "fan_in_16_8_4_b0.9_random",
+    &[148, 342, 124, 429, 67, 0, 611, 87, 543, 0, 64, 27],
+    "fan-in under random input: three trains differ, each count within one \
+         of snnTorch's",
+)];
 
-/// The digits model, `digits.json`: per test digit, its label and how many
-/// trains of each layer, of 32 and 10, run spike for spike. Most exact
-/// trains are silent on both sides: of the trains snnTorch fires on these
-/// ten digits, 101 of 155 in layer 1 and 1 of 25 in layer 2 run exact.
-/// Every digit misses in some, and none for the bridge's logic: above all
-/// for the substrate's adaptation, which adds 2 a spike where NIR's LIF
-/// adds nothing, then for its resolution, the weights at 1/1000 of a unit,
-/// a learned β's leak rate at 1/1000 of a step, so a neuron up to one part
-/// in `1000 · (1 − β)` slower, and `r` in whole MΩ. A closer substrate
-/// shows here as a count that rises.
-const DIGITS: &[(u64, [usize; 2])] = &[
-    (0, [28, 8]),
-    (1, [31, 9]),
-    (2, [30, 8]),
-    (3, [25, 6]),
-    (4, [24, 6]),
-    (5, [28, 7]),
-    (6, [23, 6]),
-    (7, [25, 7]),
-    (8, [29, 8]),
-    (9, [23, 8]),
+/// The digits model, `digits.json`: per test digit, its label and, for
+/// each layer of 32 and 10, two counts: the trains snnTorch fires that run
+/// spike for spike here, and the trains it keeps silent that stay silent
+/// here. Pinned apart, since a silent train is exact with nothing to
+/// match: a sum of the two could hide a firing train lost behind a silent
+/// one kept. Of the trains snnTorch fires on these ten digits, 143 of 155
+/// in layer 1 and 11 of 25 in layer 2 run exact, and every train it keeps
+/// silent stays silent, 165 and 75. Digits 0 and 5 run every train exact;
+/// the others miss in some, and none for the bridge's logic: for the
+/// substrate's resolution, the weights at 1/1000 of a unit, a learned β's
+/// leak rate at 1/1000 of a step, so a neuron up to one part in
+/// `1000 · (1 − β)` slower, and `r` in whole MΩ. A closer substrate shows
+/// here as a count that rises.
+const DIGITS: &[(u64, [[usize; 2]; 2])] = &[
+    (0, [[13, 19], [1, 9]]),
+    (1, [[13, 18], [0, 9]]),
+    (2, [[13, 19], [2, 7]]),
+    (3, [[16, 15], [1, 7]]),
+    (4, [[16, 13], [0, 6]]),
+    (5, [[12, 20], [3, 7]]),
+    (6, [[13, 16], [1, 7]]),
+    (7, [[17, 15], [2, 7]]),
+    (8, [[16, 16], [1, 8]]),
+    (9, [[14, 14], [0, 8]]),
 ];
 
 fn fixtures() -> PathBuf {
@@ -239,12 +233,15 @@ fn a_converted_snntorch_graph_fires_snntorch_s_spikes() {
 
 /// The one reference whose weights nobody chose, the digits model: on
 /// every test digit the class, the last layer's neuron with the most
-/// spikes (the first of a tie), is snnTorch's, and each layer's count of
-/// exact trains is the one `DIGITS` pins.
+/// spikes (the first of a tie), is snnTorch's, and each layer's exact
+/// trains, firing and silent apart, are the ones `DIGITS` pins, with the
+/// totals its doc states.
 #[test]
 fn a_trained_snntorch_model_gives_snntorch_s_class() {
     let runs = compared("digits.json");
     let mut table = Vec::new();
+    // per layer: firing exact, firing, silent kept silent, silent
+    let mut totals = [[0usize; 4]; 2];
     for (config, pairs) in &runs {
         let name = config["name"].as_str().expect("name");
         let sizes = layers(config);
@@ -257,15 +254,32 @@ fn a_trained_snntorch_model_gives_snntorch_s_class() {
             class(&theirs),
             "{name}: the class, ours {ours:?}, snnTorch {theirs:?}"
         );
+        assert_eq!(sizes.len(), totals.len(), "{name}: two layers");
         let mut exact = Vec::new();
         let mut from = 0;
-        for size in sizes {
+        for (total, size) in totals.iter_mut().zip(sizes) {
             let layer = &pairs[from..from + size];
-            exact.push(layer.iter().filter(|(ours, theirs)| ours == theirs).count());
+            let (firing, silent): (Vec<_>, Vec<_>) =
+                layer.iter().partition(|(_, theirs)| !theirs.is_empty());
+            let kept = [
+                firing
+                    .iter()
+                    .filter(|(ours, theirs)| ours == theirs)
+                    .count(),
+                silent.iter().filter(|(ours, _)| ours.is_empty()).count(),
+            ];
+            *total = [
+                total[0] + kept[0],
+                total[1] + firing.len(),
+                total[2] + kept[1],
+                total[3] + silent.len(),
+            ];
+            exact.push(kept);
             from += size;
         }
-        let exact: [usize; 2] = exact.try_into().expect("two layers");
+        let exact: [[usize; 2]; 2] = exact.try_into().expect("two layers");
         table.push((config["label"].as_u64().expect("a label"), exact));
     }
     assert_eq!(table, DIGITS, "the digits model's exact trains moved");
+    assert_eq!(totals, [[143, 155, 165, 165], [11, 25, 75, 75]]);
 }

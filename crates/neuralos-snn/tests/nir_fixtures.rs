@@ -136,7 +136,7 @@ fn reference_chain_assembles_and_fires() {
     assert_eq!(net.neuron_count(), 1);
     assert_eq!((enc.rows(), enc.cols()), (1, 3));
 
-    // feature currents (μA) -> encoder -> net; strong enough drive to
+    // feature currents (pA) -> encoder -> net; strong enough drive to
     // cross threshold (deterministic: imported neurons are noise-free)
     let spikes: usize = (0..100)
         .map(|t| {

@@ -15,6 +15,14 @@ their node/edge sets (the `infer_types` auto-wire trap).
 cargo run -p neuralos-snn --example nir_assembly_gate   # 6/6 gates
 ```
 
+Since round 65 (2026-10-11) the gate prints the current in pA, as the
+library names it: its contract line reads
+`EDGE_PULSE_QUANTA = 200 (20 pA pulse @ divisor 10)`, and its three
+failure messages say 81, 327 and 162 pA. `gate.log`, the run of record,
+keeps `uA` as printed: a passing run since differs from it, from its
+line 4 (cargo's three lines come first), in the contract line alone.
+The "20 μA" pulse of gate 3, below, is 20 pA.
+
 ## The 6 gates (gate.log is the run of record)
 
 1. branch: 4 neurons all fire; first-spike steps pinned `[3, 14, 1, 3]`

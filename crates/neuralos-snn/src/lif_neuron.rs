@@ -4,19 +4,21 @@
 //!
 //! - After [`LIFNeuron::reset`], membrane potential = resting potential, no currents,
 //!   no refractory.
-//! - After a spike, the neuron is refractory for `ceil(tau_refractory_us / dt_us)`
-//!   steps: exactly `tau_refractory_us` when `dt_us` divides it.
+//! - After a spike, the neuron is refractory for `ceil(refractory_period_us / dt_us)`
+//!   steps: exactly `refractory_period_us` when `dt_us` divides it.
 //! - Membrane potential is always in `[``MEMBRANE_MV_MIN``, ``MEMBRANE_MV_MAX``]` mV.
-//! - Firing rate cannot exceed `1_000_000 / tau_refractory_us` Hz (refractory bound).
+//! - Firing rate cannot exceed `1_000_000 / refractory_period_us` Hz (refractory bound).
 //! - With zero input and large dt, membrane → resting (leak convergence).
 //!
 //! # Fixed-point convention
 //!
 //! - Membrane potential: `i16` in the neuron's voltage quanta — mV in
-//!   [`VoltageResolution::Millivolt`] (default, `-100..=50`), centi-mV in
+//!   [`VoltageResolution::Millivolt`] (`-100..=50`), centi-mV in
 //!   [`VoltageResolution::CentiMillivolt`] (`-10_000..=5_000`)
 //! - Time: `u32` microseconds (no float in hot path)
-//! - Current: `i16` μA
+//! - Current: `i16` pA: with the resistance in MΩ, `R·I` is in μV, so
+//!   the step's `R·I/1000` is mV ([`LIFNeuron::integrate_and_fire`]
+//!   § Semantics, item 5)
 //! - Resistance: `u16` MΩ
 //! - Capacitance: `u16` pF
 //!
@@ -25,23 +27,23 @@
 //! `delta_v = dt_over_tau · (leak + R·I·s/1000) / 1000` truncates to whole
 //! quanta, `s` the grid's scale: 1 on the mV grid, 100 on the centi-mV one
 //! ([`LIFNeuron::integrate_and_fire`] § Semantics has the whole step). On
-//! the default mV grid at default params (dt=1 ms, R=100 MΩ), a
-//! steady total current at rest below ~**200 μA (E, τ=20 ms)** or ~**100 μA
+//! the mV grid at the default params (dt=1 ms, R=100 MΩ), a
+//! steady total current at rest below ~**200 pA (E, τ=20 ms)** or ~**100 pA
 //! (I, τ=10 ms)** — the dead zone scales as `τ`/`dt_over_tau` — moves the
 //! membrane exactly zero, forever. The ternary substrate's recurrent pulses
-//! (weight/divisor, default 10 = ±12 μA at γ=125) sit deep inside that blindness.
+//! (weight/divisor, default 10 = ±12 pA at γ=125) sit deep inside that blindness.
 //! [`VoltageResolution::CentiMillivolt`] shrinks both dead zones 100× with
 //! the same `i16`, no float, and bit-identical arithmetic shape; the mV
-//! default exists so every recorded result in the lineage keeps its exact
+//! grid stays so every recorded result in the lineage keeps its exact
 //! numbers. (Session F addendum: coherent multi-spike pulse SUMS can cross
 //! a sub-threshold margin even on the mV grid — the dead zone binds single
 //! small currents, not stacked ones; see the post-fix sweep evidence. The
 //! operative firing barrier is a CLIMB condition, not the rest dead zone:
 //! the last 1 mV step into threshold needs a ~20 mV gap to `V_ss` (E-type,
-//! dt=1 ms) — sustained effective current ≳ 340 μA — which is why the
-//! sweep's firing cliff sits between 450 and 300 μA. And at a sticking
-//! point truncation RECTIFIES: one +12 μA pulse ratchets the membrane
-//! +1 mV while a −12 μA pulse is absorbed — pinned by
+//! dt=1 ms) — sustained effective current ≳ 340 pA — which is why the
+//! sweep's firing cliff sits between 450 and 300 pA. And at a sticking
+//! point truncation RECTIFIES: one +12 pA pulse ratchets the membrane
+//! +1 mV while a −12 pA pulse is absorbed — pinned by
 //! `rectification_at_the_sticking_point`.)
 //!
 //! # `no_std`
@@ -61,7 +63,7 @@
 //!   same id produced identical "noise" forever. Now seeded by `id XOR time`.
 
 #![allow(clippy::module_name_repetitions)]
-// Fixed-point design: types are intentionally narrow (i16 mV, u32 μs, i16 μA, u8 amplitude).
+// Fixed-point design: types are intentionally narrow (i16 mV, u32 μs, i16 pA, u8 amplitude).
 // Casts between them are part of the design and bounded by physics:
 //   - dt_us ≤ ~2^31 μs (35 min) — realistic sim step ceiling
 //   - membrane_potential in [-100, 50] — clamped after every integration
@@ -133,9 +135,10 @@ pub const MEMBRANE_MV_MAX: i16 = 50;
 #[must_use]
 pub fn dt_over_tau(dt_us: u32, tau_membrane_us: u32) -> i64 {
     let Some(tau) = NonZeroU32::new(tau_membrane_us) else {
-        // Division-by-zero guard, and nothing more. `tau_membrane_us` is a
-        // `pub` field on `LIFNeuron`, so a zero time constant reaches this
-        // line: both network constructors refuse it since round 64
+        // Division-by-zero guard, and nothing more. `with_tau_membrane_us`
+        // assigns any value, a `with_*` never computes, so a zero time
+        // constant reaches this line: both network constructors refuse it
+        // since round 64
         // (`Error::FrozenMembrane`, with every time constant above 1,000
         // steps), but a lone neuron and `FixedNetwork::new` take it, and it
         // lands here rather than on a panic. (This comment claimed "the
@@ -214,13 +217,12 @@ fn div_1000_wide(x: i64) -> i64 {
 /// two grids and the freezer writes the grid into every frozen file, so a
 /// caller may match a `VoltageResolution` without a wildcard arm, and a
 /// third grid would be a breaking release.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VoltageResolution {
-    /// 1 mV grid — the historical default. Dead zone ≈ 200 μA at rest.
-    #[default]
+    /// 1 mV grid, the historical one. Dead zone ≈ 200 pA at rest.
     Millivolt,
-    /// 0.01 mV (10 μV) grid — 100× finer. Dead zone ≈ 2 μA; the ternary
-    /// substrate's ±12 μA recurrent pulses become visible membrane motion.
+    /// 0.01 mV (10 μV) grid — 100× finer. Dead zone ≈ 2 pA; the ternary
+    /// substrate's ±12 pA recurrent pulses become visible membrane motion.
     CentiMillivolt,
 }
 
@@ -236,11 +238,10 @@ impl VoltageResolution {
 }
 
 /// Biological neuron classification.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum NeuronType {
     /// Excitatory pyramidal neuron (~80% of cortical neurons).
-    #[default]
     Excitatory,
     /// Inhibitory interneuron (~20% of cortical neurons).
     Inhibitory,
@@ -248,91 +249,105 @@ pub enum NeuronType {
 
 /// LIF neuron — fixed-point math, `no_std`-compatible, no spike history (a
 /// caller that wants one feeds a [`SpikeRecorder`](crate::spike_recorder::SpikeRecorder)).
+///
+/// Its fields are the crate's. [`new`](Self::new) and the `with_*` chain
+/// write the parameters. [`integrate_and_fire`](Self::integrate_and_fire),
+/// the four methods after it and the chain write the state: the chain's
+/// [`with_resting_potential`](Self::with_resting_potential) moves the
+/// membrane with the rest, on a live neuron too. A getter of the field's
+/// name reads each but the capacitance and the two stamps.
 #[derive(Debug, Clone)]
 pub struct LIFNeuron {
     /// Unique identifier within the network.
-    pub id: u16,
+    pub(crate) id: u16,
     /// Biological classification (excitatory/inhibitory).
-    pub neuron_type: NeuronType,
+    pub(crate) neuron_type: NeuronType,
 
     /// Current membrane potential, in this neuron's voltage quanta (mV or
     /// centi-mV — see [`voltage_resolution`](Self::voltage_resolution)).
     /// Bounded by `[MEMBRANE_MV_MIN, MEMBRANE_MV_MAX]` scaled to the grid.
-    pub membrane_potential: i16,
+    pub(crate) membrane_potential: i16,
     /// Resting potential (mV in Millivolt mode, centi-mV in `CentiMillivolt`).
     /// Typically `-70`.
-    pub resting_potential: i16,
+    pub(crate) resting_potential: i16,
     /// Spike threshold (quanta per the resolution). `-55` mV excitatory,
     /// `-50` mV inhibitory.
-    pub threshold: i16,
+    pub(crate) threshold: i16,
     /// Reset potential after spike (quanta per the resolution). `-80` mV.
-    pub reset_potential: i16,
+    pub(crate) reset_potential: i16,
 
     /// The voltage grid the four potentials above live on.
-    pub voltage_resolution: VoltageResolution,
+    pub(crate) voltage_resolution: VoltageResolution,
 
     /// Membrane time constant (μs). Determines integration speed.
-    pub tau_membrane_us: u32,
+    pub(crate) tau_membrane_us: u32,
     /// Refractory period (μs). Prevents immediate re-firing.
-    pub tau_refractory_us: u32,
+    pub(crate) refractory_period_us: u32,
     /// Remaining refractory time (μs). `0` when not refractory.
-    pub refractory_time_us: u32,
+    pub(crate) refractory_remaining_us: u32,
     /// Last simulation time the neuron was updated (μs).
     /// Owned by the caller via `integrate_and_fire(current_time_us)`: the low
     /// 32 bits of the caller's clock, wrapping at 2^32 μs (71.6 min).
-    pub last_update_time_us: u32,
+    pub(crate) last_update_time_us: u32,
     /// Timestamp of the last spike (μs), the low 32 bits of the clock like
     /// `last_update_time_us`: two stamps are compared with `wrapping_sub`.
-    pub last_spike_time_us: u32,
-    /// Accumulated synaptic current (μA).
-    pub synaptic_current_ua: i16,
+    pub(crate) last_spike_time_us: u32,
+    /// Accumulated synaptic current (pA).
+    pub(crate) synaptic_current_pa: i16,
 
     /// Membrane capacitance (pF).
-    pub capacitance_pf: u16,
+    pub(crate) capacitance_pf: u16,
     /// Membrane resistance (MΩ).
-    pub resistance_mohm: u16,
+    pub(crate) resistance_mohm: u16,
 
-    /// Noise amplitude (μA). `0` = silent, what the constructors build; the
+    /// Noise amplitude (pA). `0` = silent, what `new` builds; the
     /// topology builders of `SpikingNeuralNetwork` write 5.
-    pub noise_amplitude_ua: u8,
-    /// Spike-frequency adaptation current (μA). Decays between spikes, jumps on each spike.
-    pub adaptation_current_ua: i16,
+    pub(crate) noise_amplitude_pa: u8,
+    /// Spike-frequency adaptation current (pA). Decays between spikes, jumps
+    /// on each spike while `adaptation_enabled` is on.
+    pub(crate) adaptation_current_pa: i16,
+    /// Whether a spike adds to the adaptation current: on as `new` builds
+    /// it, off for a neuron imported in simulation units.
+    pub(crate) adaptation_enabled: bool,
 }
 
 impl LIFNeuron {
-    /// New excitatory neuron with default biological parameters.
+    /// A neuron of `neuron_type` on the voltage grid `resolution`, at
+    /// rest: the one constructor, with no default type or grid.
     ///
-    /// Its noise amplitude is 0: the neuron is silent and deterministic until
-    /// the caller asks for noise (`with_noise_amplitude_ua`). The topology
-    /// builders of `SpikingNeuralNetwork` ask for 5 μA.
+    /// The type picks the threshold, the membrane time constant and the
+    /// capacitance. All four potentials are built on the grid (rest is
+    /// `-70` on the mV grid, `-7_000` on the centi-mV one); currents and
+    /// times do not depend on it. The noise amplitude is 0, silent: a
+    /// caller that wants noise sets it.
     ///
-    /// `const`, like the constructor it forwards to: see
-    /// [`new_with_type_resolution`](Self::new_with_type_resolution) for
-    /// the chain, its two rules and what `const` costs.
-    #[must_use]
-    pub const fn new(id: u16) -> Self {
-        Self::new_with_type(id, NeuronType::Excitatory)
-    }
-
-    /// New neuron with specific biological type. Type sets threshold, tau, capacitance.
-    /// Voltage grid = mV (the historical default).
+    /// ```
+    /// use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
     ///
-    /// `const` because [`new`](Self::new) forwards to it; private, so it
-    /// is no promise of its own.
-    #[must_use]
-    const fn new_with_type(id: u16, neuron_type: NeuronType) -> Self {
-        Self::new_with_type_resolution(id, neuron_type, VoltageResolution::Millivolt)
-    }
-
-    /// New neuron with a chosen biological type AND voltage resolution.
+    /// let e = LIFNeuron::new(3, NeuronType::Excitatory, VoltageResolution::Millivolt);
+    /// assert_eq!(e.id(), 3);
+    /// assert_eq!(e.neuron_type(), NeuronType::Excitatory);
+    /// assert_eq!(e.voltage_resolution(), VoltageResolution::Millivolt);
+    /// assert_eq!((e.membrane_potential(), e.resting_potential()), (-70, -70));
+    /// assert_eq!((e.threshold(), e.reset_potential()), (-55, -80));
+    /// assert_eq!((e.tau_membrane_us(), e.refractory_period_us()), (20_000, 2_000));
+    /// assert_eq!((e.resistance_mohm(), e.noise_amplitude_pa()), (100, 0));
+    /// // at rest: no refractory time left, no current
+    /// assert_eq!(e.refractory_remaining_us(), 0);
+    /// assert_eq!((e.synaptic_current_pa(), e.adaptation_current_pa()), (0, 0));
     ///
-    /// All four potentials are constructed on the chosen grid (e.g. resting
-    /// `-70` mV / `-7_000` centi-mV). Currents and times are grid-independent.
-    /// The noise amplitude is 0, silent: a caller that wants noise sets it.
+    /// // the type picks the threshold and the time constant, the grid scales
+    /// // the four potentials
+    /// let i = LIFNeuron::new(4, NeuronType::Inhibitory, VoltageResolution::CentiMillivolt);
+    /// assert_eq!(i.neuron_type(), NeuronType::Inhibitory);
+    /// assert_eq!(i.voltage_resolution(), VoltageResolution::CentiMillivolt);
+    /// assert_eq!((i.threshold(), i.tau_membrane_us()), (-5_000, 10_000));
+    /// assert_eq!((i.membrane_potential(), i.reset_potential()), (-7_000, -8_000));
+    /// ```
     ///
     /// # The chain
     ///
-    /// This call is the head of the `with_*` chain: it and the eight
+    /// This call is the head of the `with_*` chain: it and the nine
     /// setters below are how a network is written as Rust source
     /// (`fixed::freeze`), so every one of them is
     /// `const`. What `const` costs, in one line: no formatted panic
@@ -347,19 +362,14 @@ impl LIFNeuron {
     ///    here, with the four potentials that live on it; `id` is the
     ///    neuron's position in its network and seeds its noise; the type
     ///    picks the three parameters this constructor derives from it.
-    ///    All three fields are `pub`, so this is the chain's rule and not
-    ///    a wall: a caller can still assign any of them, and only a field
-    ///    made private would stop that.
+    ///    The three fields are the crate's, so the rule is a wall: no
+    ///    caller assigns them after this call.
     /// 2. **A `with_*` assigns, never computes.** Arithmetic in a `const`
     ///    setter turns an out-of-range value in a stranger's frozen file
     ///    into a compile error inside their crate, far from the graph
     ///    that produced the value.
     #[must_use]
-    pub const fn new_with_type_resolution(
-        id: u16,
-        neuron_type: NeuronType,
-        resolution: VoltageResolution,
-    ) -> Self {
+    pub const fn new(id: u16, neuron_type: NeuronType, resolution: VoltageResolution) -> Self {
         let (threshold_mv, tau_membrane_us, capacitance_pf) = match neuron_type {
             NeuronType::Excitatory => (-55, 20_000, 100), // 20 ms tau, pyramidal
             NeuronType::Inhibitory => (-50, 10_000, 80),  // 10 ms tau, interneuron
@@ -374,15 +384,16 @@ impl LIFNeuron {
             reset_potential: (-80 * s) as i16,
             voltage_resolution: resolution,
             tau_membrane_us,
-            tau_refractory_us: 2_000,
-            refractory_time_us: 0,
+            refractory_period_us: 2_000,
+            refractory_remaining_us: 0,
             last_update_time_us: 0,
             last_spike_time_us: 0,
-            synaptic_current_ua: 0,
+            synaptic_current_pa: 0,
             capacitance_pf,
             resistance_mohm: 100,
-            noise_amplitude_ua: 0,
-            adaptation_current_ua: 0,
+            noise_amplitude_pa: 0,
+            adaptation_current_pa: 0,
+            adaptation_enabled: true,
         }
     }
 
@@ -390,16 +401,17 @@ impl LIFNeuron {
     /// potential with it**: a neuron is built at rest.
     ///
     /// The one setter that touches two fields, which is why the order the
-    /// eight are called in cannot matter. A second such setter would end
+    /// nine are called in cannot matter. A second such setter would end
     /// that, and the order `fixed::freeze` emits them in would become
     /// load-bearing.
     ///
     /// ```
-    /// use neuralos_snn::LIFNeuron;
+    /// use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
     ///
-    /// let n = LIFNeuron::new(0).with_resting_potential(-65);
-    /// assert_eq!(n.resting_potential, -65);
-    /// assert_eq!(n.membrane_potential, -65, "built at rest");
+    /// let n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt)
+    ///     .with_resting_potential(-65);
+    /// assert_eq!(n.resting_potential(), -65);
+    /// assert_eq!(n.membrane_potential(), -65, "built at rest");
     /// ```
     #[must_use]
     pub const fn with_resting_potential(mut self, quanta: i16) -> Self {
@@ -411,9 +423,10 @@ impl LIFNeuron {
     /// The spike threshold, in this neuron's quanta.
     ///
     /// ```
-    /// use neuralos_snn::LIFNeuron;
+    /// use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
     ///
-    /// assert_eq!(LIFNeuron::new(0).with_threshold(-40).threshold, -40);
+    /// let n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
+    /// assert_eq!(n.with_threshold(-40).threshold(), -40);
     /// ```
     #[must_use]
     pub const fn with_threshold(mut self, quanta: i16) -> Self {
@@ -425,9 +438,10 @@ impl LIFNeuron {
     /// quanta.
     ///
     /// ```
-    /// use neuralos_snn::LIFNeuron;
+    /// use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
     ///
-    /// assert_eq!(LIFNeuron::new(0).with_reset_potential(-75).reset_potential, -75);
+    /// let n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
+    /// assert_eq!(n.with_reset_potential(-75).reset_potential(), -75);
     /// ```
     #[must_use]
     pub const fn with_reset_potential(mut self, quanta: i16) -> Self {
@@ -438,9 +452,10 @@ impl LIFNeuron {
     /// The membrane time constant (μs).
     ///
     /// ```
-    /// use neuralos_snn::LIFNeuron;
+    /// use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
     ///
-    /// assert_eq!(LIFNeuron::new(0).with_tau_membrane_us(5_000).tau_membrane_us, 5_000);
+    /// let n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
+    /// assert_eq!(n.with_tau_membrane_us(5_000).tau_membrane_us(), 5_000);
     /// ```
     #[must_use]
     pub const fn with_tau_membrane_us(mut self, us: u32) -> Self {
@@ -451,13 +466,14 @@ impl LIFNeuron {
     /// The refractory period (μs).
     ///
     /// ```
-    /// use neuralos_snn::LIFNeuron;
+    /// use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
     ///
-    /// assert_eq!(LIFNeuron::new(0).with_tau_refractory_us(1_000).tau_refractory_us, 1_000);
+    /// let n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
+    /// assert_eq!(n.with_refractory_period_us(1_000).refractory_period_us(), 1_000);
     /// ```
     #[must_use]
-    pub const fn with_tau_refractory_us(mut self, us: u32) -> Self {
-        self.tau_refractory_us = us;
+    pub const fn with_refractory_period_us(mut self, us: u32) -> Self {
+        self.refractory_period_us = us;
         self
     }
 
@@ -471,9 +487,15 @@ impl LIFNeuron {
     /// is open before 0.1.0, and the day it goes, this goes with it.
     ///
     /// ```
-    /// use neuralos_snn::LIFNeuron;
+    /// use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
     ///
-    /// assert_eq!(LIFNeuron::new(0).with_capacitance_pf(200).capacitance_pf, 200);
+    /// let mut a = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
+    /// let mut b = a.clone().with_capacitance_pf(200);
+    /// for t in 0..100 {
+    ///     let spiked = a.integrate_and_fire(600, 1_000, t * 1_000);
+    ///     assert_eq!(b.integrate_and_fire(600, 1_000, t * 1_000), spiked);
+    ///     assert_eq!(b.membrane_potential(), a.membrane_potential());
+    /// }
     /// ```
     #[must_use]
     pub const fn with_capacitance_pf(mut self, pf: u16) -> Self {
@@ -484,9 +506,10 @@ impl LIFNeuron {
     /// The membrane resistance (MΩ): the R of the current term.
     ///
     /// ```
-    /// use neuralos_snn::LIFNeuron;
+    /// use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
     ///
-    /// assert_eq!(LIFNeuron::new(0).with_resistance_mohm(50).resistance_mohm, 50);
+    /// let n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
+    /// assert_eq!(n.with_resistance_mohm(50).resistance_mohm(), 50);
     /// ```
     #[must_use]
     pub const fn with_resistance_mohm(mut self, mohm: u16) -> Self {
@@ -494,24 +517,147 @@ impl LIFNeuron {
         self
     }
 
-    /// The noise amplitude (μA); `0` is a deterministic neuron.
+    /// The noise amplitude (pA); `0` is a deterministic neuron.
     ///
     /// ```
-    /// use neuralos_snn::LIFNeuron;
+    /// use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
     ///
-    /// assert_eq!(LIFNeuron::new(0).with_noise_amplitude_ua(0).noise_amplitude_ua, 0);
+    /// let n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
+    /// assert_eq!(n.noise_amplitude_pa(), 0, "built silent");
+    /// assert_eq!(n.with_noise_amplitude_pa(5).noise_amplitude_pa(), 5);
     /// ```
     #[must_use]
-    pub const fn with_noise_amplitude_ua(mut self, ua: u8) -> Self {
-        self.noise_amplitude_ua = ua;
+    pub const fn with_noise_amplitude_pa(mut self, pa: u8) -> Self {
+        self.noise_amplitude_pa = pa;
         self
+    }
+
+    /// Whether a spike adds 2 pA to the adaptation current; `new` builds it
+    /// on. NIR's LIF has no adaptation, and a neuron imported in simulation
+    /// units is built with it off. Turned off on a live neuron, it stops
+    /// what a spike adds; the current already there still decays
+    /// ([`decay_adaptation_current`](Self::decay_adaptation_current)).
+    ///
+    /// ```
+    /// use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
+    ///
+    /// let n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt)
+    ///     .with_threshold(-100); // every integrating step fires
+    /// assert!(n.adaptation_enabled());
+    /// let mut on = n.clone();
+    /// let mut off = n.with_adaptation_enabled(false);
+    /// assert!(!off.adaptation_enabled());
+    /// assert!(on.integrate_and_fire(0, 1_000, 0) && off.integrate_and_fire(0, 1_000, 0));
+    /// assert_eq!((on.adaptation_current_pa(), off.adaptation_current_pa()), (2, 0));
+    ///
+    /// // off on a live neuron: its 2 pA still decay
+    /// let mut late = on.with_adaptation_enabled(false);
+    /// late.decay_adaptation_current();
+    /// assert_eq!(late.adaptation_current_pa(), 1);
+    /// ```
+    #[must_use]
+    pub const fn with_adaptation_enabled(mut self, enabled: bool) -> Self {
+        self.adaptation_enabled = enabled;
+        self
+    }
+
+    /// The neuron's id: its position in its network, and what seeds its noise.
+    #[must_use]
+    pub fn id(&self) -> u16 {
+        self.id
+    }
+
+    /// The type it was built as, which picked its threshold, its membrane
+    /// time constant and its capacitance.
+    #[must_use]
+    pub fn neuron_type(&self) -> NeuronType {
+        self.neuron_type
+    }
+
+    /// The voltage grid its four potentials live on.
+    #[must_use]
+    pub fn voltage_resolution(&self) -> VoltageResolution {
+        self.voltage_resolution
+    }
+
+    /// The membrane potential, in this neuron's quanta.
+    #[must_use]
+    pub fn membrane_potential(&self) -> i16 {
+        self.membrane_potential
+    }
+
+    /// The resting potential, in this neuron's quanta.
+    #[must_use]
+    pub fn resting_potential(&self) -> i16 {
+        self.resting_potential
+    }
+
+    /// The spike threshold, in this neuron's quanta.
+    #[must_use]
+    pub fn threshold(&self) -> i16 {
+        self.threshold
+    }
+
+    /// The potential a spike resets the membrane to, in this neuron's quanta.
+    #[must_use]
+    pub fn reset_potential(&self) -> i16 {
+        self.reset_potential
+    }
+
+    /// The membrane time constant (μs).
+    #[must_use]
+    pub fn tau_membrane_us(&self) -> u32 {
+        self.tau_membrane_us
+    }
+
+    /// The refractory period (μs), what a spike sets the time left to.
+    #[must_use]
+    pub fn refractory_period_us(&self) -> u32 {
+        self.refractory_period_us
+    }
+
+    /// The refractory time left (μs): 0 when the neuron integrates.
+    #[must_use]
+    pub fn refractory_remaining_us(&self) -> u32 {
+        self.refractory_remaining_us
+    }
+
+    /// The synaptic current accumulated since the last clear (pA).
+    #[must_use]
+    pub fn synaptic_current_pa(&self) -> i16 {
+        self.synaptic_current_pa
+    }
+
+    /// The membrane resistance (MΩ).
+    #[must_use]
+    pub fn resistance_mohm(&self) -> u16 {
+        self.resistance_mohm
+    }
+
+    /// The noise amplitude (pA); 0 is a deterministic neuron.
+    #[must_use]
+    pub fn noise_amplitude_pa(&self) -> u8 {
+        self.noise_amplitude_pa
+    }
+
+    /// The spike-frequency adaptation current (pA).
+    #[must_use]
+    pub fn adaptation_current_pa(&self) -> i16 {
+        self.adaptation_current_pa
+    }
+
+    /// Whether a spike adds to the adaptation current
+    /// ([`with_adaptation_enabled`](Self::with_adaptation_enabled)).
+    #[must_use]
+    pub fn adaptation_enabled(&self) -> bool {
+        self.adaptation_enabled
     }
 
     /// Integrate the membrane equation for one time step, return `true` if a spike fired.
     ///
     /// # Parameters
     ///
-    /// - `input_current_ua`: external input current (μA)
+    /// - `input_current_pa`: external input current (pA)
     /// - `dt_us`: time step (μs)
     /// - `current_time_us`: simulation time (μs), a `u32` — **owned by the
     ///   caller**, not the neuron. A clock wider than 32 bits hands over its
@@ -519,7 +665,9 @@ impl LIFNeuron {
     ///
     /// # Semantics
     ///
-    /// One call is one step, in the order below. Every `/` is Rust's integer
+    /// One call is one step, in the order below. The fields it names are
+    /// the neuron's storage, and each but the two stamps has a getter of
+    /// its name. Every `/` is Rust's integer
     /// division and truncates toward zero. No step can panic, for any value
     /// of any field or argument: `proofs/no-panic-step` proves at link time
     /// that a release build has no panic path, and the proptest named under
@@ -537,24 +685,25 @@ impl LIFNeuron {
     ///    multiple of 4096, so a wrap changes nothing the neuron computes: past
     ///    it the spikes are those a clock that never wrapped would give
     ///    (`a_clock_past_the_u32_boundary_gives_the_same_noise`).
-    /// 2. **Refractory.** While `refractory_time_us > 0` the step subtracts
+    /// 2. **Refractory.** While `refractory_remaining_us > 0` the step subtracts
     ///    `dt_us` from it, saturating at 0, and returns `false`: nothing is
     ///    integrated, the input and the synaptic current are ignored, the
     ///    membrane does not move. The step that brings the counter to 0 is
     ///    one of these, so a spike is followed by
-    ///    `ceil(tau_refractory_us / dt_us)` silent steps: 2 at the defaults
+    ///    `ceil(refractory_period_us / dt_us)` silent steps: 2 at the defaults
     ///    (2 ms, stepped by 1 ms).
-    /// 3. **The current** is `input_current_ua + synaptic_current_ua + noise
-    ///    − adaptation_current_ua`, in that order, each operation saturating
-    ///    in `i16`. The step reads the synaptic current and does not clear
-    ///    it: [`clear_synaptic_current`](Self::clear_synaptic_current) is the
+    /// 3. **The current** is `input_current_pa + synaptic_current_pa + noise
+    ///    − adaptation_current_pa`, in that order, each operation saturating
+    ///    in `i16` (`the_current_saturates_term_by_term`). The step reads the
+    ///    synaptic current and does not clear it:
+    ///    [`clear_synaptic_current`](Self::clear_synaptic_current) is the
     ///    caller's, and both networks call it after every integration.
-    /// 4. **Noise** is `(b − 128) · noise_amplitude_ua / 128`, `b` a byte of
+    /// 4. **Noise** is `(b − 128) · noise_amplitude_pa / 128`, `b` a byte of
     ///    a 16-bit LFSR seeded by `id XOR current_time_us`. It is a function
     ///    of those three values and of nothing else, so two runs, or a host
     ///    and a board, agree bit for bit. It lies in `−amp ..= 127·amp/128`:
     ///    −5..=4 at amplitude 5, what a topology builder gives its neurons.
-    ///    The constructors build amplitude 0, which is silent
+    ///    `new` builds amplitude 0, which is silent
     ///    (`noise_lies_in_minus_amp_to_127_amp_over_128`,
     ///    `noise_is_zero_when_amplitude_is_zero`,
     ///    `a_neuron_is_built_silent`).
@@ -594,42 +743,41 @@ impl LIFNeuron {
     ///    `the_saturating_multiply_lands_where_an_unbounded_integer_would` on
     ///    the saturating branch).
     /// 8. **The spike.** If the clamped membrane is `>= threshold`: the
-    ///    membrane goes to `reset_potential`, `refractory_time_us` to
-    ///    `tau_refractory_us`, `last_spike_time_us` to `current_time_us`,
-    ///    `adaptation_current_ua` gains 2 μA (saturating), and the step
-    ///    returns `true`. Nothing in this step decays the adaptation:
+    ///    membrane goes to `reset_potential`, `refractory_remaining_us` to
+    ///    `refractory_period_us`, `last_spike_time_us` to `current_time_us`
+    ///    (`a_spike_stamps_its_time`), `adaptation_current_pa` gains 2 pA
+    ///    (saturating) if `adaptation_enabled` is on
+    ///    (`adaptation_off_adds_nothing`), and the step returns `true`.
+    ///    Nothing in this step decays the adaptation:
     ///    [`decay_adaptation_current`](Self::decay_adaptation_current) is
     ///    the caller's, and both networks call it once per step. A neuron
-    ///    stepped alone without it keeps 2 μA more per spike, forever.
+    ///    stepped alone without it keeps 2 pA more per spike, forever.
     ///
     /// # Examples
     ///
-    /// The update, the dead zone and the grid: 600 μA moves the membrane
-    /// 3 mV, ±12 μA moves nothing on the mV grid and 6 quanta on the
+    /// The update, the dead zone and the grid: 600 pA moves the membrane
+    /// 3 mV, ±12 pA moves nothing on the mV grid and 6 quanta on the
     /// centi-mV one.
     /// ```
     /// use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
     ///
-    /// let quiet = |r| {
-    ///     let mut n = LIFNeuron::new_with_type_resolution(0, NeuronType::Excitatory, r);
-    ///     n.noise_amplitude_ua = 0;
-    ///     n
-    /// };
+    /// // built silent: no noise term
+    /// let quiet = |r| LIFNeuron::new(0, NeuronType::Excitatory, r);
     /// // dt_over_tau = 50, current_term = 600·100/1000 = 60, 50·60/1000 = 3.
     /// let mut n = quiet(VoltageResolution::Millivolt);
     /// n.integrate_and_fire(600, 1_000, 0);
-    /// assert_eq!(n.membrane_potential, -67);
+    /// assert_eq!(n.membrane_potential(), -67);
     ///
     /// // current_term = ±1, and 50·1/1000 truncates to 0 from both sides.
     /// for i in [12, -12] {
     ///     let mut n = quiet(VoltageResolution::Millivolt);
     ///     n.integrate_and_fire(i, 1_000, 0);
-    ///     assert_eq!(n.membrane_potential, -70);
+    ///     assert_eq!(n.membrane_potential(), -70);
     /// }
     /// // s = 100: current_term = 120, 50·120/1000 = 6.
     /// let mut n = quiet(VoltageResolution::CentiMillivolt);
     /// n.integrate_and_fire(12, 1_000, 0);
-    /// assert_eq!(n.membrane_potential, -7_000 + 6);
+    /// assert_eq!(n.membrane_potential(), -7_000 + 6);
     /// ```
     ///
     /// The spike at `>=`, what it resets, the two silent steps, and the
@@ -637,88 +785,78 @@ impl LIFNeuron {
     /// ```
     /// use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
     ///
-    /// let mut n = LIFNeuron::new(0);
-    /// n.noise_amplitude_ua = 0;
-    /// n.membrane_potential = -56; // one quantum under the threshold, -55
+    /// let mut n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
+    /// // current_term = 280, 50·280/1000 = 14: one quantum under the threshold, -55.
+    /// assert!(!n.integrate_and_fire(2_800, 1_000, 4_000));
+    /// assert_eq!(n.membrane_potential(), -56);
     /// // leak = -14, current_term = 40, 50·26/1000 = 1: the membrane lands ON it.
     /// assert!(n.integrate_and_fire(400, 1_000, 5_000));
-    /// assert_eq!(n.membrane_potential, n.reset_potential);
-    /// assert_eq!(n.refractory_time_us, n.tau_refractory_us);
-    /// assert_eq!(n.last_spike_time_us, 5_000);
-    /// assert_eq!(n.adaptation_current_ua, 2);
+    /// assert_eq!(n.membrane_potential(), n.reset_potential());
+    /// assert_eq!(n.refractory_remaining_us(), n.refractory_period_us());
+    /// assert_eq!(n.adaptation_current_pa(), 2);
     ///
     /// // Two silent steps: the input is ignored, the second one ends at 0.
     /// assert!(!n.integrate_and_fire(30_000, 1_000, 6_000));
     /// assert!(!n.integrate_and_fire(30_000, 1_000, 7_000));
-    /// assert_eq!((n.membrane_potential, n.refractory_time_us), (-80, 0));
+    /// assert_eq!((n.membrane_potential(), n.refractory_remaining_us()), (-80, 0));
     ///
-    /// // Integrating again, with no input: the 10 mV gap leaks 50·10/1000 = 0.
+    /// // Integrating again, with no input: the 10 mV gap to rest leaks
+    /// // 50·10/1000 = 0.
+    /// assert_eq!(n.resting_potential() - n.membrane_potential(), 10);
     /// assert!(!n.integrate_and_fire(0, 1_000, 8_000));
-    /// assert_eq!(n.membrane_potential, -80);
-    /// assert_eq!(n.adaptation_current_ua, 2); // and nothing decayed it
+    /// assert_eq!(n.membrane_potential(), -80);
+    /// assert_eq!(n.adaptation_current_pa(), 2); // and nothing decayed it
     ///
     /// // An inhibitory neuron, from reset: dt_over_tau = 100, so the same gap
-    /// // leaks 100·10/1000 = 1, once. Then 100·9/1000 = 0.
-    /// let mut i = LIFNeuron::new_with_type_resolution(
-    ///     1,
-    ///     NeuronType::Inhibitory,
-    ///     VoltageResolution::Millivolt,
-    /// );
-    /// i.noise_amplitude_ua = 0;
-    /// i.membrane_potential = i.reset_potential;
-    /// i.integrate_and_fire(0, 1_000, 0);
-    /// assert_eq!(i.membrane_potential, -79);
-    /// i.integrate_and_fire(0, 1_000, 1_000);
-    /// assert_eq!(i.membrane_potential, -79);
+    /// // leaks 100·10/1000 = 1, once. Then 100·9/1000 = 0. A spike and its
+    /// // two silent steps bring it to reset, and its 2 pA of adaptation move
+    /// // nothing: 2·100/1000 truncates to 0.
+    /// let mut i = LIFNeuron::new(1, NeuronType::Inhibitory, VoltageResolution::Millivolt);
+    /// assert!(i.integrate_and_fire(30_000, 1_000, 0));
+    /// assert!(!i.integrate_and_fire(0, 1_000, 1_000));
+    /// assert!(!i.integrate_and_fire(0, 1_000, 2_000));
+    /// assert_eq!(i.membrane_potential(), i.reset_potential());
+    /// i.integrate_and_fire(0, 1_000, 3_000);
+    /// assert_eq!(i.membrane_potential(), -79);
+    /// i.integrate_and_fire(0, 1_000, 4_000);
+    /// assert_eq!(i.membrane_potential(), -79);
     /// ```
     ///
-    /// The current saturates term by term, and the synaptic current is the
-    /// caller's to clear.
+    /// The synaptic current is the caller's to clear.
     /// ```
-    /// use neuralos_snn::LIFNeuron;
+    /// use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
     ///
-    /// let mut n = LIFNeuron::new(0);
-    /// n.noise_amplitude_ua = 0;
-    /// n.threshold = i16::MAX; // no spike in this example
-    /// // MAX + MAX saturates to MAX, then MAX − MAX is 0: nothing moves,
-    /// // where an unbounded sum would leave 32,767 μA.
-    /// n.synaptic_current_ua = i16::MAX;
-    /// n.adaptation_current_ua = i16::MAX;
-    /// n.integrate_and_fire(i16::MAX, 1_000, 0);
-    /// assert_eq!(n.membrane_potential, -70);
-    ///
-    /// let mut n = LIFNeuron::new(0);
-    /// n.noise_amplitude_ua = 0;
+    /// let mut n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
     /// n.add_synaptic_current(600);
     /// n.integrate_and_fire(0, 1_000, 0);
-    /// assert_eq!(n.membrane_potential, -67);
-    /// n.integrate_and_fire(0, 1_000, 1_000); // the 600 μA is still there
-    /// assert_eq!(n.membrane_potential, -65);
+    /// assert_eq!(n.membrane_potential(), -67);
+    /// n.integrate_and_fire(0, 1_000, 1_000); // the 600 pA is still there
+    /// assert_eq!(n.membrane_potential(), -65);
     /// n.clear_synaptic_current();
+    /// assert_eq!(n.synaptic_current_pa(), 0);
     /// n.integrate_and_fire(0, 1_000, 2_000); // a 5 mV gap leaks nothing
-    /// assert_eq!(n.membrane_potential, -65);
+    /// assert_eq!(n.membrane_potential(), -65);
     /// ```
     ///
     /// The clamp at both ends, and the frozen membrane.
     /// ```
     /// use neuralos_snn::lif_neuron::{MEMBRANE_MV_MAX, MEMBRANE_MV_MIN};
-    /// use neuralos_snn::LIFNeuron;
+    /// use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
     ///
-    /// let mut n = LIFNeuron::new(0);
-    /// n.noise_amplitude_ua = 0;
-    /// n.threshold = i16::MAX;
+    /// let mut n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt)
+    ///     .with_threshold(i16::MAX);
     /// n.integrate_and_fire(-30_000, 1_000, 0); // delta_v = -150
-    /// assert_eq!(n.membrane_potential, MEMBRANE_MV_MIN);
+    /// assert_eq!(n.membrane_potential(), MEMBRANE_MV_MIN);
     /// n.integrate_and_fire(30_000, 1_000, 1_000); // delta_v = +151
-    /// assert_eq!(n.membrane_potential, MEMBRANE_MV_MAX);
+    /// assert_eq!(n.membrane_potential(), MEMBRANE_MV_MAX);
     ///
     /// for tau in [0, 1_000_001] {
-    ///     let mut n = LIFNeuron::new(0);
-    ///     n.noise_amplitude_ua = 0;
-    ///     n.tau_membrane_us = tau; // dt_over_tau = 0
+    ///     let mut n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt)
+    ///         .with_tau_membrane_us(tau); // dt_over_tau = 0
     ///     assert!(!n.integrate_and_fire(30_000, 1_000, 0));
-    ///     assert_eq!(n.membrane_potential, -70);
-    ///     n.membrane_potential = n.threshold; // the threshold test still runs
+    ///     assert_eq!(n.membrane_potential(), -70);
+    ///     // the threshold test still runs: the chain puts it on the membrane
+    ///     let mut n = n.with_threshold(-70);
     ///     assert!(n.integrate_and_fire(0, 1_000, 1_000));
     /// }
     /// ```
@@ -733,24 +871,24 @@ impl LIFNeuron {
     #[inline]
     pub fn integrate_and_fire(
         &mut self,
-        input_current_ua: i16,
+        input_current_pa: i16,
         dt_us: u32,
         current_time_us: u32,
     ) -> bool {
         self.last_update_time_us = current_time_us;
 
         // Refractory period: count down, no integration.
-        if self.refractory_time_us > 0 {
-            self.refractory_time_us = self.refractory_time_us.saturating_sub(dt_us);
+        if self.refractory_remaining_us > 0 {
+            self.refractory_remaining_us = self.refractory_remaining_us.saturating_sub(dt_us);
             return false;
         }
 
         // Combine input + synaptic + noise − adaptation (all saturating).
         let noise = self.generate_noise(current_time_us);
-        let total_current = input_current_ua
-            .saturating_add(self.synaptic_current_ua)
+        let total_current = input_current_pa
+            .saturating_add(self.synaptic_current_pa)
             .saturating_add(noise)
-            .saturating_sub(self.adaptation_current_ua);
+            .saturating_sub(self.adaptation_current_pa);
 
         // LIF equation: dV/dt = (V_rest − V + R·I) / τ
         // Discretized:   ΔV = (dt/τ) · (V_rest − V + R·I)
@@ -763,7 +901,7 @@ impl LIFNeuron {
         // the reference semantic the batch approximates.
         //                delta_v      = dt_over_tau · (leak + current) / 1000
         // Voltage quanta: leak is stored-native; the current term converts
-        // μA → quanta (R·I/1000 mV, ×scale for the grid). At scale = 1 the
+        // pA → quanta (R·I/1000 mV, ×scale for the grid). At scale = 1 the
         // expression sequence is byte-identical to the historical arithmetic.
         // Both divisions by 1000 go through `div_1000`: the same truncation,
         // in `i32` when the value fits (the physical regime), in `i64` when
@@ -809,29 +947,32 @@ impl LIFNeuron {
     /// Record a spike: reset potential, enter refractory, store timestamp, adapt.
     fn spike(&mut self, current_time_us: u32) {
         self.membrane_potential = self.reset_potential;
-        self.refractory_time_us = self.tau_refractory_us;
+        self.refractory_remaining_us = self.refractory_period_us;
         self.last_spike_time_us = current_time_us;
-        // Spike-frequency adaptation accumulates per spike.
-        self.adaptation_current_ua = self.adaptation_current_ua.saturating_add(2);
+        // Spike-frequency adaptation accumulates per spike, when it is on.
+        if self.adaptation_enabled {
+            self.adaptation_current_pa = self.adaptation_current_pa.saturating_add(2);
+        }
     }
 
-    /// Accumulate synaptic current (μA). Saturating — never overflows.
-    pub fn add_synaptic_current(&mut self, current_ua: i16) {
-        self.synaptic_current_ua = self.synaptic_current_ua.saturating_add(current_ua);
+    /// Accumulate synaptic current (pA). Saturating — never overflows.
+    pub fn add_synaptic_current(&mut self, current_pa: i16) {
+        self.synaptic_current_pa = self.synaptic_current_pa.saturating_add(current_pa);
     }
 
     /// Zero out synaptic current. The network calls this AFTER integration
     /// has read the accumulator (session F's clear-after-read fix) — Phase 2
     /// then injects fresh pulses for the next step to integrate.
     pub fn clear_synaptic_current(&mut self) {
-        self.synaptic_current_ua = 0;
+        self.synaptic_current_pa = 0;
     }
 
-    /// Decay the spike-frequency adaptation current by 1 μA (linear).
+    /// Decay the spike-frequency adaptation current by 1 pA (linear).
     ///
     /// Called once per step by the network BEFORE integration — without it,
-    /// adaptation accumulates (+2/spike) unboundedly and silences the
-    /// network. Phase-identical to the historical opening-loop position.
+    /// adaptation accumulates (+2/spike while `adaptation_enabled` is on)
+    /// unboundedly and silences the network. Phase-identical to the
+    /// historical opening-loop position.
     ///
     /// (Session F split: the historical `decay_synaptic_current` also
     /// decayed the synaptic accumulator, but that half was structurally
@@ -841,8 +982,8 @@ impl LIFNeuron {
     /// amplitude, then are integrated and zeroed. The decorative
     /// `tau_synapse_us` field was removed at alpha.3 — F5a.)
     pub fn decay_adaptation_current(&mut self) {
-        if self.adaptation_current_ua > 0 {
-            self.adaptation_current_ua = self.adaptation_current_ua.saturating_sub(1);
+        if self.adaptation_current_pa > 0 {
+            self.adaptation_current_pa = self.adaptation_current_pa.saturating_sub(1);
         }
     }
 
@@ -852,11 +993,11 @@ impl LIFNeuron {
     /// neuron's: the caller clears it.
     pub fn reset(&mut self) {
         self.membrane_potential = self.resting_potential;
-        self.refractory_time_us = 0;
+        self.refractory_remaining_us = 0;
         self.last_update_time_us = 0;
         self.last_spike_time_us = 0;
-        self.synaptic_current_ua = 0;
-        self.adaptation_current_ua = 0;
+        self.synaptic_current_pa = 0;
+        self.adaptation_current_pa = 0;
     }
 
     /// Deterministic LFSR noise seeded by `id XOR current_time_us`.
@@ -867,22 +1008,20 @@ impl LIFNeuron {
     /// identical "noise" forever (deterministic, not noise). Now seeded by
     /// `id XOR current_time_us` — different each step, still reproducible for tests.
     fn generate_noise(&self, current_time_us: u32) -> i16 {
-        if self.noise_amplitude_ua == 0 {
+        if self.noise_amplitude_pa == 0 {
             return 0;
         }
         let mut lfsr = u32::from(self.id) ^ current_time_us;
-        // 16-bit Galois LFSR, taps 0xB400, period 65_535. Iterate 4x for diffusion.
+        // A 16-bit Galois LFSR, taps 0xB400, period 65,535 as a register,
+        // stepped 4 times from the seed. Narrower is what reaches the byte
+        // read below: seed bits 0 and 4 to 11, nine of them, so at a 1 ms
+        // step the noise repeats every 512 steps and ids 0 to 15 share two
+        // streams.
         for _ in 0..4 {
             lfsr = (lfsr >> 1) ^ (if lfsr & 1 != 0 { 0xB400_u32 } else { 0 });
         }
         let raw = (lfsr & 0xFF) as i16 - 128; // -128..=127
-        (raw * i16::from(self.noise_amplitude_ua)) / 128
-    }
-}
-
-impl Default for LIFNeuron {
-    fn default() -> Self {
-        Self::new(0)
+        (raw * i16::from(self.noise_amplitude_pa)) / 128
     }
 }
 
@@ -913,7 +1052,7 @@ impl LIFNeuron {
     /// rate, the ISI statistics and the spike count read the history, and
     /// moved with it to `SpikeRecorder` (alpha.8).
     fn is_refractory(&self) -> bool {
-        self.refractory_time_us > 0
+        self.refractory_remaining_us > 0
     }
 }
 
@@ -928,25 +1067,25 @@ mod tests {
 
     #[test]
     fn new_excitatory_neuron_has_default_params() {
-        let n = LIFNeuron::new(1);
+        let n = LIFNeuron::new(1, NeuronType::Excitatory, VoltageResolution::Millivolt);
         assert_eq!(n.id, 1);
         assert_eq!(n.neuron_type, NeuronType::Excitatory);
         assert_eq!(n.membrane_potential, -70);
         assert_eq!(n.threshold, -55);
         assert_eq!(n.tau_membrane_us, 20_000);
-        assert_eq!(n.noise_amplitude_ua, 0);
+        assert_eq!(n.noise_amplitude_pa, 0);
     }
 
     #[test]
     fn inhibitory_neuron_has_different_params() {
-        let n = LIFNeuron::new_with_type(2, NeuronType::Inhibitory);
+        let n = LIFNeuron::new(2, NeuronType::Inhibitory, VoltageResolution::Millivolt);
         assert_eq!(n.threshold, -50);
         assert_eq!(n.tau_membrane_us, 10_000);
     }
 
     #[test]
     fn neuron_fields_directly_configurable() {
-        let mut n = LIFNeuron::new_with_type(3, NeuronType::Inhibitory);
+        let mut n = LIFNeuron::new(3, NeuronType::Inhibitory, VoltageResolution::Millivolt);
         n.threshold = -45;
         n.tau_membrane_us = 15_000;
         assert_eq!(n.id, 3);
@@ -957,7 +1096,7 @@ mod tests {
 
     #[test]
     fn resolution_switch_rescales_stored_potentials() {
-        let mut n = LIFNeuron::new_with_type_resolution(
+        let mut n = LIFNeuron::new(
             10,
             NeuronType::Excitatory,
             VoltageResolution::CentiMillivolt,
@@ -971,10 +1110,10 @@ mod tests {
 
     #[test]
     fn positive_current_raises_membrane_potential() {
-        let mut n = LIFNeuron::new(4);
+        let mut n = LIFNeuron::new(4, NeuronType::Excitatory, VoltageResolution::Millivolt);
         let initial = n.membrane_potential;
-        // 10 ms step, 100 μA — biologically realistic depolarization.
-        // (1 ms / 50 μA loses precision in the fixed-point math: dt_over_tau=50,
+        // 10 ms step, 100 pA — biologically realistic depolarization.
+        // (1 ms / 50 pA loses precision in the fixed-point math: dt_over_tau=50,
         // current_term=5, delta_v=(50*5)/1000=0. Documented behavior.)
         let spiked = n.integrate_and_fire(100, 10_000, 10_000);
         assert!(
@@ -983,15 +1122,15 @@ mod tests {
             initial,
             n.membrane_potential
         );
-        assert!(!spiked, "single 10 ms step at 100 μA should not spike");
+        assert!(!spiked, "single 10 ms step at 100 pA should not spike");
     }
 
     // ----- Voltage resolution: the dead zone, demonstrated and pinned -----
 
     /// Noise-off helper (deterministic traces for hand-derived expectations).
     fn quiet_neuron(id: u16, r: VoltageResolution) -> LIFNeuron {
-        let mut n = LIFNeuron::new_with_type_resolution(id, NeuronType::Excitatory, r);
-        n.noise_amplitude_ua = 0;
+        let mut n = LIFNeuron::new(id, NeuronType::Excitatory, r);
+        n.noise_amplitude_pa = 0;
         n
     }
 
@@ -1009,17 +1148,17 @@ mod tests {
             assert_eq!(n.membrane_potential, want);
         }
         let spiked = n.integrate_and_fire(600, 1000, 0);
-        assert!(spiked, "7th 600 μA step crosses −55");
+        assert!(spiked, "7th 600 pA step crosses −55");
         assert_eq!(n.membrane_potential, -80, "spike reset");
     }
 
     #[test]
-    fn the_dead_zone_12ua_pair() {
+    fn the_dead_zone_12pa_pair() {
         // THE demonstration: the ternary substrate's recurrent pulse
-        // (±12 μA) is invisible on the mV grid and 6 quanta on centi-mV.
+        // (±12 pA) is invisible on the mV grid and 6 quanta on centi-mV.
         let mut mv = quiet_neuron(12, VoltageResolution::Millivolt);
         mv.integrate_and_fire(12, 1000, 0);
-        assert_eq!(mv.membrane_potential, -70, "mV grid: 12 μA ⇒ ΔV = 0");
+        assert_eq!(mv.membrane_potential, -70, "mV grid: 12 pA ⇒ ΔV = 0");
 
         let mut cmv = quiet_neuron(13, VoltageResolution::CentiMillivolt);
         cmv.integrate_and_fire(12, 1000, 0);
@@ -1027,13 +1166,13 @@ mod tests {
         assert_eq!(
             cmv.membrane_potential,
             -7_000 + 6,
-            "centi grid: 12 μA ⇒ 6 cV"
+            "centi grid: 12 pA ⇒ 6 cV"
         );
     }
 
     #[test]
     fn above_threshold_current_blind_on_mv_spikes_on_centi() {
-        // 160 μA > the ~150 μA E threshold current (V_ss = −54 mV), yet the
+        // 160 pA > the ~150 pA E threshold current (V_ss = −54 mV), yet the
         // mV grid truncates every step to 0 from rest — silent forever.
         // Centi-mV climbs to −54 mV and fires. The ruler, not the cable.
         let mut mv = quiet_neuron(14, VoltageResolution::Millivolt);
@@ -1043,7 +1182,7 @@ mod tests {
                 mv_spikes += 1;
             }
         }
-        assert_eq!(mv_spikes, 0, "mV grid is blind to 160 μA from rest");
+        assert_eq!(mv_spikes, 0, "mV grid is blind to 160 pA from rest");
         assert_eq!(mv.membrane_potential, -70);
 
         let mut cmv = quiet_neuron(15, VoltageResolution::CentiMillivolt);
@@ -1053,7 +1192,7 @@ mod tests {
                 cmv_spikes += 1;
             }
         }
-        assert!(cmv_spikes >= 1, "centi grid fires on 160 μA (V_ss −54 mV)");
+        assert!(cmv_spikes >= 1, "centi grid fires on 160 pA (V_ss −54 mV)");
     }
 
     #[test]
@@ -1071,11 +1210,11 @@ mod tests {
     }
 
     /// The climb barrier + rectification (session F, review-derived):
-    /// a 300 μA-driven E neuron (mV grid) climbs +1 mV/step only while the
+    /// a 300 pA-driven E neuron (mV grid) climbs +1 mV/step only while the
     /// gap to `V_ss` (−40 mV) is ≥ 20 mV — it STICKS at −59 (gap 19, delta
     /// truncates to 0), 4 mV short of threshold, forever. At the sticking
-    /// point one +12 μA recurrent pulse ratchets +1 mV (19+1.2 = 20.2 → 1);
-    /// one −12 μA pulse is absorbed (17.8 → 0). Positive excursions bind,
+    /// point one +12 pA recurrent pulse ratchets +1 mV (19+1.2 = 20.2 → 1);
+    /// one −12 pA pulse is absorbed (17.8 → 0). Positive excursions bind,
     /// negative ones are free — the rectifier that lets coherent volleys
     /// (and even incoherent positive noise) recruit neurons below the
     /// drive-only cliff.
@@ -1091,12 +1230,12 @@ mod tests {
         n.integrate_and_fire(300, 1000, 100);
         assert_eq!(n.membrane_potential, -59, "stays stuck under drive alone");
 
-        // +12 μA pulse (a ternary +γ wire transmitting): +1 mV.
+        // +12 pA pulse (a ternary +γ wire transmitting): +1 mV.
         n.add_synaptic_current(12);
         n.integrate_and_fire(300, 1000, 101);
         assert_eq!(n.membrane_potential, -58, "positive pulse ratchets +1 mV");
 
-        // −12 μA pulse at the NEW sticking point (leak −12 + 28 = 16, and
+        // −12 pA pulse at the NEW sticking point (leak −12 + 28 = 16, and
         // 16/20 → 0): absorbed, no ratchet down. The clear first, as the
         // network does after every integration: the step does not clear
         // the accumulator, so without it the +12 is still there and this
@@ -1109,9 +1248,9 @@ mod tests {
 
     #[test]
     fn large_current_triggers_spike_and_refractory() {
-        let mut n = LIFNeuron::new(5);
+        let mut n = LIFNeuron::new(5, NeuronType::Excitatory, VoltageResolution::Millivolt);
         n.threshold = -65;
-        // 200 μA over repeated 10 ms steps must eventually trigger a spike.
+        // 200 pA over repeated 10 ms steps must eventually trigger a spike.
         let mut spiked = false;
         let mut t = 0_u32;
         for _ in 0..10 {
@@ -1121,14 +1260,14 @@ mod tests {
             }
             t = t.saturating_add(10_000);
         }
-        assert!(spiked, "200 μA over 10 ms steps should eventually spike");
+        assert!(spiked, "200 pA over 10 ms steps should eventually spike");
         assert_eq!(n.membrane_potential, n.reset_potential);
         assert!(n.is_refractory());
     }
 
     #[test]
     fn refractory_blocks_repeated_spikes() {
-        let mut n = LIFNeuron::new(6);
+        let mut n = LIFNeuron::new(6, NeuronType::Excitatory, VoltageResolution::Millivolt);
         n.membrane_potential = n.threshold + 1;
         let spiked = n.integrate_and_fire(0, 1000, 1000);
         assert!(spiked);
@@ -1137,29 +1276,44 @@ mod tests {
         assert!(!again, "must not spike during refractory");
     }
 
+    /// The countdown holds the neuron while any time is left, one
+    /// microsecond included: that step integrates nothing and ends the
+    /// period, and the next one integrates.
+    #[test]
+    fn refractory_holds_through_its_last_microsecond() {
+        let mut n = LIFNeuron::new(6, NeuronType::Excitatory, VoltageResolution::Millivolt);
+        let rest = n.membrane_potential;
+        n.refractory_remaining_us = 1;
+        assert!(!n.integrate_and_fire(1000, 1000, 1000));
+        assert_eq!((n.membrane_potential, n.refractory_remaining_us), (rest, 0));
+        assert!(!n.integrate_and_fire(1000, 1000, 2000));
+        // 1,000 pA through 100 MΩ is 100 mV, times dt/τ = 1/20
+        assert_eq!(n.membrane_potential, rest + 5);
+    }
+
     #[test]
     fn synaptic_current_accumulates_then_clears() {
-        let mut n = LIFNeuron::new(7);
+        let mut n = LIFNeuron::new(7, NeuronType::Excitatory, VoltageResolution::Millivolt);
         n.add_synaptic_current(30);
         n.add_synaptic_current(20);
-        assert_eq!(n.synaptic_current_ua, 50);
+        assert_eq!(n.synaptic_current_pa, 50);
         n.clear_synaptic_current();
-        assert_eq!(n.synaptic_current_ua, 0);
+        assert_eq!(n.synaptic_current_pa, 0);
     }
 
     #[test]
     fn reset_restores_initial_state() {
-        let mut n = LIFNeuron::new(8);
+        let mut n = LIFNeuron::new(8, NeuronType::Excitatory, VoltageResolution::Millivolt);
         n.membrane_potential = -50;
-        n.synaptic_current_ua = 100;
-        n.adaptation_current_ua = 10;
+        n.synaptic_current_pa = 100;
+        n.adaptation_current_pa = 10;
         // Force a spike via the private method by going through integrate path.
         n.spike(5000);
         n.spike(6000);
         n.reset();
         assert_eq!(n.membrane_potential, n.resting_potential);
-        assert_eq!(n.synaptic_current_ua, 0);
-        assert_eq!(n.adaptation_current_ua, 0);
+        assert_eq!(n.synaptic_current_pa, 0);
+        assert_eq!(n.adaptation_current_pa, 0);
         assert!(!n.is_refractory());
     }
 
@@ -1167,7 +1321,7 @@ mod tests {
     fn firing_rate_uses_last_update_time_not_last_spike() {
         // Regression for v0.1 bug: current_time() returned last_spike_time_us,
         // so the firing-rate window never advanced. Now last_update_time_us drives it.
-        let mut n = LIFNeuron::new(9);
+        let mut n = LIFNeuron::new(9, NeuronType::Excitatory, VoltageResolution::Millivolt);
         let mut rec = SpikeRecorder::new();
         // Spike at t = 1000.
         n.membrane_potential = n.threshold + 1;
@@ -1191,8 +1345,8 @@ mod tests {
 
     #[test]
     fn noise_is_zero_when_amplitude_is_zero() {
-        let mut n = LIFNeuron::new(12);
-        n.noise_amplitude_ua = 0;
+        let mut n = LIFNeuron::new(12, NeuronType::Excitatory, VoltageResolution::Millivolt);
+        n.noise_amplitude_pa = 0;
         for t in 0..1000_u32 {
             assert_eq!(n.generate_noise(t), 0);
         }
@@ -1200,13 +1354,18 @@ mod tests {
 
     /// The range the rustdoc states: `(b − 128) · amp / 128` truncates toward
     /// zero, so the floor is `−amp` and the ceiling `127·amp/128`, which is
-    /// `amp − 1` up to amplitude 128 and less above it. Both ends are
-    /// reached within one LFSR period.
+    /// `amp − 1` up to amplitude 128 and less above it: at 1 pA the noise
+    /// is −1 or 0. Both ends are reached within one LFSR period.
     #[test]
     fn noise_lies_in_minus_amp_to_127_amp_over_128() {
-        for (amp, lo, hi) in [(5_u8, -5_i16, 4_i16), (128, -128, 127), (255, -255, 253)] {
-            let mut n = LIFNeuron::new(0);
-            n.noise_amplitude_ua = amp;
+        for (amp, lo, hi) in [
+            (1_u8, -1_i16, 0_i16),
+            (5, -5, 4),
+            (128, -128, 127),
+            (255, -255, 253),
+        ] {
+            let mut n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
+            n.noise_amplitude_pa = amp;
             let (mut min, mut max) = (i16::MAX, i16::MIN);
             for t in 0..=u32::from(u16::MAX) {
                 let v = n.generate_noise(t);
@@ -1221,8 +1380,8 @@ mod tests {
     #[test]
     fn noise_varies_with_time_for_same_id() {
         // Regression for v0.1 bug: noise seeded only by id → constant per neuron.
-        let mut n = LIFNeuron::new(13);
-        n.noise_amplitude_ua = 5;
+        let mut n = LIFNeuron::new(13, NeuronType::Excitatory, VoltageResolution::Millivolt);
+        n.noise_amplitude_pa = 5;
         let samples: [i16; 8] = [
             n.generate_noise(100),
             n.generate_noise(101),
@@ -1242,7 +1401,7 @@ mod tests {
         );
     }
 
-    /// The constructors build a silent neuron: noise is the caller's to ask
+    /// `new` builds a silent neuron: noise is the caller's to ask
     /// for. A topology builder asks for 5
     /// (`a_topology_builder_gives_its_neurons_noise`).
     #[test]
@@ -1252,12 +1411,10 @@ mod tests {
                 VoltageResolution::Millivolt,
                 VoltageResolution::CentiMillivolt,
             ] {
-                let n = LIFNeuron::new_with_type_resolution(7, ty, res);
-                assert_eq!(n.noise_amplitude_ua, 0, "{ty:?} on {res:?}");
+                let n = LIFNeuron::new(7, ty, res);
+                assert_eq!(n.noise_amplitude_pa, 0, "{ty:?} on {res:?}");
             }
         }
-        assert_eq!(LIFNeuron::new(0).noise_amplitude_ua, 0);
-        assert_eq!(LIFNeuron::default().noise_amplitude_ua, 0);
     }
 
     /// The noise reads only the low 12 bits of its seed, `id XOR time`: the
@@ -1268,7 +1425,7 @@ mod tests {
     fn noise_reads_only_the_low_12_bits_of_its_seed() {
         for id in [0u16, 1, 0x5A5A, u16::MAX] {
             let mut n = quiet_neuron(id, VoltageResolution::Millivolt);
-            n.noise_amplitude_ua = 127;
+            n.noise_amplitude_pa = 127;
             for low in 0..=u32::from(u16::MAX) {
                 let want = n.generate_noise(low & 0xFFF);
                 for high in [0u32, 0x1_0000, 0xDEAD_0000, 0xFFFF_0000] {
@@ -1324,7 +1481,7 @@ mod tests {
             } else {
                 VoltageResolution::Millivolt
             };
-            let mut n = LIFNeuron::new(0);
+            let mut n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
             n.voltage_resolution = resolution;
             n.membrane_potential = mp;
             n.resting_potential = rp;
@@ -1335,10 +1492,10 @@ mod tests {
             // product lands near 4.6e16, and NOTHING saturates — the rows
             // would pass while proving the opposite of what they claim.
             n.tau_membrane_us = 1;
-            n.noise_amplitude_ua = 0;
-            n.synaptic_current_ua = 0;
-            n.adaptation_current_ua = 0;
-            n.refractory_time_us = 0;
+            n.noise_amplitude_pa = 0;
+            n.synaptic_current_pa = 0;
+            n.adaptation_current_pa = 0;
+            n.refractory_remaining_us = 0;
             let _ = n.integrate_and_fire(input, u32::MAX, 0);
 
             // The same step with no width limit at all, reading the neuron's
@@ -1449,17 +1606,17 @@ mod tests {
             } else {
                 VoltageResolution::Millivolt
             };
-            let mut n = LIFNeuron::new(0);
+            let mut n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
             n.voltage_resolution = resolution;
             n.membrane_potential = mp;
             n.resting_potential = rp;
             n.tau_membrane_us = tau_us;
             n.resistance_mohm = resistance;
             n.threshold = i16::MAX; // unreachable: no spike, no reset
-            n.noise_amplitude_ua = 0;
-            n.synaptic_current_ua = 0;
-            n.adaptation_current_ua = 0;
-            n.refractory_time_us = 0;
+            n.noise_amplitude_pa = 0;
+            n.synaptic_current_pa = 0;
+            n.adaptation_current_pa = 0;
+            n.refractory_remaining_us = 0;
 
             let _ = n.integrate_and_fire(input, dt_us, 0);
 
@@ -1488,16 +1645,16 @@ mod tests {
         /// After reset, membrane = resting, no currents, no refractory.
         #[test]
         fn prop_reset_clears_all_state(id in 0u16..=1000) {
-            let mut n = LIFNeuron::new(id);
+            let mut n = LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt);
             n.add_synaptic_current(50);
-            n.adaptation_current_ua = 20;
+            n.adaptation_current_pa = 20;
             n.spike(5000);
             n.spike(6000);
             n.reset();
             prop_assert_eq!(n.membrane_potential, n.resting_potential);
-            prop_assert_eq!(n.synaptic_current_ua, 0);
-            prop_assert_eq!(n.adaptation_current_ua, 0);
-            prop_assert_eq!(n.refractory_time_us, 0);
+            prop_assert_eq!(n.synaptic_current_pa, 0);
+            prop_assert_eq!(n.adaptation_current_pa, 0);
+            prop_assert_eq!(n.refractory_remaining_us, 0);
         }
 
         /// Membrane potential always within biological bounds.
@@ -1508,7 +1665,7 @@ mod tests {
             dt in 1u32..=10_000,
             start_t in 0u32..=1_000_000,
         ) {
-            let mut n = LIFNeuron::new(id);
+            let mut n = LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt);
             let mut t = start_t;
             for _ in 0..100 {
                 let _ = n.integrate_and_fire(input, dt, t);
@@ -1518,15 +1675,15 @@ mod tests {
             prop_assert!(n.membrane_potential <= MEMBRANE_MV_MAX);
         }
 
-        /// Firing rate ≤ 1_000_000 / tau_refractory_us (refractory physical bound, +5% tolerance).
+        /// Firing rate ≤ 1_000_000 / refractory_period_us (refractory physical bound, +5% tolerance).
         #[test]
         fn prop_firing_rate_respects_refractory_bound(
             id in 0u16..=50,
             tau_ref in 500u32..=10_000,
         ) {
-            let mut n = LIFNeuron::new(id);
+            let mut n = LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt);
             let mut rec = SpikeRecorder::new();
-            n.tau_refractory_us = tau_ref;
+            n.refractory_period_us = tau_ref;
             n.threshold = -100; // force spiking with any input
             let mut t = 0_u32;
             for _ in 0..100 {
@@ -1553,15 +1710,61 @@ mod tests {
     #[test]
     fn adaptation_decay_is_exact_minus_one_with_floor_zero() {
         let mut n = quiet_neuron(21, VoltageResolution::Millivolt);
-        n.adaptation_current_ua = 3;
+        n.adaptation_current_pa = 3;
         n.decay_adaptation_current();
-        assert_eq!(n.adaptation_current_ua, 2);
+        assert_eq!(n.adaptation_current_pa, 2);
         n.decay_adaptation_current();
-        assert_eq!(n.adaptation_current_ua, 1);
+        assert_eq!(n.adaptation_current_pa, 1);
         n.decay_adaptation_current();
-        assert_eq!(n.adaptation_current_ua, 0);
+        assert_eq!(n.adaptation_current_pa, 0);
         n.decay_adaptation_current();
-        assert_eq!(n.adaptation_current_ua, 0, "floors at zero, never negative");
+        assert_eq!(n.adaptation_current_pa, 0, "floors at zero, never negative");
+    }
+
+    /// The current saturates term by term, `input + synaptic + noise −
+    /// adaptation` left to right in `i16` (§ Semantics, item 3): MAX + MAX
+    /// is MAX, then MAX − MAX is 0, and nothing moves, where an unbounded
+    /// sum would leave 32,767 pA. An adaptation current of `i16::MAX` takes
+    /// 16,384 spikes to reach through the step, so this test writes it.
+    #[test]
+    fn the_current_saturates_term_by_term() {
+        let mut n = quiet_neuron(0, VoltageResolution::Millivolt);
+        n.threshold = i16::MAX; // no spike in this test
+        n.synaptic_current_pa = i16::MAX;
+        n.adaptation_current_pa = i16::MAX;
+        n.integrate_and_fire(i16::MAX, 1_000, 0);
+        assert_eq!(n.membrane_potential, -70);
+    }
+
+    /// A spike stamps its time, the caller's clock (§ Semantics, item 8):
+    /// the stamp has no getter, so this test reads it.
+    #[test]
+    fn a_spike_stamps_its_time() {
+        let mut n = quiet_neuron(0, VoltageResolution::Millivolt);
+        n.threshold = -100; // fires at the first integrating step
+        assert!(n.integrate_and_fire(0, 1_000, 5_000));
+        assert_eq!(n.last_spike_time_us, 5_000);
+        assert!(!n.integrate_and_fire(0, 1_000, 6_000));
+        assert_eq!(n.last_spike_time_us, 5_000, "a silent step stamps nothing");
+    }
+
+    /// The switch off: a spike adds nothing to the adaptation current,
+    /// the decay finds nothing to take, and `reset` leaves the switch, a
+    /// parameter, as it was. On, a spike adds 2 and `reset` leaves it on
+    /// (the test below).
+    #[test]
+    fn adaptation_off_adds_nothing() {
+        let mut n = quiet_neuron(22, VoltageResolution::Millivolt).with_adaptation_enabled(false);
+        n.threshold = -100; // force a spike every integrating step
+        n.refractory_period_us = 0;
+        for t in 0..10 {
+            assert!(n.integrate_and_fire(1000, 1000, t * 1000));
+            assert_eq!(n.adaptation_current_pa, 0, "step {t}");
+        }
+        n.decay_adaptation_current();
+        assert_eq!(n.adaptation_current_pa, 0);
+        n.reset();
+        assert!(!n.adaptation_enabled);
     }
 
     #[test]
@@ -1570,7 +1773,9 @@ mod tests {
         n.threshold = -100; // force a spike this step
         let spiked = n.integrate_and_fire(1000, 1000, 0);
         assert!(spiked);
-        assert_eq!(n.adaptation_current_ua, 2, "+2 per spike");
+        assert_eq!(n.adaptation_current_pa, 2, "+2 per spike");
+        n.reset();
+        assert!(n.adaptation_enabled, "reset leaves the switch on");
     }
 
     // ----- The dt/tau formula, and the neuron's exactness over the whole domain -----
@@ -1740,11 +1945,11 @@ mod tests {
     /// says, so answering that pattern with a lazy `..` is no longer
     /// silent (that pattern, the first tripwire, is answerable that way
     /// and the traces, clippy and the size pin above all stay green:
-    /// `LIFNeuron` has three bytes of padding, and a `bool` or a `u16`
-    /// fits).
+    /// `LIFNeuron` has two bytes of padding, the adaptation switch having
+    /// taken one, and a `bool` or a `u16` still fits).
     ///
     /// TWO CHECKS, the literal first. The neuron below is built from a
-    /// `LIFNeuron { … }` literal naming all seventeen fields, so a field
+    /// `LIFNeuron { … }` literal naming all eighteen fields, so a field
     /// added or removed is `E0063` or `E0560` HERE, at the compiler,
     /// with the message below in front of whoever answers it. That is
     /// what the 31 literals of a frozen `frozen.rs` used to give and no
@@ -1771,9 +1976,9 @@ mod tests {
     /// literal above, which the compiler checks. The number can be edited,
     /// like any pin, with the same message in front of whoever edits it.
     ///
-    /// `17` has one home: this test.
+    /// `18` has one home: this test.
     #[test]
-    fn the_neuron_has_seventeen_fields() {
+    fn the_neuron_has_eighteen_fields() {
         // Arbitrary values, not the constructor's (doc above).
         let neuron = LIFNeuron {
             id: 9,
@@ -1784,15 +1989,16 @@ mod tests {
             reset_potential: -7_100,
             voltage_resolution: VoltageResolution::CentiMillivolt,
             tau_membrane_us: 12_345,
-            tau_refractory_us: 987,
-            refractory_time_us: 3,
+            refractory_period_us: 987,
+            refractory_remaining_us: 3,
             last_update_time_us: 41,
             last_spike_time_us: 40,
-            synaptic_current_ua: -17,
+            synaptic_current_pa: -17,
             capacitance_pf: 222,
             resistance_mohm: 33,
-            noise_amplitude_ua: 7,
-            adaptation_current_ua: 6,
+            noise_amplitude_pa: 7,
+            adaptation_current_pa: 6,
+            adaptation_enabled: false,
         };
         let pretty = format!("{neuron:#?}");
         let fields = pretty
@@ -1804,7 +2010,7 @@ mod tests {
             })
             .count();
         assert_eq!(
-            fields, 17,
+            fields, 18,
             "a field was added to or taken from LIFNeuron (and the literal above compiled, \
              so this count is the second word, not the first). Adding one is a decision in \
              `fixed::freeze` (`neuron_chain`'s destructure, and its doc): bind it there \

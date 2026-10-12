@@ -138,13 +138,16 @@ records it names in `evidence/INDEX.md`. Four lines, in order:
 2. **alpha.9: the pub walk.** What stops being public before the
    crate's surface is promised: paths and re-exports, `LIFNeuron`'s
    fields, the rest of the field walk; the noise default (a neuron has
-   none, a topology builder gives its neurons 5 μA), the networks' clock
+   none, a topology builder gives its neurons 5 pA), the networks' clock
    (a `u64`), the refusals (one `Error` variant per rule), the divisor's
    range (1 to 32,767), the cap of 65,535 neurons, one grid per network,
    a connectivity or rewiring probability from 0 to 1, a step that sorts
-   the synapses added since the last sort, with no public sort, and a
-   membrane the network's step can move are in. Then the rename, the
-   front door, the stamp.
+   the synapses added since the last sort, with no public sort, a
+   membrane the network's step can move, the current named in pA, one
+   neuron constructor that names its type and grid, `LIFNeuron`'s
+   fields behind fifteen getters and the chain, adaptation a switch per
+   neuron, and a neuron at rest in its place at `from_neurons` are in.
+   Then the rename, the front door, the stamp.
 3. **0.1.0: the stamp.** The principal's call, once the fourteen checks
    of § 0.1.0 hold again at the final tree, after the rename.
 4. **After 0.1.0: the learning chapter** (`docs/VISION.md` § Realistic

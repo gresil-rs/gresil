@@ -102,6 +102,14 @@ pub enum Error {
     /// A trace case name that is empty or holds anything but lowercase
     /// ASCII letters, digits and `-` (`trace::header`).
     BadCaseName,
+    /// A neuron that is not at rest: its membrane off its resting
+    /// potential, refractory time left, a current or a stamp, none of which
+    /// `LIFNeuron::new` and the `with_*` chain build
+    /// (`SpikingNeuralNetwork::from_neurons`).
+    NeuronNotAtRest,
+    /// A neuron whose id is not its position among the neurons given
+    /// (`SpikingNeuralNetwork::from_neurons`).
+    NeuronIdMismatch,
 }
 
 impl core::fmt::Display for Error {
@@ -125,6 +133,8 @@ impl core::fmt::Display for Error {
             Self::SynapseCountMismatch => "a synapse count other than the fixed network's S",
             Self::MixedVoltageGrids => "neurons on more than one voltage grid",
             Self::BadCaseName => "a case name that is empty or outside [a-z0-9-]",
+            Self::NeuronNotAtRest => "a neuron that is not at rest",
+            Self::NeuronIdMismatch => "a neuron id other than its position",
         })
     }
 }
@@ -207,6 +217,11 @@ mod tests {
                 Error::BadCaseName,
                 "a case name that is empty or outside [a-z0-9-]",
             ),
+            (Error::NeuronNotAtRest, "a neuron that is not at rest"),
+            (
+                Error::NeuronIdMismatch,
+                "a neuron id other than its position",
+            ),
         ];
         for (error, text) in texts {
             // No wildcard: a new variant does not compile here until it has
@@ -225,7 +240,9 @@ mod tests {
                 | Error::NeuronCountMismatch
                 | Error::SynapseCountMismatch
                 | Error::MixedVoltageGrids
-                | Error::BadCaseName => assert_eq!(error.to_string(), text),
+                | Error::BadCaseName
+                | Error::NeuronNotAtRest
+                | Error::NeuronIdMismatch => assert_eq!(error.to_string(), text),
             }
             assert!(text.starts_with(char::is_lowercase), "{text}");
             assert!(!text.ends_with(['.', '!', '?']), "{text}");

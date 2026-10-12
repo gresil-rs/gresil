@@ -41,12 +41,12 @@
 //!
 //! The neuron step is two calls, in the order `Network::step` uses them:
 //! `decay_adaptation_current` then `integrate_and_fire`. Each spike adds
-//! +2 µA of adaptation and only the decay call removes it; without the decay
+//! +2 pA of adaptation and only the decay call removes it; without the decay
 //! the neuron fires a few times and goes silent for good (verified on the
 //! host: 6 spikes then dark on this grid and input).
 //!
-//! Grid and input: centi-millivolt grid, 160 µA. On the default millivolt
-//! grid 160 µA truncates to ΔV = 0 every step and the neuron never fires
+//! Grid and input: centi-millivolt grid, 160 pA. On the millivolt
+//! grid 160 pA truncates to ΔV = 0 every step and the neuron never fires
 //! (`above_threshold_current_blind_on_mv_spikes_on_centi` in
 //! `lif_neuron.rs`); on the centi grid the same current fires, first spike
 //! at step 55, then about 15 spikes per second sustained, a blink the eye
@@ -125,10 +125,10 @@ const STRANGER_INPUT: &[i16; stranger::graph::N] = &stranger::graph::DRIVE[0].1;
 
 /// Simulation step, µs. Same value the crate's own tests use.
 const DT_US: u32 = 1_000;
-/// Constant input current, µA. Above the excitatory threshold current
-/// (~150 µA, V_ss = −54 mV); fires on the centi-mV grid, silent on the mV
+/// Constant input current, pA. Above the excitatory threshold current
+/// (~150 pA, V_ss = −54 mV); fires on the centi-mV grid, silent on the mV
 /// grid. See the module note.
-const INPUT_UA: i16 = 160;
+const INPUT_PA: i16 = 160;
 /// Steps in each timed burst arm.
 const BURST_STEPS: u32 = 10_000;
 /// Steps in the stranger's timed arm: a step costs about 10 ms at the
@@ -149,7 +149,7 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 esp_bootloader_esp_idf::esp_app_desc!();
 
 fn neuron(id: u16) -> LIFNeuron {
-    LIFNeuron::new_with_type_resolution(
+    LIFNeuron::new(
         id,
         NeuronType::Excitatory,
         VoltageResolution::CentiMillivolt,
@@ -161,7 +161,7 @@ fn neuron(id: u16) -> LIFNeuron {
 /// see; every other call passes `DT_US`.
 fn step(n: &mut LIFNeuron, dt_us: u32, now_us: u32) -> bool {
     n.decay_adaptation_current();
-    n.integrate_and_fire(INPUT_UA, dt_us, now_us)
+    n.integrate_and_fire(INPUT_PA, dt_us, now_us)
 }
 
 /// One line per burst arm, named, so a log reads without the brief. The
@@ -256,8 +256,8 @@ fn main() -> ! {
     let delay = Delay::new();
 
     println!(
-        "neuralos-esp32c3: LIF neuron, centi-mV grid, dt={} us, input={} uA",
-        DT_US, INPUT_UA
+        "neuralos-esp32c3: LIF neuron, centi-mV grid, dt={} us, input={} pA",
+        DT_US, INPUT_PA
     );
 
     // 1. Timed burst, two arms (module note): no delay between steps,

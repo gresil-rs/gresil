@@ -9,7 +9,7 @@ export component App inherits Window {
     // Sim controls (Rust reads/writes these).
     in-out property <bool> running;
     in-out property <bool> learning;
-    in-out property <float> input-drive;  // μA, 0..=1000 (float for the Slider)
+    in-out property <float> input-drive;  // pA, 0..=1000 (float for the Slider)
     in property <image> raster;
     in property <image> weight-map;
     in property <string> stats-text;
@@ -36,7 +36,7 @@ export component App inherits Window {
                 clicked => { root.learn-clicked(); }
             }
             Text {
-                text: "Drive: " + root.input-drive + " μA";
+                text: "Drive: " + root.input-drive + " pA";
                 color: #CCCCCC;
                 vertical-alignment: center;
             }

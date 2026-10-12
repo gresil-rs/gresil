@@ -75,11 +75,11 @@ or grab a prebuilt static binary from the releases (linux-x86_64).
   current quanta per unit), so the product `r·I` keeps the source's
   scale. An input is read in thousandths of a unit (`Thousandths`), and
   a stage's current rounds to the nearest quantum, half away from zero.
-  The import follows NIR's LIF: it fires on `v > v_threshold`
-  and has no refractory period. The step is 0.1 ms unless `--dt` gives
-  another: snnTorch's exporter assumes it, and a `.nir` file carries
-  none. The transform is opt-in and sidecar-stamped, each node's `V`
-  with it: an interpretive act is never silent. The JSON carries a
+  The import follows NIR's LIF: it fires on `v > v_threshold` and has no
+  refractory period and no adaptation. The step is 0.1 ms unless `--dt`
+  gives another: snnTorch's exporter assumes it, and a `.nir` file
+  carries none. The transform is opt-in and sidecar-stamped, each node's
+  `V` with it: an interpretive act is never silent. The JSON carries a
   mark too, `"units":"simulation"` on each LIF node, and the library
   refuses it under native options, and a file with no mark under
   simulation ones (`NirError::UnitsMismatch`); a `--sim-units` file
@@ -94,10 +94,9 @@ or grab a prebuilt static binary from the releases (linux-x86_64).
   moves a membrane by whole quanta, so it stops up to about τ/dt quanta
   short of the value it settles to: a neuron that settles just above
   its threshold can stay silent, and one that nears it slowly fires
-  later than in floating point; the substrate's spike-frequency
-  adaptation stays on, which slows a neuron that fires at a high rate;
-  and snnTorch's default reset, subtraction, does not survive NIR (its
-  exporter writes `v_reset = 0` for every model), so a model runs as
+  later than in floating point; and snnTorch's default reset,
+  subtraction, does not survive NIR (its exporter writes `v_reset = 0`
+  for every model), so a model runs as
   trained only with `reset_mechanism="zero"`. The flag is
   **all-or-nothing per file**: mixed-convention graphs (bio
   `r ≥ 1 MΩ` beside sim `r`) transform every `r` of the node — and

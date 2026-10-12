@@ -915,7 +915,7 @@ pub enum NirUnits {
     /// `v > v_threshold` (membranes are integers), and a threshold at
     /// the membrane's ceiling, which could then never fire, is refused
     /// ([`NirError::PotentialOutOfRange`]). The refractory period is 0,
-    /// since NIR's LIF has none.
+    /// and adaptation is off, since NIR's LIF has neither.
     Simulation,
 }
 
@@ -2310,7 +2310,7 @@ mod std_assembly {
     //!   term` — STDP would clamp ±32767 and corrupt the edge quanta);
     //!   recorded in the report.
     //! - **Grid:** any graph with a LIF→LIF edge assembles only on
-    //!   [`VoltageResolution::CentiMillivolt`] options — a 20 μA edge
+    //!   [`VoltageResolution::CentiMillivolt`] options — a 20 pA edge
     //!   pulse is dead 10× over on mV — and D8 extends the rule to any
     //!   graph with a LIF→Linear edge. Explicit mV options on such a
     //!   graph reject BY NAME with the re-import remedy (never a
@@ -2337,8 +2337,8 @@ mod std_assembly {
     /// **THE D1 edge-semantics contract (principal-ratified 2026-08-22).**
     ///
     /// A spiking-stage edge (LIF→LIF) transmits ONE spike as ONE current
-    /// pulse of this many μA, divided by the network's
-    /// `synaptic_input_divisor` (default 10 → a 20 μA pulse), accumulated
+    /// pulse of this many pA, divided by the network's
+    /// `synaptic_input_divisor` (default 10 → a 20 pA pulse), accumulated
     /// saturating-i16 across fan-in, integrated exactly one step later
     /// (the pinned session-F step order).
     ///
@@ -2348,8 +2348,8 @@ mod std_assembly {
     ///
     /// | axis | mV grid (s=1) | centi-mV grid (s=100) |
     /// |---|---|---|
-    /// | dead zone at rest | trunc(I/200) = 0 ⇒ **200 μA** | trunc(I/2) = 0 ⇒ **2 μA** |
-    /// | one 20 μA pulse | trunc(50·2/1000) = **0 quanta — dead** | trunc(50·200/1000) = **+10 quanta** |
+    /// | dead zone at rest | trunc(I/200) = 0 ⇒ **200 pA** | trunc(I/2) = 0 ⇒ **2 pA** |
+    /// | one 20 pA pulse | trunc(50·2/1000) = **0 quanta — dead** | trunc(50·200/1000) = **+10 quanta** |
     /// | sustained `V_ss` lift/spiking neighbor | +2.0 mV (coupling, not ignition) | +200 quanta |
     /// | ≥ 1 quantum/pulse headroom | — | holds to τ = 200 ms |
     ///
@@ -2360,7 +2360,7 @@ mod std_assembly {
     ///
     /// Consequence (named, never silent): any graph with a LIF→LIF
     /// edge assembles only under `CentiMillivolt` import options — a
-    /// single 20 μA pulse is dead 10× over on the mV grid. Explicit mV
+    /// single 20 pA pulse is dead 10× over on the mV grid. Explicit mV
     /// options on such a graph are rejected BY NAME with the remedy.
     ///
     /// Native units only. Under [`NirUnits::Simulation`] a spike through
@@ -2372,7 +2372,7 @@ mod std_assembly {
     ///
     /// A spike on a `LIF→Linear→…→LIF` path is the value 1 into the
     /// Linear chain. The pulse it delivers to post neuron `i` from pre
-    /// neuron `j` is `trunc(q_ij / LINEAR_GAIN_DIVISOR)` μA, where `q`
+    /// neuron `j` is `trunc(q_ij / LINEAR_GAIN_DIVISOR)` pA, where `q`
     /// is the composed chain's quantized i16 weight: the chain's
     /// matrices composed in f64 from the LIF and quantized ONCE by
     /// [`quantize_linear`](super::quantize_linear), the D2 fusion code
@@ -2383,20 +2383,20 @@ mod std_assembly {
     /// back onto itself would be a self-synapse and rejects by name.
     /// `q` is scaled by the composed matrix's own absmax, as each drive
     /// stage is (D6's note), so a chain's largest weight always maps to
-    /// ±32767: a 1×1 chain delivers ±327 μA whatever its nonzero weight.
+    /// ±32767: a 1×1 chain delivers ±327 pA whatever its nonzero weight.
     ///
     /// The divisor is the substrate's encoder gain: both drive encoders
     /// read this constant, so an input feature of 1 and a spike of 1
-    /// through the same Linear give the same μA. In the std network the
+    /// through the same Linear give the same pA. In the std network the
     /// edge is one synapse per nonzero `(j, i)` of weight
     /// `trunc(q_ij / 10)` under the assembly's divisor 10, and the
     /// step's `weight / 10` is `trunc(trunc(q/10)/10) = trunc(q/100)`
     /// for every i16 `q` (truncation toward zero composes; pinned over
     /// all 65,536 values), which `FixedSynapse::from_network` carries.
     /// The band: a `q` with `0 < |q| < LINEAR_GAIN_DIVISOR` still makes
-    /// its synapse, which delivers 0 μA (its std weight is already 0
+    /// its synapse, which delivers 0 pA (its std weight is already 0
     /// under 10), kept on purpose, since an input feature of 1 through
-    /// the same `q` gives 0 μA too and the nonzero composed weights are
+    /// the same `q` gives 0 pA too and the nonzero composed weights are
     /// the graph's topology, which the visualizer draws and STDP moves
     /// but never adds to.
     ///
@@ -2433,7 +2433,7 @@ mod std_assembly {
     /// assembly's `synaptic_input_divisor`, the network's default 10,
     /// which `build_network` never changes. Native units only:
     /// `a_two_linear_chain_after_a_lif_is_fused_once` and
-    /// `an_input_feature_and_a_spike_through_one_linear_give_the_same_ua`
+    /// `an_input_feature_and_a_spike_through_one_linear_give_the_same_pa`
     /// pin the pulse end to end; the witnesses import in simulation
     /// units, which never read it.
     const D8_WEIGHT_DIVISOR: i16 = LINEAR_GAIN_DIVISOR / 10;
@@ -2448,24 +2448,24 @@ mod std_assembly {
         /// mapping): τ=20 ms, R=100 MΩ, −70/−55/−80 V, deterministic.
         fn substrate_neuron(id: u16, res: VoltageResolution) -> LIFNeuron {
             let s = res.scale() as i16;
-            let mut n = LIFNeuron::new_with_type_resolution(id, NeuronType::Excitatory, res);
+            let mut n = LIFNeuron::new(id, NeuronType::Excitatory, res);
             n.resting_potential = -70 * s;
             n.membrane_potential = -70 * s;
             n.threshold = -55 * s;
             n.reset_potential = -80 * s;
             n.tau_membrane_us = 20_000;
-            n.tau_refractory_us = 1_000;
+            n.refractory_period_us = 1_000;
             n.resistance_mohm = 100;
             n.capacitance_pf = 200;
-            n.noise_amplitude_ua = 0;
+            n.noise_amplitude_pa = 0;
             n
         }
 
         /// **THE D1 exact-value pin, both grids in one test** (network
         /// `transmission_is_live_*` style). Pre driven over threshold on
-        /// step 0 (3000 μA ⇒ +1500 centi / +15 mV — exactly threshold);
+        /// step 0 (3000 pA ⇒ +1500 centi / +15 mV — exactly threshold);
         /// the `EDGE_PULSE_QUANTA` synapse (200 / default divisor 10 =
-        /// a 20 μA pulse) moves the post exactly one step later:
+        /// a 20 pA pulse) moves the post exactly one step later:
         /// centi +10 quanta (`dt_over_tau`=50: 50·200/1000), mV exactly
         /// ZERO (50·2/1000 truncates) — the dead-zone math that makes
         /// recurrent graphs a centi-only, named-rejection surface.
@@ -2495,7 +2495,7 @@ mod std_assembly {
                 assert_eq!(
                     net.neurons()[1].membrane_potential,
                     moved,
-                    "{label}: post integrates the 20 uA pulse one step later \
+                    "{label}: post integrates the 20 pA pulse one step later \
                      (centi: +10 quanta; mV: dead — the named-rejection math)"
                 );
             }
@@ -2530,10 +2530,16 @@ mod std_assembly {
         /// builders: `build_chain_network` (frozen pins) and
         /// `build_network` must produce the same neurons, the same
         /// encoder output, and the same 100-step spike raster — the
-        /// general path subsumes the chain, proven bit-exact.
+        /// general path subsumes the chain, proven bit-exact. On both
+        /// grids, so each builder's is read: the default options' mV and
+        /// the centi-mV one.
         #[test]
         fn chain_equivalence_both_builders_bit_exact() {
-            let opts = NirImportOptions::default();
+            chain_equivalence(NirImportOptions::default());
+            chain_equivalence(centi());
+        }
+
+        fn chain_equivalence(opts: NirImportOptions) {
             let g = NirImport::from_json(CHAIN, opts).expect("chain imports");
             let (mut net1, enc1) = g.build_chain_network().expect("chain builder");
             let (mut net2, enc2, rep2) = g.build_network().expect("general builder");
@@ -2819,8 +2825,8 @@ mod std_assembly {
         }
 
         /// The merge fixture at graph scale: one branch stalls below
-        /// the climb (81 μA → `V_ss−rest` 810 < the 1500 gap), the
-        /// summed fan-in fires (162 μA) — the `transmission_pulses_sum`
+        /// the climb (81 pA → `V_ss−rest` 810 < the 1500 gap), the
+        /// summed fan-in fires (162 pA) — the `transmission_pulses_sum`
         /// property, encoder edition. First-spike step pinned exactly
         /// (integer math, noise 0).
         #[test]
@@ -2843,8 +2849,8 @@ mod std_assembly {
                     counts[s.neuron_id as usize] += 1;
                 }
             }
-            assert_eq!(counts[0], 0, "81 uA stalls below the climb");
-            assert!(counts[1] > 0, "the 327 uA control row fires");
+            assert_eq!(counts[0], 0, "81 pA stalls below the climb");
+            assert!(counts[1] > 0, "the 327 pA control row fires");
 
             // fresh net, both branches: first spike on neuron 0 at
             // 0-based step 52 (g shrinks 1620 -> 116 by g/20 per step)
@@ -2861,7 +2867,7 @@ mod std_assembly {
                     }
                 }
             }
-            assert_eq!(first, 52, "summed 162 uA crosses at step 52 exactly");
+            assert_eq!(first, 52, "summed 162 pA crosses at step 52 exactly");
             assert_eq!(n0, 1, "one spike in the 100-step window (next ~112)");
         }
 
@@ -2880,7 +2886,7 @@ mod std_assembly {
             assert!(rep.undriven.is_empty());
 
             // ids: lif_a = 0,1; lif_b = 2,3. Drive x=[1,0]: a0 at 327
-            // uA fires; a1 undriven; b* has no encoder path.
+            // pA fires; a1 undriven; b* has no encoder path.
             let mut a0_first = usize::MAX;
             for t in 0..80 {
                 let fired_a0 = net
@@ -2900,7 +2906,7 @@ mod std_assembly {
                     assert_eq!(
                         net.neurons()[2].membrane_potential,
                         -6_990,
-                        "b0 integrates the 20 uA pulse: exactly +10 quanta"
+                        "b0 integrates the 20 pA pulse: exactly +10 quanta"
                     );
                 }
             }
@@ -3011,7 +3017,7 @@ mod std_assembly {
                 ("recurrent on mV (opts-driven)", RECURRENT, |e| {
                     matches!(e, NirError::UnsupportedTopology(m) if m.contains(
                         "CentiMillivolt"
-                    ) && m.contains("~200 uA dead zone"))
+                    ) && m.contains("~200 pA dead zone"))
                 }),
             ];
             for (label, doc, check) in cases {
@@ -3235,13 +3241,13 @@ mod std_assembly {
         const SELF_SYNAPSE: &str = "spiking Linear edge onto its own neuron (LIF->Linear->LIF, \
              a nonzero diagonal) — the substrate forbids self-synapse";
 
-        /// The one native synapse of a 1×1 chain: 327 μA. A 1×1 weight
+        /// The one native synapse of a 1×1 chain: 327 pA. A 1×1 weight
         /// quantizes to full scale, 32767, and 32767 / 100 truncates to
         /// 327.
         const ONE_EDGE: [FixedSynapse; 1] = [FixedSynapse {
             pre: 0,
             post: 1,
-            pulse_ua: 327,
+            pulse_pa: 327,
         }];
 
         /// The one synapse of both simulation-unit witnesses: lif1 →
@@ -3249,7 +3255,7 @@ mod std_assembly {
         const ONE_SIM_EDGE: [FixedSynapse; 1] = [FixedSynapse {
             pre: 0,
             post: 1,
-            pulse_ua: 1_000,
+            pulse_pa: 1_000,
         }];
 
         fn centi() -> NirImportOptions {
@@ -3507,7 +3513,7 @@ mod std_assembly {
 
         /// The tripwire that separates fused from per-segment:
         /// `a → Linear([[2.0]]) → Linear([[0.3]]) → b` composes to 0.6,
-        /// absmax 0.6, `q = 32767`, a 327 μA pulse. Quantizing each
+        /// absmax 0.6, `q = 32767`, a 327 pA pulse. Quantizing each
         /// tensor to full scale and composing in i16 would deliver about
         /// 32,767. The chain is one fusion record, as on the drive side.
         #[test]
@@ -3543,12 +3549,12 @@ mod std_assembly {
         }
 
         /// One constant, two sides: an input feature of 1 and a spike of
-        /// 1 through the same 1×1 Linear give the same μA. `l` has two
+        /// 1 through the same 1×1 Linear give the same pA. `l` has two
         /// roots, the Input (an encoder stage onto `b`) and the LIF `a`
         /// (a D8 synapse onto `b`); both quantize the same matrix and
         /// read `LINEAR_GAIN_DIVISOR`.
         #[test]
-        fn an_input_feature_and_a_spike_through_one_linear_give_the_same_ua() {
+        fn an_input_feature_and_a_spike_through_one_linear_give_the_same_pa() {
             let mut bld = NirBuilder::new(centi());
             let inp = bld.add_input("input", &[1]).expect("input");
             let to_pre = bld.add_linear("la", &[1.0], 1, 1).expect("linear");
@@ -3570,14 +3576,14 @@ mod std_assembly {
             let graph = bld.build().expect("builds");
             let (net, enc, _) = graph.build_network().expect("assembles");
             let drive = enc.encode(&[&[Thousandths(1_000)]])[1];
-            let pulse = FixedSynapse::from_network(&net)[0].pulse_ua;
+            let pulse = FixedSynapse::from_network(&net)[0].pulse_pa;
             assert_eq!((drive, pulse), (327, 327));
             assert_eq!(pulse, 32_767 / LINEAR_GAIN_DIVISOR);
         }
 
         /// The band, kept on purpose (`LINEAR_GAIN_DIVISOR`'s doc): a
         /// nonzero `q` under `LINEAR_GAIN_DIVISOR` still makes its
-        /// synapse, which delivers 0 μA. `a` (three neurons) →
+        /// synapse, which delivers 0 pA. `a` (three neurons) →
         /// `Linear([[1.0, 0.001, 0.0002]])` → `b`: absmax 1.0, so `q` is
         /// 32767, 33 and 7, the std weights 3276, 3 and 0, the pulses
         /// 327, 0 and 0.
@@ -3603,7 +3609,7 @@ mod std_assembly {
             assert_eq!(weights, [3_276, 3, 0]);
             let pulses: Vec<i16> = FixedSynapse::from_network(&net)
                 .iter()
-                .map(|s| s.pulse_ua)
+                .map(|s| s.pulse_pa)
                 .collect();
             assert_eq!(pulses, [327, 0, 0]);
         }
@@ -3683,12 +3689,12 @@ mod std_assembly {
                 FixedSynapse {
                     pre: 0,
                     post: 1,
-                    pulse_ua: 327,
+                    pulse_pa: 327,
                 },
                 FixedSynapse {
                     pre: 1,
                     post: 0,
-                    pulse_ua: 327,
+                    pulse_pa: 327,
                 },
             ];
             assert_eq!(recurrent(&[0.0, 1.0, 1.0, 0.0]), Ok(both));
@@ -3839,20 +3845,16 @@ mod std_assembly {
                     .lifs
                     .get(pop.offset + id)
                     .ok_or(NirError::MissingField("lif"))?;
-                let mut n = LIFNeuron::new_with_type_resolution(
-                    id as u16,
-                    NeuronType::Excitatory,
-                    self.opts.resolution,
-                );
+                let mut n = LIFNeuron::new(id as u16, NeuronType::Excitatory, self.opts.resolution);
                 n.resting_potential = p.leak_q;
                 n.membrane_potential = p.leak_q;
                 n.threshold = p.threshold_q;
                 n.reset_potential = p.reset_q;
                 n.tau_membrane_us = p.tau_us;
-                n.tau_refractory_us = 1_000; // NIR LIF has no refractory → minimum
+                n.refractory_period_us = 1_000; // NIR LIF has no refractory → minimum
                 n.resistance_mohm = p.resistance_mohm;
                 n.capacitance_pf = p.capacitance_pf;
-                n.noise_amplitude_ua = 0; // import is deterministic
+                n.noise_amplitude_pa = 0; // import is deterministic
                 neurons.push(n);
             }
             let net = SpikingNeuralNetwork::from_neurons(neurons, self.opts.dt_us)
@@ -3884,7 +3886,7 @@ mod std_assembly {
         /// The import options ARE the grid request (one channel, no
         /// overrides): a graph with any LIF→LIF or LIF→Linear edge
         /// assembles only on centi-mV options — mV options reject by
-        /// name with the re-import remedy (D1: a 20 μA pulse is dead
+        /// name with the re-import remedy (D1: a 20 pA pulse is dead
         /// 10× over on the mV grid; D8 extends the rule). Feed-forward
         /// imports without a spike edge keep the historical mV default
         /// — the frozen chain pins.
@@ -4569,7 +4571,7 @@ mod std_assembly {
 
     /// The Linear half of a general graph: root-Input feature values,
     /// [`Thousandths`] of a unit, → the global per-step current vector
-    /// (μA, one entry per neuron). One quantized matrix per (drive
+    /// (pA, one entry per neuron). One quantized matrix per (drive
     /// Linear, root) pair — fused chains arrive as a single composed
     /// matrix (D2: no hop-by-hop i16 encode-composition) — each row
     /// summed exactly and divided as [`encode`](Self::encode) says,
@@ -4694,7 +4696,7 @@ mod std_assembly {
 
     /// The named mV-on-recurrent rejection, remedy verbatim and
     /// copy-pasteable (D1 + the plan-gate ruling).
-    const RECURRENT_MV_REMEDY: &str = "recurrent graph on mV: pulses fall in the ~200 uA dead \
+    const RECURRENT_MV_REMEDY: &str = "recurrent graph on mV: pulses fall in the ~200 pA dead \
      zone — re-import a neuralos-nir2json --sim-units file with \
      NirImportOptions::sim_units(dt_us), a graph in native units with \
      NirImportOptions { resolution: VoltageResolution::CentiMillivolt, \
@@ -4711,8 +4713,9 @@ mod std_assembly {
     #[cfg(test)]
     mod sim_units_tests {
         //! `NirUnits::Simulation`: true-scale weights, NIR's firing rule,
-        //! no refractory, a direct edge at one unit a spike, and the
-        //! refusals. The graphs are what `--sim-units` writes at V 10:
+        //! no refractory, no adaptation, a direct edge at one unit a
+        //! spike, and the refusals. The graphs are what `--sim-units`
+        //! writes at V 10:
         //! τ 5 ms, r 50 → 500 MΩ, threshold 1.0 → 10 mV, leak and reset 0.
         use super::super::{
             nir_export, NirBuilder, NirError, NirImport, NirImportOptions, NirLifParams, NirUnits,
@@ -4769,6 +4772,25 @@ mod std_assembly {
 
         fn sim() -> NirImportOptions {
             NirImportOptions::sim_units(100)
+        }
+
+        /// NIR's LIF has no adaptation: a network imported in simulation
+        /// units builds every neuron with it off, a native one with it on,
+        /// as `LIFNeuron::new` builds it.
+        #[test]
+        fn simulation_units_build_neurons_without_adaptation() {
+            let native = NirImportOptions::new(100, VoltageResolution::CentiMillivolt);
+            for (opts, on) in [(sim(), false), (native, true)] {
+                let (net, _, _) = graph(opts, 1.0, Some(0.3), false)
+                    .build_network()
+                    .expect("builds");
+                assert_eq!(net.neurons().len(), 2);
+                assert!(
+                    net.neurons().iter().all(|n| n.adaptation_enabled() == on),
+                    "{:?}",
+                    opts.units
+                );
+            }
         }
 
         /// The units mark rides the export in simulation units only, one
@@ -4901,7 +4923,7 @@ mod std_assembly {
             let pulse = [FixedSynapse {
                 pre: 0,
                 post: 1,
-                pulse_ua: 300,
+                pulse_pa: 300,
             }];
             assert_eq!(FixedSynapse::from_network(&net), pulse);
         }
@@ -4921,13 +4943,13 @@ mod std_assembly {
                 .expect("builds");
             let n = &net.neurons()[0];
             assert_eq!(n.threshold, 1_001, "10 mV is 1,000 quanta, one up");
-            assert_eq!(n.tau_refractory_us, 0);
+            assert_eq!(n.refractory_period_us, 0);
             let native = NirImportOptions::new(100, VoltageResolution::CentiMillivolt);
             let (net, _, _) = graph(native, 1.0, None, false)
                 .build_network()
                 .expect("builds");
             let n = &net.neurons()[0];
-            assert_eq!((n.threshold, n.tau_refractory_us), (1_000, 1_000));
+            assert_eq!((n.threshold, n.refractory_period_us), (1_000, 1_000));
         }
 
         #[test]
@@ -4963,7 +4985,7 @@ mod std_assembly {
             let silent = [FixedSynapse {
                 pre: 0,
                 post: 1,
-                pulse_ua: 0,
+                pulse_pa: 0,
             }];
             assert_eq!(FixedSynapse::from_network(&net), silent);
         }
@@ -4998,10 +5020,10 @@ mod std_assembly {
     /// `with_resting_potential`'s doctest.
     ///
     /// In simulation units the threshold is one quantum up, so the
-    /// substrate's `v ≥ threshold` fires on NIR's `v > v_threshold`, and
-    /// the refractory period is 0. The chain builder refuses simulation
-    /// units, so its inline block stays the native mapping this one is
-    /// compared with.
+    /// substrate's `v ≥ threshold` fires on NIR's `v > v_threshold`, the
+    /// refractory period is 0 and adaptation is off. The chain builder
+    /// refuses simulation units, so its inline block stays the native
+    /// mapping this one is compared with.
     fn substrate_neuron(id: u16, p: &NirLif, opts: NirImportOptions) -> LIFNeuron {
         // NIR's LIF has no refractory: 0 in simulation units, the
         // native minimum otherwise
@@ -5009,15 +5031,17 @@ mod std_assembly {
             NirUnits::Native => (p.threshold_q, 1_000),
             NirUnits::Simulation => (p.threshold_q.saturating_add(1), 0), // NIR's strict `>`
         };
-        LIFNeuron::new_with_type_resolution(id, NeuronType::Excitatory, opts.resolution)
+        LIFNeuron::new(id, NeuronType::Excitatory, opts.resolution)
             .with_resting_potential(p.leak_q) // the membrane with it: built at rest
             .with_threshold(threshold)
             .with_reset_potential(p.reset_q)
             .with_tau_membrane_us(p.tau_us)
-            .with_tau_refractory_us(refractory_us)
+            .with_refractory_period_us(refractory_us)
             .with_capacitance_pf(p.capacitance_pf)
             .with_resistance_mohm(p.resistance_mohm)
-            .with_noise_amplitude_ua(0) // import is deterministic
+            .with_noise_amplitude_pa(0) // import is deterministic
+            // NIR's LIF has no adaptation: off in simulation units
+            .with_adaptation_enabled(matches!(opts.units, NirUnits::Native))
     }
 
     /// A weight at true scale in simulation units:
@@ -5057,10 +5081,10 @@ mod std_assembly {
     /// `G(L)`: root node index (an Input or, D8, a LIF) → arriving value.
     type GMap = BTreeMap<usize, GVal>;
 
-    /// The Linear half of the chain: feature currents (μA) →
-    /// per-neuron currents (μA), saturating i16 — `y = W·x` in
+    /// The Linear half of the chain: feature currents (pA) →
+    /// per-neuron currents (pA), saturating i16 — `y = W·x` in
     /// substrate units. Weights are scaled by 1/[`LINEAR_GAIN_DIVISOR`]
-    /// (the substrate's convention: a weight contributes `w/100` μA per
+    /// (the substrate's convention: a weight contributes `w/100` pA per
     /// unit input feature current; D8's spike side reads the same
     /// constant), documented as the encoder's gain.
     #[derive(Debug)]

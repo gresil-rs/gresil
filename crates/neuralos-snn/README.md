@@ -33,7 +33,7 @@ print a loop's first spike at step 56). The assert here is the burst's 55.
 ```rust
 use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
 
-let mut neuron = LIFNeuron::new_with_type_resolution(
+let mut neuron = LIFNeuron::new(
     0,
     NeuronType::Excitatory,
     VoltageResolution::CentiMillivolt,
@@ -65,7 +65,7 @@ each name by its shortest public path.
 
 | Module | What it holds |
 |---|---|
-| `lif_neuron` | Leaky-Integrate-and-Fire neuron, fixed-point, per-neuron voltage grid (`VoltageResolution`: mV default, opt-in centi-mV) |
+| `lif_neuron` | Leaky-Integrate-and-Fire neuron, fixed-point, per-neuron voltage grid (`VoltageResolution`: mV or centi-mV, written at construction) |
 | `spike_recorder` | `SpikeRecorder`, the spike history a caller keeps when it wants one: a `[u32; MAX_SPIKE_HISTORY]` ring (64 entries, the oldest overwritten), fed from `integrate_and_fire`'s return; the neuron keeps none |
 | `synapse` | Synapse, weight scale `SCALE = 1000`; with `unstable-stdp`, the pairwise STDP rule (a₊ 50 / a₋ −53 / lr 100) |
 | `network` *(std)* | `SpikingNeuralNetwork` orchestration (`step()`), a CSR synapse store (forward and reverse), 4 topology builders (Random, Small-World, Feedforward, Balanced E/I), per-step stats; with `unstable-stdp`, the plasticity passes (LTD + LTP), off until `set_plasticity_enabled(true)` |
@@ -121,7 +121,7 @@ enforces.
 ## Usage sketch
 
 ```rust
-use neuralos_snn::{NetworkTopology, SpikingNeuralNetwork};
+use neuralos_snn::{NetworkTopology, SpikingNeuralNetwork, VoltageResolution};
 
 fn main() -> neuralos_snn::Result<()> {
     let mut net = SpikingNeuralNetwork::new_with_voltage_resolution(
@@ -130,7 +130,7 @@ fn main() -> neuralos_snn::Result<()> {
         NetworkTopology::Balanced {
             excitatory_ratio: 0.8,
         },
-        Default::default(),
+        VoltageResolution::Millivolt,
     )?;
     net.build_topology()?;
 

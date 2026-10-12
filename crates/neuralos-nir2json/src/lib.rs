@@ -1184,8 +1184,8 @@ pub fn convert_file_opts(
 /// The import options a conversion runs under: `opts`, or under
 /// `--sim-units` the same time step in simulation units,
 /// [`NirImportOptions::sim_units`]: the centi-mV grid, true-scale
-/// weights, NIR's firing rule, no refractory. `--freeze` builds the
-/// network under the same.
+/// weights, NIR's firing rule, no refractory, no adaptation.
+/// `--freeze` builds the network under the same.
 #[must_use]
 pub fn effective_options(opts: NirImportOptions, sim_units: bool) -> NirImportOptions {
     if sim_units {

@@ -346,7 +346,8 @@ exist because careful per-session process still produced drift.
 ## Library behavior to know
 
 `SpikingNeuralNetwork::step()` calls `decay_adaptation_current` each
-step so the `adaptation_current` (which accumulates +2/spike) doesn't
+step so the `adaptation_current` (which accumulates +2/spike while the
+neuron's adaptation is on, as `LIFNeuron::new` builds it) doesn't
 grow unboundedly and silence the network. **If you add new per-step
 logic, preserve this decay** — and preserve the session-F step
 ordering: adaptation decay → integrate (reads last step's pulses) →
@@ -356,9 +357,10 @@ sessions' findings; see the transmission tests in `network.rs`). There
 is also a `set_plasticity_enabled(bool)` toggle, behind the
 `unstable-stdp` feature: a network starts with plasticity OFF, feature
 or not, so a default build does not learn, and the visualizer's
-sustained-firing mode is that default. And an opt-in
-centi-mV `VoltageResolution` grid (default mV is bit-identical —
-pinned by tests).
+sustained-firing mode is that default. And two `VoltageResolution`
+grids: `SpikingNeuralNetwork::new` builds on mV, bit-identical to the
+record (pinned by tests), the centi-mV one is opt-in, and
+`LIFNeuron::new` takes its grid, with no default.
 
 ## Do not
 
