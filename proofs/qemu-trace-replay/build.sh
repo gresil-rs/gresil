@@ -14,15 +14,16 @@
 # tree lowers both counts, but the replay still prints that case, and the
 # diff calls a header outside the tree's set red.
 #
-# A release-round gate, run by hand and pinned, like Leg A: not a CI job
-# (QEMU is not on the runner image). The capture goes to LOG, default
-# target/replay.log under the crate (CARGO_TARGET_DIR honored); a LOG
-# that exists is refused, so a pinned log is never written over (a
-# re-run writes a new name and compares, evidence/qemu-riscv-gate/
-# README.md). The crate's own format gate runs first: `cargo fmt --all`
-# at the root never reaches this workspace. Needs the
-# riscv64gc-unknown-none-elf target on the pin and qemu-system-riscv64
-# (8.2.2 on the laptop that banked the log).
+# Like Leg A, a gate run by hand and pinned, not a CI job (QEMU is not
+# on the runner image). It runs at each release round and in every PR
+# that moves a trace (AGENTS.md, the `proofs/` row). The capture goes to
+# LOG, default target/replay.log under the crate (CARGO_TARGET_DIR
+# honored); a LOG that exists is refused, so a pinned log is never
+# written over (a re-run writes a new name and compares,
+# evidence/qemu-riscv-gate/README.md). The crate's own format gate runs
+# first: `cargo fmt --all` at the root never reaches this workspace.
+# Needs the riscv64gc-unknown-none-elf target on the pin and
+# qemu-system-riscv64 (8.2.2 on the laptop that banked the log).
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)

@@ -3663,7 +3663,8 @@ mod tests {
     }
 
     /// The clock runs past 2^32 μs, where it used to saturate: the neurons are
-    /// handed its low 32 bits, and a spike carries the whole clock.
+    /// handed its low 32 bits, all 32 of them, and a spike, the firing rate
+    /// and a `FixedNetwork` converted from the network read the whole clock.
     #[test]
     fn the_clock_runs_past_the_u32_ceiling() {
         let mut net =
@@ -3672,6 +3673,8 @@ mod tests {
         net.current_time_us = u64::from(u32::MAX) - 400;
         net.step(&[0, 0]).expect("step");
         assert_eq!(net.current_time_us(), u64::from(u32::MAX) + 600);
+        // The first step ran at 2^32 - 401: its stamp keeps bit 31.
+        assert_eq!(net.neurons[0].last_update_time_us, u32::MAX - 400);
         // Neuron 0 fires on the second step, which runs at 2^32 + 599.
         let spikes = net.step(&[i16::MAX, 0]).expect("step");
         assert_eq!(net.current_time_us(), u64::from(u32::MAX) + 1_600);
@@ -3680,10 +3683,20 @@ mod tests {
         // The neuron's own stamps are the low 32 bits: 599.
         assert_eq!(net.neurons[0].last_update_time_us, 599);
         assert_eq!(net.neurons[0].last_spike_time_us, 599);
+        // One spike over two neurons in 2^32 + 1,599 μs, 4,294.968895 s: the
+        // rate is not read off the 1,599 μs of the clock's low 32 bits.
+        let rate = net.stats().firing_rate_hz;
+        assert!(
+            (rate - 1.0 / (4_294.968_895 * 2.0)).abs() < 1e-12,
+            "{rate} Hz"
+        );
+        let fixed = crate::fixed::FixedNetwork::<2, 0>::try_from(&net).expect("2 and 0");
+        assert_eq!(fixed.time_us(), u64::from(u32::MAX) + 1_600);
     }
 
     /// A topology builder gives every neuron noise 5, whatever the topology
-    /// and the grid; `from_neurons` keeps the neurons as given.
+    /// and the grid, and `new` builds through it; `from_neurons` keeps the
+    /// neurons as given, their noise too.
     #[test]
     fn a_topology_builder_gives_its_neurons_noise() {
         for res in [
@@ -3703,25 +3716,37 @@ mod tests {
                 );
             }
         }
+        // `new`, which the visualizer, the examples and the README call.
+        for topology in [
+            NetworkTopology::default(),
+            NetworkTopology::Random { connectivity: 0.0 },
+        ] {
+            let net = SpikingNeuralNetwork::new(10, 1000, topology).expect("builds");
+            assert!(
+                net.neurons().iter().all(|n| n.noise_amplitude_pa == 5),
+                "new, {topology:?}"
+            );
+        }
         let given = SpikingNeuralNetwork::from_neurons(
-            vec![LIFNeuron::new(
-                0,
-                NeuronType::Excitatory,
-                VoltageResolution::Millivolt,
-            )],
+            vec![
+                LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt)
+                    .with_noise_amplitude_pa(3),
+            ],
             1000,
         )
         .expect("builds");
-        assert_eq!(given.neurons()[0].noise_amplitude_pa, 0);
+        assert_eq!(given.neurons()[0].noise_amplitude_pa, 3);
     }
 
     /// STDP does the same past 2^32 μs as at the start: the three pairings the
-    /// rule tells apart give a weight change of −3, +3 and 0 at time 0 and at
-    /// 2^32 + 10^7 μs alike. The neurons carry 32-bit stamps and the clock is
-    /// a `u64`, so the pairing takes the difference of their low 32 bits
-    /// (`stamp_dt_us`). At the old saturated clock every pre spike whose post
-    /// had fired since the ceiling gained +5, whatever the timing; in this
-    /// test's shape, a fresh network per pairing, the three read +5, 0 and 0.
+    /// rule tells apart give a weight change of −3, +3 and 0 at time 0, at
+    /// 2^31 + 10^7 μs (bit 31 set in every stamp) and at 2^32 + 10^7 μs
+    /// alike. The neurons carry 32-bit stamps and the clock is a `u64`, so
+    /// the pairing takes the difference of their low 32 bits
+    /// (`stamp_dt_us`), and a pair across a turn of them still reads −3. At
+    /// the old saturated clock every pre spike whose post had fired since the
+    /// ceiling gained +5, whatever the timing; in this test's shape, a fresh
+    /// network per pairing, the three read +5, 0 and 0.
     #[cfg(feature = "unstable-stdp")]
     #[test]
     fn stdp_pairs_the_same_past_the_u32_ceiling() {
@@ -3761,7 +3786,7 @@ mod tests {
             }
             net.synapses()[0].weight - 500
         };
-        for start_us in [0, (1u64 << 32) + 10_000_000] {
+        for start_us in [0, (1u64 << 31) + 10_000_000, (1u64 << 32) + 10_000_000] {
             assert_eq!(
                 change(start_us, 1, 5),
                 -3,
@@ -3773,6 +3798,61 @@ mod tests {
                 "pre 5 steps before post, from {start_us}"
             );
             assert_eq!(change(start_us, 0, 0), 0, "pre alone, from {start_us}");
+        }
+        // Post at 2^32 - 3,000 μs, pre 5 ms later at 2^32 + 2,000: the low 32
+        // bits turn between them. Post first only: a pre spike this close to
+        // the turn would also pair with the never-fired post's stamp 0.
+        assert_eq!(
+            change((1u64 << 32) - 2_003_000, 1, 5),
+            -3,
+            "post 5 steps before pre, across the turn"
+        );
+    }
+
+    /// Two neurons firing in the same step pair as pre 1 μs after post, the
+    /// LTD tie-break, −5 at any clock past 0: at 1 ms, at the turns of the
+    /// clock's low 32 bits and between them. At a turn's first microsecond
+    /// the low 32 bits are 0, so the tie-break must take 1 off the whole
+    /// clock, as the queue must hold it: off the low 32 bits it would
+    /// saturate at 0.
+    #[cfg(feature = "unstable-stdp")]
+    #[test]
+    fn the_same_step_tie_break_holds_at_the_turns() {
+        const TURN: u64 = 1 << 32;
+        for clock in [
+            1_000,
+            TURN - 1,
+            TURN,
+            TURN + 1_000,
+            2 * TURN - 1,
+            2 * TURN,
+            5 * TURN + 3,
+        ] {
+            let mut net = SpikingNeuralNetwork::from_neurons(
+                (0..2)
+                    .map(|id| {
+                        LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt)
+                    })
+                    .collect(),
+                1_000,
+            )
+            .expect("two");
+            net.add_synapse(0, 1, 500).expect("0 -> 1");
+            net.finalize_synapses();
+            net.set_plasticity_enabled(true);
+            net.current_time_us = clock;
+            let ids: Vec<u16> = net
+                .step(&[i16::MAX, i16::MAX])
+                .expect("steps")
+                .iter()
+                .map(|s| s.neuron_id)
+                .collect();
+            assert_eq!(ids, [0, 1], "both fire at {clock:#x}");
+            assert_eq!(
+                net.synapses()[0].weight - 500,
+                -5,
+                "the tie-break at {clock:#x}"
+            );
         }
     }
 

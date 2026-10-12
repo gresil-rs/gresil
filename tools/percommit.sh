@@ -76,6 +76,17 @@ run() {
 for c in $commits; do
   git checkout --quiet "$c"
   echo "===== $c $(git log -1 --format=%s)  $(date +%T)"
+  # The two tree checks (round 66): the same lines as the per-commit job.
+  if [ -f tools/units.sh ]; then
+    run tools/units.sh
+  else
+    echo "(no tools/units.sh at this commit)"
+  fi
+  if [ -f tools/evidence-sums.sh ]; then
+    run tools/evidence-sums.sh
+  else
+    echo "(no tools/evidence-sums.sh at this commit)"
+  fi
   if grep -qE '^ +- name: cargo fmt --check$' .gitea/workflows/ci.yml .github/workflows/ci.yml; then
     run cargo fmt --all -- --check
   else

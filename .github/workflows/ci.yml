@@ -281,6 +281,20 @@ jobs:
           for c in $commits; do
             git checkout --quiet "$c"
             echo "===== $c $(git log -1 --format=%s)"
+            # The two tree checks (round 66), first, since they need no
+            # build: the current's unit and the evidence manifests.
+            # Guarded like the firmware leg, so commits before the
+            # scripts stay valid.
+            if [ -f tools/units.sh ]; then
+              tools/units.sh
+            else
+              echo "(no tools/units.sh at this commit)"
+            fi
+            if [ -f tools/evidence-sums.sh ]; then
+              tools/evidence-sums.sh
+            else
+              echo "(no tools/evidence-sums.sh at this commit)"
+            fi
             if grep -qE '^ +- name: cargo fmt --check$' .gitea/workflows/ci.yml .github/workflows/ci.yml; then
               cargo fmt --all -- --check
             else
