@@ -15,7 +15,7 @@ use neuralos_snn::bridge::{
 use neuralos_snn::kernel::{absmax_normalize_q15, pack_trits, ternary_matvec, unpack_trit};
 use neuralos_snn::lif_neuron::{LIFNeuron, NeuronType, VoltageResolution};
 use neuralos_snn::nir::{quantize_lif, quantize_linear, NirError, NirImportOptions, NirLinear};
-use neuralos_snn::synapse::{Synapse, SynapseType, STDPRule, SCALE};
+use neuralos_snn::synapse::{STDPRule, Synapse, SCALE};
 use neuralos_snn::trit::{project_to_ternary, stochastic_ternary_flip, tensor_scale, Trit};
 use neuralos_snn::Error;
 
@@ -328,33 +328,15 @@ fn cks_or<T: PartialEq + core::fmt::Debug>(name: &str, suffix: &str, got: T, wan
 
 fn synapse_checks() {
     let s = Synapse::new(1, 2, 100).unwrap_or_else(|_| Synapse::new(1, 2, 0).unwrap());
-    ck("synapse::default_params pre", s.pre_neuron_id, 1);
-    ck("synapse::default_params post", s.post_neuron_id, 2);
-    ck("synapse::default_params weight", s.weight, 100);
-    ck(
-        "synapse::default_params type",
-        s.synapse_type,
-        SynapseType::Excitatory,
-    );
-    ck("synapse::default_params tau_rise", s.tau_rise_us, 500);
-    ck("synapse::default_params tau_decay", s.tau_decay_us, 5_000);
-    ck("synapse::default_params max", s.max_weight, 2000);
-    ck("synapse::default_params min", s.min_weight, 0);
+    ck("synapse::default_params pre", s.pre(), 1);
+    ck("synapse::default_params post", s.post(), 2);
+    ck("synapse::default_params weight", s.weight(), 100);
+    ck("synapse::default_params max", s.max_weight(), 2000);
+    ck("synapse::default_params min", s.min_weight(), 0);
 
     let s = Synapse::new(1, 2, -100).unwrap_or_else(|_| Synapse::new(1, 2, 0).unwrap());
-    ck(
-        "synapse::negative_weight type",
-        s.synapse_type,
-        SynapseType::Inhibitory,
-    );
-    ck("synapse::negative_weight tau_rise", s.tau_rise_us, 300);
-    ck(
-        "synapse::negative_weight tau_decay",
-        s.tau_decay_us,
-        10_000,
-    );
-    ck("synapse::negative_weight max", s.max_weight, 0);
-    ck("synapse::negative_weight min", s.min_weight, -2000);
+    ck("synapse::negative_weight max", s.max_weight(), 0);
+    ck("synapse::negative_weight min", s.min_weight(), -2000);
 
     ck_bool(
         "synapse::self_connection_rejected",
@@ -382,14 +364,14 @@ fn synapse_checks() {
     s.update_weight(10_000);
     ck(
         "synapse::weight_clamped_at_bounds max",
-        s.weight,
-        s.max_weight,
+        s.weight(),
+        s.max_weight(),
     );
     s.update_weight(-10_000);
     ck(
         "synapse::weight_clamped_at_bounds min",
-        s.weight,
-        s.min_weight,
+        s.weight(),
+        s.min_weight(),
     );
 }
 

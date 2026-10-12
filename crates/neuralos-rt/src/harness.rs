@@ -19,7 +19,6 @@
 //! externalizes, it does not re-tune).
 
 use neuralos_snn::bridge::{decode_q2_0, encode_q2_0};
-use neuralos_snn::synapse::SynapseType;
 use neuralos_snn::trit::Trit;
 use neuralos_snn::{NetworkTopology, SpikingNeuralNetwork, VoltageResolution};
 
@@ -771,7 +770,7 @@ fn run_hybrid(trits: &[Trit], inputs: &[Vec<i16>], p: &ExperimentParams) -> Hybr
     let mut prev: Vec<Trit> = net
         .synapses()
         .iter()
-        .map(|s| Trit::from_weight(s.weight, GAMMA))
+        .map(|s| Trit::from_weight(s.weight(), GAMMA))
         .collect();
     net.set_plasticity_enabled(true);
 
@@ -803,7 +802,7 @@ fn run_hybrid(trits: &[Trit], inputs: &[Vec<i16>], p: &ExperimentParams) -> Hybr
             }
         }
         for (k, s) in net.synapses().iter().enumerate() {
-            let cur = Trit::from_weight(s.weight, GAMMA);
+            let cur = Trit::from_weight(s.weight(), GAMMA);
             if cur != prev[k] {
                 census[tix(prev[k])][tix(cur)] += 1;
                 flips += 1;
@@ -851,14 +850,14 @@ fn run_hybrid(trits: &[Trit], inputs: &[Vec<i16>], p: &ExperimentParams) -> Hybr
     let (mut absorbed_intra, mut absorbed_inter) = (0_i64, 0_i64);
     let (mut n_intra, mut n_inter) = (0_u32, 0_u32);
     for s in net.synapses() {
-        if s.pre_neuron_id < exc && s.post_neuron_id < exc {
-            if group_of(s.pre_neuron_id, exc, p) == group_of(s.post_neuron_id, exc, p) {
-                raw_intra += s.raw_stdp_delta;
-                absorbed_intra += s.absorbed_delta;
+        if s.pre() < exc && s.post() < exc {
+            if group_of(s.pre(), exc, p) == group_of(s.post(), exc, p) {
+                raw_intra += s.raw_stdp_delta();
+                absorbed_intra += s.absorbed_delta();
                 n_intra += 1;
             } else {
-                raw_inter += s.raw_stdp_delta;
-                absorbed_inter += s.absorbed_delta;
+                raw_inter += s.raw_stdp_delta();
+                absorbed_inter += s.absorbed_delta();
                 n_inter += 1;
             }
         }
@@ -884,7 +883,7 @@ fn run_hybrid(trits: &[Trit], inputs: &[Vec<i16>], p: &ExperimentParams) -> Hybr
         final_trits: net
             .synapses()
             .iter()
-            .map(|s| Trit::from_weight(s.weight, GAMMA))
+            .map(|s| Trit::from_weight(s.weight(), GAMMA))
             .collect(),
         plasticity_events: net.stats().plasticity_events,
         pairs_same_step: net.stats().stdp_pairs_same_step,
@@ -1051,12 +1050,14 @@ pub fn run_gate_phase(src: &[Trit], p: &ExperimentParams, phase1: bool) -> GateO
 
     let mut imported = build_from_trits(src, GAMMA, p, VoltageResolution::Millivolt);
     assert_eq!(imported.synapse_count() as u64, total - N as u64);
-    // Sign-asymmetry census: SynapseType owns PLASTICITY BOUNDS (sign-inferred
-    // at construction); the substrate type-sign invariant is intentionally
-    // not imposed on imported weights — propagation reads the stored sign.
+    // Sign-asymmetry census: the weight's sign sets the PLASTICITY BOUNDS at
+    // construction ([0, 2000] from 0 up, [−2000, 0] below), so a minimum of
+    // 0 is an excitatory synapse; the substrate type-sign invariant is
+    // intentionally not imposed on imported weights — propagation reads the
+    // stored sign.
     let (mut exc_t, mut inh_t) = (0u64, 0u64);
     for s in imported.synapses() {
-        if s.synapse_type == SynapseType::Excitatory {
+        if s.min_weight() == 0 {
             exc_t += 1;
         } else {
             inh_t += 1;
@@ -1076,7 +1077,7 @@ pub fn run_gate_phase(src: &[Trit], p: &ExperimentParams, phase1: bool) -> GateO
             if i == j {
                 continue;
             }
-            let got = Trit::from_weight(imported.synapses()[k].weight, GAMMA);
+            let got = Trit::from_weight(imported.synapses()[k].weight(), GAMMA);
             if got != src[i * N + j] {
                 mismatch += 1;
             }

@@ -126,6 +126,15 @@ from −90 and from −20 and the adaptation decay from 3, by the step and
 the chain, and the centi-mV floor from rest, where its test starts at
 −9,999. A comment at each says how; each keeps its name and its value.
 
+Since round 67 (step 7) leg A runs 169 checks. The six that read
+`Synapse`'s type and its two time constants, for each sign, went with
+those fields: `[ 38]` to `[ 40]` and `[ 43]` to `[ 45]` of `leg-a.log`
+(`synapse::default_params type`, `tau_rise`, `tau_decay`, then
+`synapse::negative_weight` the same three). Every check after them
+prints its index 3 lower from `[ 41]` to `[ 42]` and 6 lower from
+`[ 46]` on, with its name and its value as recorded, and the last line
+counts `checks: 169`.
+
 ## Leg B — user-mode, the REAL suite (the wire crosses)
 
 Full workspace test suite of the crate — NOT a subset — built static

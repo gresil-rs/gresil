@@ -9,6 +9,9 @@
 //!
 //! - `Synapse::new(id, id, _)` always refuses, with
 //!   [`Error::SelfConnection`] (no self-connections).
+//! - `Synapse::new` sets the bounds from the weight's sign: `[0, 2000]`
+//!   for a weight of 0 or more, `[-2000, 0]` below 0. The fields are the
+//!   crate's, so no caller writes the bounds.
 //!
 //! With the `unstable-stdp` feature (`update_weight` and `STDPRule` exist in
 //! no other build, and may change or go in a minor release):
@@ -47,64 +50,54 @@ use crate::Error;
 /// and a pinning test, not a magic 1000.
 pub const SCALE: i32 = 1000;
 
-/// Synapse type — biological neurotransmitter classification.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-#[non_exhaustive]
-pub enum SynapseType {
-    /// Excitatory (glutamate / AMPA). Weight ≥ 0.
-    #[default]
-    Excitatory,
-    /// Inhibitory (GABA). Weight < 0.
-    Inhibitory,
-    /// Modulatory (dopamine, serotonin). Slower, lower amplitude.
-    Modulatory,
-}
-
-/// Synapse with fixed-point weight and STDP instrumentation counters.
+/// A synapse: its two ends, its fixed-point weight, the bounds STDP
+/// clamps the weight to, and two STDP instrumentation counters.
 ///
-/// Biologically-modeled synaptic transmission with fixed-point math throughout.
-/// Pairs with [`LIFNeuron`](crate::LIFNeuron) for full integrate-and-fire + STDP.
+/// Its fields are the crate's. [`new`](Self::new) builds it, the bounds
+/// from the weight's sign; `update_weight`, behind `unstable-stdp`, is
+/// its one method that changes it, and a network writes its own
+/// synapses' weights, never their bounds, in its STDP and ternary passes.
+/// A getter reads each value. A network's synapses reach a caller as a
+/// slice (`SpikingNeuralNetwork::synapses`). Pairs with
+/// [`LIFNeuron`](crate::LIFNeuron) for full integrate-and-fire + STDP.
 #[derive(Debug, Clone)]
 pub struct Synapse {
     /// Presynaptic (source) neuron ID.
-    pub pre_neuron_id: u16,
+    pub(crate) pre_neuron_id: u16,
     /// Postsynaptic (target) neuron ID.
-    pub post_neuron_id: u16,
-    /// Neurotransmitter type — determines `tau_rise`, `tau_decay`, weight bounds.
-    pub synapse_type: SynapseType,
-
+    pub(crate) post_neuron_id: u16,
     /// Synaptic weight (fixed-point, 1000 = 1.0). Negative = inhibitory.
-    pub weight: i16,
+    pub(crate) weight: i16,
     /// Maximum weight (plasticity clamp).
-    pub max_weight: i16,
+    pub(crate) max_weight: i16,
     /// Minimum weight (plasticity clamp).
-    pub min_weight: i16,
-
-    /// Conductance rise time constant (μs) — biological: AMPA 0.5ms, GABA 0.3ms.
-    pub tau_rise_us: u16,
-    /// Conductance decay time constant (μs) — biological: AMPA 5ms, GABA 10ms.
-    pub tau_decay_us: u16,
-
-    /// Cumulative RAW STDP delta applied by `update_weight` (session G
-    /// instrumentation — the mechanism-label evidence): the signed sum of
-    /// every plasticity delta BEFORE clamping. Read it per class (intra vs
-    /// inter assemblies) to decide whether a realized bucket movement was
-    /// pairing-driven or clamp/flip-machinery-driven. Reads 0 in a build
-    /// without `unstable-stdp`: `update_weight` is behind it.
-    pub raw_stdp_delta: i64,
-    /// Cumulative delta ABSORBED by the `[min_weight, max_weight]` clamp:
-    /// `Σ(delta − applied)`. When |absorbed| is large relative to
-    /// [`raw_stdp_delta`](Self::raw_stdp_delta), bounds asymmetry — not pairing — shaped the
-    /// trajectory. Reads 0 in a build without `unstable-stdp`, as
-    /// `raw_stdp_delta` does.
-    pub absorbed_delta: i64,
+    pub(crate) min_weight: i16,
+    /// Cumulative raw STDP delta (session G instrumentation): see
+    /// [`raw_stdp_delta`](Self::raw_stdp_delta).
+    pub(crate) raw_stdp_delta: i64,
+    /// Cumulative delta the clamp absorbed: see
+    /// [`absorbed_delta`](Self::absorbed_delta).
+    pub(crate) absorbed_delta: i64,
 }
 
 impl Synapse {
     /// New synapse between `pre_id` and `post_id` with initial `weight`.
     ///
-    /// Synapse type is inferred from the sign of `weight`; biological parameters
-    /// (`tau_rise`, `tau_decay`, weight bounds) are set from the type.
+    /// The bounds come from the weight's sign: `[0, 2000]` for a weight of
+    /// 0 or more (excitatory, AMPA), `[-2000, 0]` below 0 (inhibitory,
+    /// GABA). The weight is kept as given, inside its bounds or not; the
+    /// counters start at 0.
+    ///
+    /// ```
+    /// use neuralos_snn::Synapse;
+    ///
+    /// let s = Synapse::new(3, 7, -150)?;
+    /// assert_eq!((s.pre(), s.post(), s.weight()), (3, 7, -150));
+    /// assert_eq!((s.min_weight(), s.max_weight()), (-2000, 0));
+    /// assert_eq!((s.raw_stdp_delta(), s.absorbed_delta()), (0, 0));
+    /// assert_eq!(Synapse::new(3, 7, 2_500)?.weight(), 2_500, "kept as given");
+    /// # Ok::<(), neuralos_snn::Error>(())
+    /// ```
     ///
     /// # Errors
     ///
@@ -113,26 +106,68 @@ impl Synapse {
         if pre_id == post_id {
             return Err(Error::SelfConnection);
         }
-
-        let synapse_type = if weight >= 0 {
-            SynapseType::Excitatory
-        } else {
-            SynapseType::Inhibitory
-        };
-        let (tau_rise_us, tau_decay_us, max_weight, min_weight) = biological_params(synapse_type);
-
+        let (max_weight, min_weight) = bounds_by_sign(weight);
         Ok(Self {
             pre_neuron_id: pre_id,
             post_neuron_id: post_id,
-            synapse_type,
             weight,
             max_weight,
             min_weight,
-            tau_rise_us,
-            tau_decay_us,
             raw_stdp_delta: 0,
             absorbed_delta: 0,
         })
+    }
+
+    /// The presynaptic neuron's id: its spike sends the pulse.
+    #[must_use]
+    pub fn pre(&self) -> u16 {
+        self.pre_neuron_id
+    }
+
+    /// The postsynaptic neuron's id: its synaptic current takes the pulse.
+    #[must_use]
+    pub fn post(&self) -> u16 {
+        self.post_neuron_id
+    }
+
+    /// The weight (fixed-point, 1000 = 1.0); negative is inhibitory.
+    #[must_use]
+    pub fn weight(&self) -> i16 {
+        self.weight
+    }
+
+    /// The largest weight `update_weight` leaves: 2000 for an excitatory
+    /// synapse, 0 for an inhibitory one.
+    #[must_use]
+    pub fn max_weight(&self) -> i16 {
+        self.max_weight
+    }
+
+    /// The smallest weight `update_weight` leaves: 0 for an excitatory
+    /// synapse, -2000 for an inhibitory one.
+    #[must_use]
+    pub fn min_weight(&self) -> i16 {
+        self.min_weight
+    }
+
+    /// The signed sum of every delta `update_weight` was given, before the
+    /// clamp (session G instrumentation, the mechanism-label evidence). Read
+    /// it per class (intra vs inter assemblies) to decide whether a bucket's
+    /// movement was pairing-driven or clamp/flip-machinery-driven. Reads 0
+    /// in a build without `unstable-stdp`: `update_weight` is behind it.
+    #[must_use]
+    pub fn raw_stdp_delta(&self) -> i64 {
+        self.raw_stdp_delta
+    }
+
+    /// The part of those deltas the `[min_weight, max_weight]` clamp
+    /// absorbed: `Σ(delta − applied)`. When it is large beside
+    /// [`raw_stdp_delta`](Self::raw_stdp_delta), the bounds' asymmetry, not
+    /// the pairing, shaped the trajectory. Reads 0 in a build without
+    /// `unstable-stdp`, as `raw_stdp_delta` does.
+    #[must_use]
+    pub fn absorbed_delta(&self) -> i64 {
+        self.absorbed_delta
     }
 
     /// Unstable: behind `unstable-stdp`.
@@ -168,31 +203,13 @@ impl Synapse {
     }
 }
 
-impl Default for Synapse {
-    fn default() -> Self {
-        // Default = excitatory synapse from neuron 0 to neuron 1, weight 100.
-        Self::new(0, 1, 100).unwrap_or(Self {
-            pre_neuron_id: 0,
-            post_neuron_id: 1,
-            synapse_type: SynapseType::Excitatory,
-            weight: 100,
-            max_weight: 2000,
-            min_weight: 0,
-            tau_rise_us: 500,
-            tau_decay_us: 5_000,
-            raw_stdp_delta: 0,
-            absorbed_delta: 0,
-        })
-    }
-}
-
-/// Biological parameter tuple (`tau_rise_us`, `tau_decay_us`, `max_weight`, `min_weight`)
-/// per neurotransmitter type.
-fn biological_params(t: SynapseType) -> (u16, u16, i16, i16) {
-    match t {
-        SynapseType::Excitatory => (500, 5_000, 2000, 0), // AMPA
-        SynapseType::Inhibitory => (300, 10_000, 0, -2000), // GABA
-        SynapseType::Modulatory => (1000, 50_000, 1000, -1000), // Dopamine etc.
+/// The bounds (`max_weight`, `min_weight`) a weight's sign gives a
+/// synapse: excitatory from 0 up, inhibitory below.
+fn bounds_by_sign(weight: i16) -> (i16, i16) {
+    if weight >= 0 {
+        (2000, 0) // AMPA
+    } else {
+        (0, -2000) // GABA
     }
 }
 
@@ -309,25 +326,38 @@ mod tests {
 
     #[test]
     fn new_excitatory_synapse_has_default_params() {
-        let s = Synapse::new(1, 2, 100).expect("valid ids");
-        assert_eq!(s.pre_neuron_id, 1);
-        assert_eq!(s.post_neuron_id, 2);
-        assert_eq!(s.weight, 100);
-        assert_eq!(s.synapse_type, SynapseType::Excitatory);
-        assert_eq!(s.tau_rise_us, 500); // AMPA
-        assert_eq!(s.tau_decay_us, 5_000);
-        assert_eq!(s.max_weight, 2000);
-        assert_eq!(s.min_weight, 0);
+        let s = Synapse::new(3, 7, 150).expect("valid ids");
+        assert_eq!(s.pre(), 3);
+        assert_eq!(s.post(), 7);
+        assert_eq!(s.weight(), 150);
+        assert_eq!(s.max_weight(), 2000); // AMPA
+        assert_eq!(s.min_weight(), 0);
+        assert_eq!((s.raw_stdp_delta(), s.absorbed_delta()), (0, 0));
     }
 
     #[test]
     fn negative_weight_makes_inhibitory() {
-        let s = Synapse::new(1, 2, -100).expect("valid ids");
-        assert_eq!(s.synapse_type, SynapseType::Inhibitory);
-        assert_eq!(s.tau_rise_us, 300); // GABA
-        assert_eq!(s.tau_decay_us, 10_000);
-        assert_eq!(s.max_weight, 0);
-        assert_eq!(s.min_weight, -2000);
+        let s = Synapse::new(3, 7, -150).expect("valid ids");
+        assert_eq!((s.pre(), s.post(), s.weight()), (3, 7, -150));
+        assert_eq!(s.max_weight(), 0); // GABA
+        assert_eq!(s.min_weight(), -2000);
+    }
+
+    /// The bounds follow the weight's sign alone, 0 counting as
+    /// excitatory, at both ends of `i16` and on each side of 0.
+    #[test]
+    fn the_bounds_follow_the_sign() {
+        for (weight, bounds) in [
+            (i16::MAX, (0, 2000)),
+            (1, (0, 2000)),
+            (0, (0, 2000)),
+            (-1, (-2000, 0)),
+            (i16::MIN, (-2000, 0)),
+        ] {
+            let s = Synapse::new(3, 7, weight).expect("valid ids");
+            assert_eq!((s.min_weight(), s.max_weight()), bounds, "weight {weight}");
+            assert_eq!(s.weight(), weight, "kept as given");
+        }
     }
 
     #[test]
@@ -337,25 +367,9 @@ mod tests {
     }
 
     #[test]
-    fn weight_bounds_directly_configurable() {
-        let mut s = Synapse::new(1, 2, 150).expect("valid ids");
-        s.min_weight = -500;
-        s.max_weight = 500;
-        assert_eq!(s.max_weight, 500);
-        assert_eq!(s.min_weight, -500);
-    }
-
-    #[test]
-    fn biological_params_map_modulatory_type() {
-        let (tau_rise, tau_decay, _max_w, _min_w) = biological_params(SynapseType::Modulatory);
-        assert_eq!(tau_decay, 50_000);
-        assert!(tau_rise > 0);
-    }
-
-    #[test]
     fn normalized_weight_is_percentage_of_max() {
         let mut s = Synapse::new(1, 2, 100).expect("valid ids");
-        assert_eq!(s.max_weight, 2000);
+        assert_eq!(s.max_weight(), 2000);
         // 100/2000 = 5%
         assert_eq!(s.normalized_weight(), 5);
         s.weight = s.max_weight;
@@ -371,9 +385,13 @@ mod tests {
     fn weight_clamped_at_bounds() {
         let mut s = Synapse::new(1, 2, 100).expect("valid ids");
         s.update_weight(10_000); // Way over max
-        assert_eq!(s.weight, s.max_weight);
+        assert_eq!(s.weight(), s.max_weight());
+        // 10,000 given, 1,900 applied: the clamp absorbed 8,100
+        assert_eq!((s.raw_stdp_delta(), s.absorbed_delta()), (10_000, 8_100));
         s.update_weight(-10_000); // Way under min
-        assert_eq!(s.weight, s.min_weight);
+        assert_eq!(s.weight(), s.min_weight());
+        // -10,000 given, -2,000 applied: -8,000 more absorbed
+        assert_eq!((s.raw_stdp_delta(), s.absorbed_delta()), (0, 100));
     }
 
     // ----- STDP rule tests -----
@@ -485,19 +503,17 @@ mod tests {
             prop_assert_eq!(result.err(), Some(Error::SelfConnection));
         }
 
-        /// Weight stays within `[min_weight, max_weight]` after any update.
+        /// Weight stays within `[min_weight, max_weight]` after any update,
+        /// for every synapse `new` builds: a caller cannot write the
+        /// bounds, so the clamp never meets a minimum above the maximum.
         #[cfg(feature = "unstable-stdp")]
         #[test]
-        fn prop_weight_clamped(
-            weight in -2000i16..=2000,
-            delta in -5000i16..=5000,
-        ) {
-            let mut s = Synapse::new(1, 2, weight).unwrap_or_else(|_| {
-                Synapse::new(1, 2, 0).expect("fallback synapse")
-            });
+        fn prop_weight_clamped(weight in any::<i16>(), delta in any::<i16>()) {
+            let mut s = Synapse::new(1, 2, weight).expect("valid ids");
+            prop_assert!(s.min_weight() <= s.max_weight());
             s.update_weight(delta);
-            prop_assert!(s.weight >= s.min_weight);
-            prop_assert!(s.weight <= s.max_weight);
+            prop_assert!(s.weight() >= s.min_weight());
+            prop_assert!(s.weight() <= s.max_weight());
         }
 
         /// STDP sign convention holds across random dt.

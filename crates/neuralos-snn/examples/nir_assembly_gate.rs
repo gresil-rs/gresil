@@ -195,7 +195,11 @@ fn main() {
     if net.neurons()[3].membrane_potential() != -7_000 {
         fail("b1 unmoved — a1 never fires (identity element mapping)");
     }
-    if !net.synapses().iter().all(|s| s.weight == EDGE_PULSE_QUANTA) {
+    if !net
+        .synapses()
+        .iter()
+        .all(|s| s.weight() == EDGE_PULSE_QUANTA)
+    {
         fail("edge quanta frozen (plasticity off)");
     }
     println!(

@@ -143,8 +143,6 @@ pub struct Spike {
     /// (71.6 min) it no longer fits a `u32`, and the neuron's own
     /// `last_spike_time_us` holds its low 32 bits.
     pub time_us: u64,
-    /// Spike weight (fixed-point, 1000 = 1.0). Always 1000 for direct neuron spikes.
-    pub weight: i16,
 }
 
 /// Plasticity queue entry: `(pre_neuron_id, post_neuron_id, synapse_index, pre_spike_time_us)`.
@@ -513,7 +511,6 @@ impl SpikingNeuralNetwork {
                 let spike = Spike {
                     neuron_id,
                     time_us: self.time_us,
-                    weight: 1000,
                 };
                 output_spikes.push(spike);
                 firing_neurons.push(neuron_id);

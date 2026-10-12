@@ -69,7 +69,7 @@ fn run_demo() {
     println!();
 
     // --- Phase 2: Snapshot initial state ---
-    let initial_weights: Vec<i16> = net.synapses().iter().map(|s| s.weight).collect();
+    let initial_weights: Vec<i16> = net.synapses().iter().map(|s| s.weight()).collect();
 
     // --- Phase 3: Run simulation ---
     println!(
@@ -111,7 +111,7 @@ fn run_demo() {
     print_final_stats(&net);
 
     // --- Phase 7: Weight evolution (STDP learning evidence) ---
-    let final_weights: Vec<i16> = net.synapses().iter().map(|s| s.weight).collect();
+    let final_weights: Vec<i16> = net.synapses().iter().map(|s| s.weight()).collect();
     let changed = initial_weights
         .iter()
         .zip(final_weights.iter())

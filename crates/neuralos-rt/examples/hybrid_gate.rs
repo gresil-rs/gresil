@@ -56,11 +56,11 @@
 //!   above floor means degenerate under this drive. Neither outcome is spun.
 //! - **Signed propagation (load-bearing read, verified from substrate
 //!   source):** `step()` Phase 2 injects `weight/10` straight from the CSR
-//!   slot — a negative stored weight IS inhibitory current; `SynapseType`
-//!   and the bio `receive_spike` path are not in the step loop. Imported
-//!   mixed-sign matrices therefore propagate as-is, no sign→SynapseType
-//!   split. `SynapseType` DOES own the plasticity bounds (sign-inferred at
-//!   `Synapse::new`): +γ→[0,2000], −γ→[−2000,0], 0→Excitatory [0,2000]. So
+//!   slot — a negative stored weight IS inhibitory current; no synapse
+//!   class and no bio `receive_spike` path is in the step loop. Imported
+//!   mixed-sign matrices therefore propagate as-is, no sign→class split.
+//!   The sign DOES set the plasticity bounds (at `Synapse::new`):
+//!   +γ→[0,2000], −γ→[−2000,0], 0→[0,2000], as an excitatory one. So
 //!   no imported synapse can cross sign under STDP — flips are
 //!   one-directional per class (+γ↔0, −γ↔0, 0→+γ only). That asymmetry is a
 //!   FINDING the census measures, not a defect to repair.

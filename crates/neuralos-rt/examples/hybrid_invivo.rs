@@ -191,9 +191,9 @@ fn group_pair_classes(
     net.synapses()
         .iter()
         .map(|s| {
-            s.pre_neuron_id < exc
-                && s.post_neuron_id < exc
-                && group_of(s.pre_neuron_id, exc, p) == group_of(s.post_neuron_id, exc, p)
+            s.pre() < exc
+                && s.post() < exc
+                && group_of(s.pre(), exc, p) == group_of(s.post(), exc, p)
         })
         .collect()
 }
@@ -232,7 +232,7 @@ fn run_vivo_ck(
     let mut prev: Vec<Trit> = net
         .synapses()
         .iter()
-        .map(|s| Trit::from_weight(s.weight, GAMMA))
+        .map(|s| Trit::from_weight(s.weight(), GAMMA))
         .collect();
     if learn_plasticity {
         net.set_plasticity_enabled(true);
@@ -264,13 +264,13 @@ fn run_vivo_ck(
                 t,
                 net.synapses()
                     .iter()
-                    .map(|s| Trit::from_weight(s.weight, GAMMA))
+                    .map(|s| Trit::from_weight(s.weight(), GAMMA))
                     .collect(),
             ));
             ck_i += 1;
         }
         for (k, s) in net.synapses().iter().enumerate() {
-            let cur = Trit::from_weight(s.weight, GAMMA);
+            let cur = Trit::from_weight(s.weight(), GAMMA);
             if cur != prev[k] {
                 census[tix(prev[k])][tix(cur)] += 1;
                 flips += 1;
@@ -282,11 +282,11 @@ fn run_vivo_ck(
     for (k, s) in net.synapses().iter().enumerate() {
         let intra = is_intra[k];
         if intra {
-            raw_intra += s.raw_stdp_delta;
-            absorbed_intra += s.absorbed_delta;
+            raw_intra += s.raw_stdp_delta();
+            absorbed_intra += s.absorbed_delta();
         } else {
-            raw_inter += s.raw_stdp_delta;
-            absorbed_inter += s.absorbed_delta;
+            raw_inter += s.raw_stdp_delta();
+            absorbed_inter += s.absorbed_delta();
         }
     }
     let total_learn_spikes: u64 = quarter_spikes.iter().sum();
@@ -300,7 +300,7 @@ fn run_vivo_ck(
         final_trits: net
             .synapses()
             .iter()
-            .map(|s| Trit::from_weight(s.weight, GAMMA))
+            .map(|s| Trit::from_weight(s.weight(), GAMMA))
             .collect(),
         plasticity_events: st.plasticity_events,
         pairs_same_step: st.stdp_pairs_same_step,
