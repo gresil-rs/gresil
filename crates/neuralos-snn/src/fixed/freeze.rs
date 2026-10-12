@@ -101,7 +101,7 @@ pub fn module(
         "{case}: plasticity is on, and a FixedNetwork has none"
     );
     assert_eq!(
-        net.current_time_us(),
+        net.time_us(),
         0,
         "{case}: the network has stepped, and a frozen file starts at 0"
     );
@@ -117,7 +117,7 @@ pub fn module(
         .expect("one grid and a case name by the rule, both checked above");
     let neurons = net.neurons();
     let synapses = FixedSynapse::from_network(net);
-    let dt_us = net.time_step_us();
+    let dt_us = net.dt_us();
     let spikes_only = matches!(rows, Rows::Spikes);
     let name = case.replace('-', "_");
     assert!(

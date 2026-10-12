@@ -240,8 +240,8 @@ fn print_final_stats(net: &SpikingNeuralNetwork) {
     );
     println!(
         "│ Simulation time:        {:>8} μs ({:.1} ms)             │",
-        net.current_time_us(),
-        net.current_time_us() as f64 / 1000.0
+        net.time_us(),
+        net.time_us() as f64 / 1000.0
     );
     println!("└────────────────────────────────────────────────────────────┘");
     println!();

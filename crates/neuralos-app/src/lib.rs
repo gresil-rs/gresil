@@ -84,9 +84,8 @@ impl SimRunner {
     /// # Errors
     /// Propagates [`neuralos_snn::Error`] if the network cannot be constructed
     /// or the topology fails to build (e.g. `neuron_count == 0`).
-    pub fn new(neuron_count: u16, time_step_us: u32) -> neuralos_snn::Result<Self> {
-        let mut net =
-            SpikingNeuralNetwork::new(neuron_count, time_step_us, NetworkTopology::default())?;
+    pub fn new(neuron_count: u16, dt_us: u32) -> neuralos_snn::Result<Self> {
+        let mut net = SpikingNeuralNetwork::new(neuron_count, dt_us, NetworkTopology::default())?;
         net.build_topology()?;
         let rows = usize::from(neuron_count);
 
@@ -222,7 +221,7 @@ impl SimRunner {
     #[must_use]
     pub fn stats_text(&self) -> String {
         let s = self.net.stats();
-        let sim_ms = self.net.current_time_us() as f64 / 1000.0;
+        let sim_ms = self.net.time_us() as f64 / 1000.0;
 
         // STDP learning readouts: mean weight + % of synapses changed since start.
         let syns = self.net.synapses();

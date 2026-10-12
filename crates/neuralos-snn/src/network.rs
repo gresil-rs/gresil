@@ -12,7 +12,7 @@
 //!
 //! - `SpikingNeuralNetwork::new(0, ...)` always refuses, with
 //!   [`Error::NeuronCountOutOfRange`].
-//! - `step()` advances `current_time_us`, a `u64`, by exactly `time_step_us`
+//! - `step()` advances `time_us()`, a `u64`, by exactly `dt_us`
 //!   (saturating at `u64::MAX`, about 585,000 years of model time).
 //! - Topology builders never create self-connections.
 //! - LFSR RNG is deterministic: same seed → same network connectivity.
@@ -161,7 +161,7 @@ type PlasticityEntry = (u16, u16, usize, u64);
 /// Holds [`LIFNeuron`] + [`Synapse`] collections, a CSR synapse matrix
 /// for fast synaptic transmission, and, with the `unstable-stdp` feature, an
 /// `STDPRule` for plasticity. One call to [`step`](Self::step) advances the
-/// simulation by `time_step_us` microseconds.
+/// simulation by `dt_us` microseconds.
 ///
 /// A network starts with plasticity off and does not learn. Only
 /// `set_plasticity_enabled`, behind `unstable-stdp`, turns it on.
@@ -176,8 +176,8 @@ pub struct SpikingNeuralNetwork {
     /// synapse as `synapses[synapse_matrix.synapse_indices[k]]`, and the weight in
     /// the corresponding CSR slot is kept in sync after every STDP update.
     synapse_matrix: SparseSynapseMatrix,
-    time_step_us: u32,
-    current_time_us: u64,
+    dt_us: u32,
+    time_us: u64,
     #[cfg(feature = "unstable-stdp")]
     plasticity_rule: STDPRule,
     stats: NetworkStats,
@@ -221,7 +221,7 @@ pub struct SpikingNeuralNetwork {
 const BUILT_NEURON_NOISE_PA: u8 = 5;
 
 impl SpikingNeuralNetwork {
-    /// Construct a network with `neuron_count` neurons, `time_step_us` simulation
+    /// Construct a network with `neuron_count` neurons, `dt_us` simulation
     /// step, and the given `topology`. Neurons are created with the biological
     /// 80/20 E/I ratio, or with the ratio a `Balanced` topology gives.
     /// Each has noise amplitude 5 pA (`BUILT_NEURON_NOISE_PA`), unlike a neuron
@@ -231,14 +231,14 @@ impl SpikingNeuralNetwork {
     /// # Errors
     ///
     /// [`Error::NeuronCountOutOfRange`] if `neuron_count == 0`;
-    /// [`Error::ZeroTimeStep`] if `time_step_us == 0`;
+    /// [`Error::ZeroTimeStep`] if `dt_us == 0`;
     /// [`Error::FrozenMembrane`] if a neuron's membrane cannot move at
-    /// `time_step_us`: under 20 μs with an excitatory neuron (τ = 20 ms),
+    /// `dt_us`: under 20 μs with an excitatory neuron (τ = 20 ms),
     /// under 10 μs with an inhibitory one (τ = 10 ms).
-    pub fn new(neuron_count: u16, time_step_us: u32, topology: NetworkTopology) -> Result<Self> {
+    pub fn new(neuron_count: u16, dt_us: u32, topology: NetworkTopology) -> Result<Self> {
         Self::new_with_voltage_resolution(
             neuron_count,
-            time_step_us,
+            dt_us,
             topology,
             VoltageResolution::Millivolt,
         )
@@ -255,14 +255,14 @@ impl SpikingNeuralNetwork {
     /// Same as [`new`](Self::new).
     pub fn new_with_voltage_resolution(
         neuron_count: u16,
-        time_step_us: u32,
+        dt_us: u32,
         topology: NetworkTopology,
         resolution: VoltageResolution,
     ) -> Result<Self> {
         if neuron_count == 0 {
             return Err(Error::NeuronCountOutOfRange);
         }
-        if time_step_us == 0 {
+        if dt_us == 0 {
             return Err(Error::ZeroTimeStep);
         }
 
@@ -294,7 +294,7 @@ impl SpikingNeuralNetwork {
             );
         }
 
-        if !membranes_move(&neurons, time_step_us) {
+        if !membranes_move(&neurons, dt_us) {
             return Err(Error::FrozenMembrane);
         }
         // No room is reserved for synapses, as in `from_neurons`: they grow
@@ -303,8 +303,8 @@ impl SpikingNeuralNetwork {
             neurons,
             synapses: Vec::new(),
             synapse_matrix: SparseSynapseMatrix::new(neuron_count, 0),
-            time_step_us,
-            current_time_us: 0,
+            dt_us,
+            time_us: 0,
             #[cfg(feature = "unstable-stdp")]
             plasticity_rule: STDPRule::new(),
             stats: NetworkStats::new(neuron_count),
@@ -334,24 +334,24 @@ impl SpikingNeuralNetwork {
     ///
     /// [`Error::NeuronCountOutOfRange`] unless `neurons` holds 1 to 65,535
     /// neurons, since ids are `u16` (`Spike::neuron_id`, `add_synapse`) and
-    /// so is the count; [`Error::ZeroTimeStep`] when `time_step_us == 0`;
+    /// so is the count; [`Error::ZeroTimeStep`] when `dt_us == 0`;
     /// [`Error::FrozenMembrane`] when a neuron's membrane cannot move at
-    /// `time_step_us`, its `tau_membrane_us` 0 or above
-    /// `1000 · time_step_us`; [`Error::MixedVoltageGrids`] unless every
+    /// `dt_us`, its `tau_membrane_us` 0 or above
+    /// `1000 · dt_us`; [`Error::MixedVoltageGrids`] unless every
     /// neuron is on one voltage grid, the one the network keeps for its
     /// stats; [`Error::NeuronNotAtRest`] when a neuron carries state: its
     /// membrane off its resting potential, refractory time left, a current
     /// or a stamp ([`LIFNeuron::reset`] brings it back);
     /// [`Error::NeuronIdMismatch`] unless each neuron's id is its position
     /// in `neurons`.
-    pub fn from_neurons(neurons: Vec<LIFNeuron>, time_step_us: u32) -> Result<Self> {
+    pub fn from_neurons(neurons: Vec<LIFNeuron>, dt_us: u32) -> Result<Self> {
         if !(1..=usize::from(u16::MAX)).contains(&neurons.len()) {
             return Err(Error::NeuronCountOutOfRange);
         }
-        if time_step_us == 0 {
+        if dt_us == 0 {
             return Err(Error::ZeroTimeStep);
         }
-        if !membranes_move(&neurons, time_step_us) {
+        if !membranes_move(&neurons, dt_us) {
             return Err(Error::FrozenMembrane);
         }
         let resolution = neurons[0].voltage_resolution;
@@ -369,8 +369,8 @@ impl SpikingNeuralNetwork {
             neurons,
             synapses: Vec::new(),
             synapse_matrix: SparseSynapseMatrix::new(neuron_count, 0),
-            time_step_us,
-            current_time_us: 0,
+            dt_us,
+            time_us: 0,
             #[cfg(feature = "unstable-stdp")]
             plasticity_rule: STDPRule::new(),
             stats: NetworkStats::new(neuron_count),
@@ -428,7 +428,7 @@ impl SpikingNeuralNetwork {
         Ok(())
     }
 
-    /// Advance the simulation by one `time_step_us`. Returns the spikes emitted
+    /// Advance the simulation by one `dt_us`. Returns the spikes emitted
     /// this step in chronological (neuron-id) order.
     ///
     /// A step first sorts the CSR if a synapse came in since the last sort
@@ -455,7 +455,7 @@ impl SpikingNeuralNetwork {
     ///    (`set_plasticity_enabled`; a network starts with it off), the STDP
     ///    passes run on this step's spikes. A build without the feature has
     ///    no item 5.
-    /// 6. The time advances by `time_step_us`. It is a `u64`, saturating at
+    /// 6. The time advances by `dt_us`. It is a `u64`, saturating at
     ///    `u64::MAX`, about 585,000 years of model time: no run reaches it.
     ///    The neurons are handed its low 32 bits, which wrap at 2^32 μs (71.6
     ///    min) without changing a spike
@@ -505,14 +505,14 @@ impl SpikingNeuralNetwork {
         // in the lineage was re-pinned on this fix.)
         // The neurons keep the low 32 bits of the clock
         // (`LIFNeuron::integrate_and_fire` § Semantics item 1).
-        let now_us = self.current_time_us as u32;
+        let now_us = self.time_us as u32;
         for (idx, neuron) in self.neurons.iter_mut().enumerate() {
             let current_pa = input_currents.get(idx).copied().unwrap_or(0);
-            if neuron.integrate_and_fire(current_pa, self.time_step_us, now_us) {
+            if neuron.integrate_and_fire(current_pa, self.dt_us, now_us) {
                 let neuron_id = idx as u16;
                 let spike = Spike {
                     neuron_id,
-                    time_us: self.current_time_us,
+                    time_us: self.time_us,
                     weight: 1000,
                 };
                 output_spikes.push(spike);
@@ -541,7 +541,7 @@ impl SpikingNeuralNetwork {
                 }
                 #[cfg(feature = "unstable-stdp")]
                 self.plasticity_queue
-                    .push((pre_id, post_id, syn_idx, self.current_time_us));
+                    .push((pre_id, post_id, syn_idx, self.time_us));
                 // The queue is `syn_idx`'s one reader in the step.
                 #[cfg(not(feature = "unstable-stdp"))]
                 let _ = syn_idx;
@@ -557,9 +557,7 @@ impl SpikingNeuralNetwork {
         }
 
         // Advance time and stats.
-        self.current_time_us = self
-            .current_time_us
-            .saturating_add(u64::from(self.time_step_us));
+        self.time_us = self.time_us.saturating_add(u64::from(self.dt_us));
         self.stats.total_spikes += output_spikes.len() as u64;
         self.update_stats();
 
@@ -669,7 +667,7 @@ impl SpikingNeuralNetwork {
         // double-counting. `last_spike_time_us > 0` excludes neurons that never
         // fired (their time-0 sentinel would otherwise fake a recent pre spike
         // and spuriously potentiate silent partners early in the run).
-        let post_time = self.current_time_us;
+        let post_time = self.time_us;
         // Collect work items first: incoming() borrows synapse_matrix
         // immutably, but applying the delta mutates synapses + synapse_matrix.
         let mut ltp_work: Vec<(usize, i32)> = Vec::new();
@@ -724,7 +722,7 @@ impl SpikingNeuralNetwork {
         // the default grid).
         let s = self.voltage_resolution.scale();
         self.stats.avg_membrane_potential_mv = total_v as f64 / (n as f64 * f64::from(s));
-        let time_sec = self.current_time_us as f64 / 1_000_000.0;
+        let time_sec = self.time_us as f64 / 1_000_000.0;
         if time_sec > 0.0 {
             self.stats.firing_rate_hz = self.stats.total_spikes as f64 / (time_sec * n as f64);
         }
@@ -922,7 +920,7 @@ impl SpikingNeuralNetwork {
         for n in &mut self.neurons {
             n.reset();
         }
-        self.current_time_us = 0;
+        self.time_us = 0;
         self.stats.total_spikes = 0;
         self.stats.plasticity_events = 0;
         #[cfg(feature = "unstable-stdp")]
@@ -963,15 +961,15 @@ impl SpikingNeuralNetwork {
     /// Current simulation time (μs), a `u64`: it does not reach its ceiling in
     /// any run (about 585,000 years of model time).
     #[must_use]
-    pub fn current_time_us(&self) -> u64 {
-        self.current_time_us
+    pub fn time_us(&self) -> u64 {
+        self.time_us
     }
 
     /// The simulation step (μs), read by `FixedNetwork`'s conversion.
     /// `pub(crate)` at 0.1.0 on purpose; it can go public in a minor release.
     #[must_use]
-    pub(crate) fn time_step_us(&self) -> u32 {
-        self.time_step_us
+    pub(crate) fn dt_us(&self) -> u32 {
+        self.dt_us
     }
 
     /// Total neuron count.
@@ -1158,8 +1156,8 @@ impl std::fmt::Debug for SpikingNeuralNetwork {
         f.debug_struct("SpikingNeuralNetwork")
             .field("neurons", &self.neurons.len())
             .field("synapses", &self.synapses.len())
-            .field("time_step_us", &self.time_step_us)
-            .field("current_time_us", &self.current_time_us)
+            .field("dt_us", &self.dt_us)
+            .field("time_us", &self.time_us)
             .field("topology", &self.topology)
             .finish_non_exhaustive()
     }
@@ -1208,10 +1206,10 @@ fn layer_sizes_fit(layers: &[u16], neuron_count: usize) -> bool {
 /// least 1, so its membrane moves, a time constant neither 0 nor above
 /// 1,000 time steps. Its one home: `new` and `from_neurons` refuse neurons
 /// that break it.
-fn membranes_move(neurons: &[LIFNeuron], time_step_us: u32) -> bool {
+fn membranes_move(neurons: &[LIFNeuron], dt_us: u32) -> bool {
     neurons
         .iter()
-        .all(|n| dt_over_tau(time_step_us, n.tau_membrane_us) > 0)
+        .all(|n| dt_over_tau(dt_us, n.tau_membrane_us) > 0)
 }
 
 /// At rest: the six fields [`LIFNeuron::reset`] writes hold the values it
@@ -1511,7 +1509,7 @@ mod tests {
         let net = SpikingNeuralNetwork::new(100, 1000, NetworkTopology::default())
             .expect("100 neurons valid");
         assert_eq!(net.neuron_count(), 100);
-        assert_eq!(net.current_time_us(), 0);
+        assert_eq!(net.time_us(), 0);
     }
 
     #[test]
@@ -1862,9 +1860,9 @@ mod tests {
         net.build_topology().expect("build");
         let inputs = vec![0; 10];
         let _ = net.step(&inputs).expect("step");
-        assert_eq!(net.current_time_us(), 1000);
+        assert_eq!(net.time_us(), 1000);
         let _ = net.step(&inputs).expect("step");
-        assert_eq!(net.current_time_us(), 2000);
+        assert_eq!(net.time_us(), 2000);
     }
 
     /// A neuron past the end of `input_currents` gets 0 pA, as a 0 in the
@@ -1914,7 +1912,7 @@ mod tests {
         for _ in 0..5 {
             let _ = net.step(&inputs).expect("step");
         }
-        assert!(net.current_time_us() > 0);
+        assert!(net.time_us() > 0);
         assert!(net.stats().total_spikes > 0);
         #[cfg(feature = "unstable-stdp")]
         assert!(
@@ -1922,7 +1920,7 @@ mod tests {
             "the counter must have moved, or the reset below clears a 0"
         );
         net.reset();
-        assert_eq!(net.current_time_us(), 0);
+        assert_eq!(net.time_us(), 0);
         assert_eq!(net.stats().total_spikes, 0);
         assert_eq!(net.stats().plasticity_events, 0);
     }
@@ -2639,9 +2637,9 @@ mod tests {
         );
 
         let start_weight = net.synapses[0].weight;
-        // Pre fired 3 ms ago; post fires "now" at current_time_us = 10_000.
+        // Pre fired 3 ms ago; post fires "now" at time_us = 10_000.
         net.neurons[0].last_spike_time_us = 7_000;
-        net.current_time_us = 10_000;
+        net.time_us = 10_000;
         // Only the post fired this step; plasticity_queue stays empty (no pre
         // spike this step) so the LTD pass is inert — only LTP can fire.
         net.update_plasticity(&[1]);
@@ -2687,7 +2685,7 @@ mod tests {
         let start_weight = net.synapses[0].weight;
         net.neurons[0].last_spike_time_us = 1_000;
         net.neurons[1].last_spike_time_us = 1_000;
-        net.current_time_us = 1_000;
+        net.time_us = 1_000;
         // Both fire this step; queue the pre-firing event as step() would.
         net.plasticity_queue.push((0, 1, 0, 1_000));
         net.update_plasticity(&[0, 1]);
@@ -2721,7 +2719,7 @@ mod tests {
         let start_weight = net.synapses[0].weight;
         // Post fired 3 ms ago; pre fires now.
         net.neurons[1].last_spike_time_us = 7_000;
-        net.current_time_us = 10_000;
+        net.time_us = 10_000;
         net.plasticity_queue.push((0, 1, 0, 10_000));
         // Only pre fired this step.
         net.update_plasticity(&[0]);
@@ -3021,8 +3019,8 @@ mod tests {
                     .map(|s| (s.pre_neuron_id, s.post_neuron_id, s.weight))
                     .collect(),
                 divisor: net.synaptic_input_divisor() as i16,
-                dt_us: net.time_step_us,
-                time_us: net.current_time_us,
+                dt_us: net.dt_us,
+                time_us: net.time_us,
             }
         }
 
@@ -3168,9 +3166,8 @@ mod tests {
     /// and at the end every weight, each list taken `by_pre`.
     #[cfg(feature = "unstable-stdp")]
     fn learns_as_its_reference(mut net: SpikingNeuralNetwork, acts: &[Act], seed: u64) -> bool {
-        let mut reference =
-            SpikingNeuralNetwork::from_neurons(net.neurons().to_vec(), net.time_step_us)
-                .expect("the same neurons");
+        let mut reference = SpikingNeuralNetwork::from_neurons(net.neurons().to_vec(), net.dt_us)
+            .expect("the same neurons");
         reference
             .set_synaptic_input_divisor(net.synaptic_input_divisor())
             .expect("the same divisor");
@@ -3662,6 +3659,24 @@ mod tests {
         assert_eq!(net.neurons[1].synaptic_current_pa, -1);
     }
 
+    /// The hand-written `Debug` reads the two counts and names the step and
+    /// the clock as their getters do, `dt_us` and `time_us`, the names
+    /// `FixedNetwork`'s derived one prints. It steps twice, so the clock and
+    /// the step differ and a crossed pair shows.
+    #[test]
+    fn debug_reads_the_counts_the_step_and_the_clock() {
+        let mut net =
+            SpikingNeuralNetwork::new(3, 1000, NetworkTopology::default()).expect("constructs");
+        net.add_synapse(0, 1, 100).expect("adds");
+        net.add_synapse(1, 2, -50).expect("adds");
+        net.step(&[0, 0, 0]).expect("step");
+        net.step(&[0, 0, 0]).expect("step");
+        let text = format!("{net:?}");
+        let head = "SpikingNeuralNetwork { neurons: 3, synapses: 2, dt_us: 1000, time_us: 2000, ";
+        assert!(text.starts_with(head), "{text}");
+        assert!(text.ends_with(", .. }"), "{text}");
+    }
+
     /// The clock runs past 2^32 μs, where it used to saturate: the neurons are
     /// handed its low 32 bits, all 32 of them, and a spike, the firing rate
     /// and a `FixedNetwork` converted from the network read the whole clock.
@@ -3670,14 +3685,14 @@ mod tests {
         let mut net =
             SpikingNeuralNetwork::new(2, 1000, NetworkTopology::Random { connectivity: 0.0 })
                 .expect("constructs");
-        net.current_time_us = u64::from(u32::MAX) - 400;
+        net.time_us = u64::from(u32::MAX) - 400;
         net.step(&[0, 0]).expect("step");
-        assert_eq!(net.current_time_us(), u64::from(u32::MAX) + 600);
+        assert_eq!(net.time_us(), u64::from(u32::MAX) + 600);
         // The first step ran at 2^32 - 401: its stamp keeps bit 31.
         assert_eq!(net.neurons[0].last_update_time_us, u32::MAX - 400);
         // Neuron 0 fires on the second step, which runs at 2^32 + 599.
         let spikes = net.step(&[i16::MAX, 0]).expect("step");
-        assert_eq!(net.current_time_us(), u64::from(u32::MAX) + 1_600);
+        assert_eq!(net.time_us(), u64::from(u32::MAX) + 1_600);
         assert_eq!(spikes.len(), 1, "neuron 0 fires, neuron 1 does not");
         assert_eq!(spikes[0].time_us, u64::from(u32::MAX) + 600);
         // The neuron's own stamps are the low 32 bits: 599.
@@ -3762,7 +3777,7 @@ mod tests {
             net.add_synapse(0, 1, 500).expect("0 -> 1");
             net.finalize_synapses();
             net.set_plasticity_enabled(true);
-            net.current_time_us = start_us;
+            net.time_us = start_us;
             let fire = |net: &mut SpikingNeuralNetwork, id: usize| {
                 let mut input = [0i16; 2];
                 input[id] = i16::MAX;
@@ -3840,7 +3855,7 @@ mod tests {
             net.add_synapse(0, 1, 500).expect("0 -> 1");
             net.finalize_synapses();
             net.set_plasticity_enabled(true);
-            net.current_time_us = clock;
+            net.time_us = clock;
             let ids: Vec<u16> = net
                 .step(&[i16::MAX, i16::MAX])
                 .expect("steps")
@@ -3962,7 +3977,7 @@ mod tests {
             prop_assert!(result.is_ok(), "valid n+topology must construct");
         }
 
-        /// step() advances time by exactly time_step_us, regardless of input,
+        /// step() advances time by exactly dt_us, regardless of input,
         /// from time 0. Past the `u32` ceiling the clock keeps running
         /// (`the_clock_runs_past_the_u32_ceiling`).
         #[test]
@@ -3975,7 +3990,7 @@ mod tests {
             net.build_topology()?;
             let inputs = vec![input_value; n as usize];
             net.step(&inputs)?;
-            prop_assert_eq!(net.current_time_us(), u64::from(dt));
+            prop_assert_eq!(net.time_us(), u64::from(dt));
         }
 
         /// No topologies create self-connections (pre != post for every synapse).

@@ -10,7 +10,7 @@
 //!      may fold the constant and keep the neuron in registers;
 //!    - pinned: the neuron behind `core::hint::black_box` once per step and
 //!      dt read once through it, as a network holds them (neurons in
-//!      memory, `time_step_us` a run-time field). Same id and inputs as the
+//!      memory, `dt_us` a run-time field). Same id and inputs as the
 //!      free arm, so the same spikes; its figure is the cost a network pays
 //!      (ISA round 27).
 //! 2. network: the frozen `feedforward-8` of the library's traces (8
@@ -296,7 +296,7 @@ fn main() -> ! {
     //    `black_box(&mut n)` once per step: the optimizer must assume the
     //    neuron is read and written behind its back, so it stays in memory,
     //    as in a network. dt is read once through `black_box` and passed in,
-    //    a run-time value like a network's `time_step_us`; the timestamp
+    //    a run-time value like a network's `dt_us`; the timestamp
     //    stays `i × DT_US`.
     let mut n = neuron(0);
     let dt_us = core::hint::black_box(DT_US);

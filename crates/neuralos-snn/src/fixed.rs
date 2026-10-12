@@ -257,8 +257,8 @@ impl<const N: usize, const S: usize> TryFrom<&SpikingNeuralNetwork> for FixedNet
         Ok(Self {
             neurons,
             synapses,
-            dt_us: net.time_step_us(),
-            time_us: net.current_time_us(),
+            dt_us: net.dt_us(),
+            time_us: net.time_us(),
         })
     }
 }
@@ -488,11 +488,7 @@ mod tests {
             for (f, s) in fixed.neurons().iter().zip(net.neurons()) {
                 assert_eq!(state(f), state(s), "step {step}: neuron {}", s.id);
             }
-            assert_eq!(
-                fixed.time_us(),
-                net.current_time_us(),
-                "step {step}: the time"
-            );
+            assert_eq!(fixed.time_us(), net.time_us(), "step {step}: the time");
             for &id in &got {
                 counts[usize::from(id)] += 1;
             }
