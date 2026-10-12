@@ -368,11 +368,7 @@ fn stranger_fallback_snntorch_two_layer_completes_full_path_sim_units() {
     assert_eq!((report.neurons, report.synapses), (2, 1));
     assert_eq!(
         neuralos_snn::FixedSynapse::from_network(&net),
-        [neuralos_snn::FixedSynapse {
-            pre: 0,
-            post: 1,
-            pulse_pa: 1_000
-        }],
+        [neuralos_snn::FixedSynapse::new(0, 1, 1_000)],
         "w 1.0 at true scale: 1,000 quanta a spike"
     );
 }

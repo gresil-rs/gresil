@@ -228,7 +228,7 @@ fn print_final_stats(net: &SpikingNeuralNetwork) {
     );
     println!(
         "│ Synapses:               {:>8}                         │",
-        s.total_synapses
+        net.synapse_count()
     );
     println!(
         "│ Avg firing rate:        {:>8.2} Hz                    │",

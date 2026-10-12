@@ -135,7 +135,11 @@ impl Default for NetworkTopology {
 }
 
 /// Spike event emitted by a neuron during a [`SpikingNeuralNetwork::step`].
+///
+/// The step builds it and a caller reads it. Not exhaustive: a field may
+/// come in a minor release.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Spike {
     /// ID of the neuron that fired.
     pub neuron_id: u16,
@@ -305,7 +309,7 @@ impl SpikingNeuralNetwork {
             time_us: 0,
             #[cfg(feature = "unstable-stdp")]
             plasticity_rule: STDPRule::new(),
-            stats: NetworkStats::new(neuron_count),
+            stats: NetworkStats::new(),
             topology,
             seed: DEFAULT_SEED,
             #[cfg(feature = "unstable-stdp")]
@@ -371,7 +375,7 @@ impl SpikingNeuralNetwork {
             time_us: 0,
             #[cfg(feature = "unstable-stdp")]
             plasticity_rule: STDPRule::new(),
-            stats: NetworkStats::new(neuron_count),
+            stats: NetworkStats::new(),
             topology: NetworkTopology::Random { connectivity: 0.0 },
             seed: DEFAULT_SEED,
             #[cfg(feature = "unstable-stdp")]
@@ -391,7 +395,8 @@ impl SpikingNeuralNetwork {
     /// `Random`, `SmallWorld` and `Balanced` go on from the seed the last
     /// build left, so a second call can wire differently. Runtime spike
     /// counters are preserved (use [`reset`](Self::reset) to clear those
-    /// too). On success, `stats.total_synapses` is the new synapse count.
+    /// too). On success, [`synapse_count`](Self::synapse_count) is the new
+    /// synapse count.
     ///
     /// # Errors
     ///
@@ -422,7 +427,6 @@ impl SpikingNeuralNetwork {
         // The builders add in any pre order; one sort here, so the network
         // leaves clean and its first step sorts nothing.
         self.synapse_matrix.finalize();
-        self.stats.total_synapses = self.synapses.len() as u32;
         Ok(())
     }
 
@@ -726,7 +730,7 @@ impl SpikingNeuralNetwork {
     }
 
     /// Append a synapse. Both the CSR and the `synapses` vec get a copy,
-    /// and `stats().total_synapses` counts it. The next
+    /// and [`synapse_count`](Self::synapse_count) counts it. The next
     /// [`step`](Self::step) delivers it, after the sort it runs first
     /// (O(S + N)): adding between steps pays that sort at each step after
     /// an add.
@@ -746,7 +750,6 @@ impl SpikingNeuralNetwork {
         self.synapse_matrix
             .add(pre_id, post_id, weight, synapse_index);
         self.synapses.push(synapse);
-        self.stats.total_synapses = self.synapses.len() as u32;
         Ok(())
     }
 
@@ -2038,7 +2041,7 @@ mod tests {
         // round 64. `add_synapse` in arbitrary pre_id order, then a step,
         // must produce the authoritative forward CSR (right members, stable
         // within-row order), the reverse CSR (right incoming edges), and
-        // the count in the stats.
+        // the count.
         let mut net =
             SpikingNeuralNetwork::new(4, 1000, NetworkTopology::Random { connectivity: 0.0 })
                 .expect("valid");
@@ -2049,10 +2052,9 @@ mod tests {
         net.add_synapse(0, 1, 125).expect("add");
         net.add_synapse(2, 3, -125).expect("add");
         net.add_synapse(1, 3, 0).expect("add");
-        assert_eq!(net.stats().total_synapses, 4, "each add is counted");
+        assert_eq!(net.synapse_count(), 4, "each add is counted");
         net.step(&[0; 4]).expect("steps");
         assert_eq!(net.synapse_count(), 4);
-        assert_eq!(net.stats().total_synapses, 4);
 
         // Forward CSR: each row holds exactly its presynaptic neuron's edges,
         // stable order among same-pre adds (0 was added before 3 for pre 2).
@@ -3387,7 +3389,7 @@ mod tests {
             vec![vec![(1, 500, 1), (2, 300, 2)], vec![(2, 500, 0)], vec![]],
             "pre 0's two in the order added"
         );
-        assert_eq!(net.stats().total_synapses, 3);
+        assert_eq!(net.synapse_count(), 3);
         let mut built =
             SpikingNeuralNetwork::new(10, 1000, NetworkTopology::default()).expect("ten neurons");
         built.build_topology().expect("builds");
@@ -4331,6 +4333,25 @@ mod tests {
     }
 
     // ----- The membrane average: every neuron, in mV -----
+
+    /// Before its first step a network's stats read what `NetworkStats`
+    /// starts at, from either constructor: no spike, a rate of 0, and a
+    /// mean membrane of -70.0, as the field's doc says ("reads `-70.0`
+    /// until the first step"; the derived `Default` gave 0.0, and went).
+    #[test]
+    fn the_stats_read_rest_before_the_first_step() {
+        let built = SpikingNeuralNetwork::new(3, 1000, NetworkTopology::default()).expect("valid");
+        let neurons = (0..3)
+            .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+            .collect();
+        let given = SpikingNeuralNetwork::from_neurons(neurons, 1000).expect("valid");
+        for net in [&built, &given] {
+            let s = net.stats();
+            assert_eq!(s.avg_membrane_potential_mv, -70.0);
+            assert_eq!(s.firing_rate_hz, 0.0);
+            assert_eq!(s.total_spikes, 0);
+        }
+    }
 
     #[test]
     fn membrane_average_reads_rest_after_a_step() {

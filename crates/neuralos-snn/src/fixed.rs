@@ -42,7 +42,13 @@ pub mod freeze;
 /// Six bytes, `Copy`. The pulse is the std network's per-spike
 /// `weight / synaptic_input_divisor`, computed once, when the synapse is
 /// made (`from_network`).
+///
+/// The three fields are public on purpose: every value is legal (a `pre`
+/// or `post` past the arrays delivers nothing), so no field guards a rule.
+/// Not exhaustive: a field may come in a minor release, so outside this
+/// crate a synapse is built by [`new`](Self::new).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct FixedSynapse {
     /// Presynaptic neuron id: its spike sends the pulse.
     pub pre: u16,
@@ -132,7 +138,7 @@ impl<const N: usize, const S: usize> FixedNetwork<N, S> {
     /// use neuralos_snn::{FixedNetwork, FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
     ///
     /// let quiet = |id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt);
-    /// let synapse = [FixedSynapse { pre: 0, post: 1, pulse_pa: 400 }];
+    /// let synapse = [FixedSynapse::new(0, 1, 400)];
     /// let mut fired = [false; 2];
     ///
     /// // `pre` fires at step 0 (3,000 pA: +15 mV, onto the threshold).

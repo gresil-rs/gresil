@@ -147,9 +147,10 @@ records it names in `evidence/INDEX.md`. Four lines, in order:
    neuron constructor that names its type and grid, `LIFNeuron`'s
    fields behind fifteen getters and the chain, adaptation a switch per
    neuron, a neuron at rest in its place at `from_neurons`, one word
-   for the std network's clock and step, `time_us()` and `dt_us`, and
+   for the std network's clock and step, `time_us()` and `dt_us`,
    `Synapse`'s fields behind getters, the three no computation read
-   gone, are in. Then the rename, the front door, the stamp.
+   gone, and `Spike`, `NetworkStats` and `FixedSynapse` not exhaustive
+   are in. Then the rename, the front door, the stamp.
 3. **0.1.0: the stamp.** The principal's call, once the fourteen checks
    of § 0.1.0 hold again at the final tree, after the rename.
 4. **After 0.1.0: the learning chapter** (`docs/VISION.md` § Realistic

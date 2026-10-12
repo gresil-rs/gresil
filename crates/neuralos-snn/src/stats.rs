@@ -7,12 +7,15 @@
 //! `neuralos_snn::network::NetworkStats` is unchanged.
 
 /// Network-level statistics. Computed after each step. No serde (kept minimal).
-#[derive(Debug, Clone, Default, PartialEq)]
+///
+/// The network builds and writes it, and a caller reads it
+/// ([`SpikingNeuralNetwork::stats`](crate::network::SpikingNeuralNetwork::stats)).
+/// Not exhaustive: a field may come in a minor release. The neuron and
+/// synapse counts are the network's own, `neuron_count()` and
+/// `synapse_count()`.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct NetworkStats {
-    /// Total neuron count (fixed at construction).
-    pub total_neurons: u16,
-    /// Total synapse count: set by `build_topology` and by `add_synapse`.
-    pub total_synapses: u32,
     /// Cumulative spikes emitted since construction or last `reset`.
     pub total_spikes: u64,
     /// Cumulative plasticity updates applied. Reads 0 in a build without
@@ -38,10 +41,8 @@ pub struct NetworkStats {
 }
 
 impl NetworkStats {
-    pub(crate) fn new(neuron_count: u16) -> Self {
+    pub(crate) fn new() -> Self {
         Self {
-            total_neurons: neuron_count,
-            total_synapses: 0,
             total_spikes: 0,
             plasticity_events: 0,
             stdp_pairs_same_step: 0,
