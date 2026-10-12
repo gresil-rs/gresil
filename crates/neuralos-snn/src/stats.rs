@@ -18,20 +18,27 @@
 pub struct NetworkStats {
     /// Cumulative spikes emitted since construction or last `reset`.
     pub total_spikes: u64,
-    /// Cumulative plasticity updates applied. Reads 0 in a build without
-    /// `unstable-stdp`, as the three `stdp_pairs_*` fields do: a network
-    /// learns only there, once `set_plasticity_enabled(true)` was called.
+    /// Unstable: behind `unstable-stdp`, as the three `stdp_pairs_*`
+    /// fields are. Cumulative plasticity updates applied: a network learns
+    /// only once `set_plasticity_enabled(true)` was called.
+    #[cfg(feature = "unstable-stdp")]
     pub plasticity_events: u64,
+    /// Unstable: behind `unstable-stdp`.
     /// STDP pairing histogram (session F instrumentation): in-window
     /// pairings by category — the Hebbian-attribution evidence.
     /// `same_step` = a9a2679 co-fire tie-break (dt = +1, LTD branch).
     /// Out-of-window pairings contribute delta 0 and are counted in none
     /// of the three `stdp_pairs_*` fields this histogram splits over.
+    #[cfg(feature = "unstable-stdp")]
     pub stdp_pairs_same_step: u64,
+    /// Unstable: behind `unstable-stdp`.
     /// `post_leads` = post-before-pre within the window (LTD branch).
+    #[cfg(feature = "unstable-stdp")]
     pub stdp_pairs_post_leads: u64,
+    /// Unstable: behind `unstable-stdp`.
     /// `pre_leads` = pre-before-post within the window (LTP branch —
     /// the Hebbian channel live transmission opened in session F).
+    #[cfg(feature = "unstable-stdp")]
     pub stdp_pairs_pre_leads: u64,
     /// Mean membrane potential across all neurons (mV). Computed post-step;
     /// reads `-70.0` until the first step.
@@ -44,9 +51,13 @@ impl NetworkStats {
     pub(crate) fn new() -> Self {
         Self {
             total_spikes: 0,
+            #[cfg(feature = "unstable-stdp")]
             plasticity_events: 0,
+            #[cfg(feature = "unstable-stdp")]
             stdp_pairs_same_step: 0,
+            #[cfg(feature = "unstable-stdp")]
             stdp_pairs_post_leads: 0,
+            #[cfg(feature = "unstable-stdp")]
             stdp_pairs_pre_leads: 0,
             avg_membrane_potential_mv: -70.0,
             firing_rate_hz: 0.0,

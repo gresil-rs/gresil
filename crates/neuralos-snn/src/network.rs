@@ -922,9 +922,9 @@ impl SpikingNeuralNetwork {
         }
         self.time_us = 0;
         self.stats.total_spikes = 0;
-        self.stats.plasticity_events = 0;
         #[cfg(feature = "unstable-stdp")]
         {
+            self.stats.plasticity_events = 0;
             self.plasticity_queue.clear();
             self.ternary_flip_lfsr = TERNARY_FLIP_SEED;
         }
@@ -1922,6 +1922,7 @@ mod tests {
         net.reset();
         assert_eq!(net.time_us(), 0);
         assert_eq!(net.stats().total_spikes, 0);
+        #[cfg(feature = "unstable-stdp")]
         assert_eq!(net.stats().plasticity_events, 0);
     }
 
@@ -4247,6 +4248,7 @@ mod tests {
             off.synapses[0].weight, 100,
             "OFF must freeze the weight exactly (stuck-ON detector)"
         );
+        #[cfg(feature = "unstable-stdp")]
         assert_eq!(
             off.stats().plasticity_events,
             0,

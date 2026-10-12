@@ -9,13 +9,14 @@
 //!
 //! - `Synapse::new(id, id, _)` always refuses, with
 //!   [`Error::SelfConnection`] (no self-connections).
+//!
+//! With the `unstable-stdp` feature (`update_weight`, `STDPRule`, a
+//! synapse's bounds and its two counters exist in no other build, and may
+//! change or go in a minor release):
+//!
 //! - `Synapse::new` sets the bounds from the weight's sign: `[0, 2000]`
 //!   for a weight of 0 or more, `[-2000, 0]` below 0. The fields are the
 //!   crate's, so no caller writes the bounds.
-//!
-//! With the `unstable-stdp` feature (`update_weight` and `STDPRule` exist in
-//! no other build, and may change or go in a minor release):
-//!
 //! - Weight stays within `[min_weight, max_weight]` after every `update_weight` call.
 //! - `STDPRule::calculate_weight_change(dt)` returns 0 for `|dt| ≥ 10·tau` (decay floor).
 //! - LTP (pre before post, dt < 0) returns a non-negative delta.
@@ -50,8 +51,9 @@ use crate::Error;
 /// and a pinning test, not a magic 1000.
 pub const SCALE: i32 = 1000;
 
-/// A synapse: its two ends, its fixed-point weight, the bounds STDP
-/// clamps the weight to, and two STDP instrumentation counters.
+/// A synapse: its two ends and its fixed-point weight, and with
+/// `unstable-stdp` the bounds STDP clamps the weight to and two
+/// instrumentation counters.
 ///
 /// Its fields are the crate's. [`new`](Self::new) builds it, the bounds
 /// from the weight's sign; `update_weight`, behind `unstable-stdp`, is
@@ -69,31 +71,37 @@ pub struct Synapse {
     /// Synaptic weight (fixed-point, 1000 = 1.0). Negative = inhibitory.
     pub(crate) weight: i16,
     /// Maximum weight (plasticity clamp).
+    #[cfg(feature = "unstable-stdp")]
     pub(crate) max_weight: i16,
     /// Minimum weight (plasticity clamp).
+    #[cfg(feature = "unstable-stdp")]
     pub(crate) min_weight: i16,
     /// Cumulative raw STDP delta (session G instrumentation): see
     /// [`raw_stdp_delta`](Self::raw_stdp_delta).
+    #[cfg(feature = "unstable-stdp")]
     pub(crate) raw_stdp_delta: i64,
     /// Cumulative delta the clamp absorbed: see
     /// [`absorbed_delta`](Self::absorbed_delta).
+    #[cfg(feature = "unstable-stdp")]
     pub(crate) absorbed_delta: i64,
 }
 
 impl Synapse {
     /// New synapse between `pre_id` and `post_id` with initial `weight`.
     ///
-    /// The bounds come from the weight's sign: `[0, 2000]` for a weight of
-    /// 0 or more (excitatory, AMPA), `[-2000, 0]` below 0 (inhibitory,
-    /// GABA). The weight is kept as given, inside its bounds or not; the
-    /// counters start at 0.
+    /// With `unstable-stdp`, the bounds come from the weight's sign:
+    /// `[0, 2000]` for a weight of 0 or more (excitatory, AMPA),
+    /// `[-2000, 0]` below 0 (inhibitory, GABA), and the counters start at
+    /// 0. The weight is kept as given, inside its bounds or not.
     ///
     /// ```
     /// use neuralos_snn::Synapse;
     ///
     /// let s = Synapse::new(3, 7, -150)?;
     /// assert_eq!((s.pre(), s.post(), s.weight()), (3, 7, -150));
+    /// #[cfg(feature = "unstable-stdp")]
     /// assert_eq!((s.min_weight(), s.max_weight()), (-2000, 0));
+    /// #[cfg(feature = "unstable-stdp")]
     /// assert_eq!((s.raw_stdp_delta(), s.absorbed_delta()), (0, 0));
     /// assert_eq!(Synapse::new(3, 7, 2_500)?.weight(), 2_500, "kept as given");
     /// # Ok::<(), neuralos_snn::Error>(())
@@ -106,14 +114,19 @@ impl Synapse {
         if pre_id == post_id {
             return Err(Error::SelfConnection);
         }
+        #[cfg(feature = "unstable-stdp")]
         let (max_weight, min_weight) = bounds_by_sign(weight);
         Ok(Self {
             pre_neuron_id: pre_id,
             post_neuron_id: post_id,
             weight,
+            #[cfg(feature = "unstable-stdp")]
             max_weight,
+            #[cfg(feature = "unstable-stdp")]
             min_weight,
+            #[cfg(feature = "unstable-stdp")]
             raw_stdp_delta: 0,
+            #[cfg(feature = "unstable-stdp")]
             absorbed_delta: 0,
         })
     }
@@ -136,35 +149,41 @@ impl Synapse {
         self.weight
     }
 
+    /// Unstable: behind `unstable-stdp`.
     /// The largest weight `update_weight` leaves: 2000 for an excitatory
     /// synapse, 0 for an inhibitory one.
+    #[cfg(feature = "unstable-stdp")]
     #[must_use]
     pub fn max_weight(&self) -> i16 {
         self.max_weight
     }
 
+    /// Unstable: behind `unstable-stdp`.
     /// The smallest weight `update_weight` leaves: 0 for an excitatory
     /// synapse, -2000 for an inhibitory one.
+    #[cfg(feature = "unstable-stdp")]
     #[must_use]
     pub fn min_weight(&self) -> i16 {
         self.min_weight
     }
 
+    /// Unstable: behind `unstable-stdp`.
     /// The signed sum of every delta `update_weight` was given, before the
     /// clamp (session G instrumentation, the mechanism-label evidence). Read
     /// it per class (intra vs inter assemblies) to decide whether a bucket's
-    /// movement was pairing-driven or clamp/flip-machinery-driven. Reads 0
-    /// in a build without `unstable-stdp`: `update_weight` is behind it.
+    /// movement was pairing-driven or clamp/flip-machinery-driven.
+    #[cfg(feature = "unstable-stdp")]
     #[must_use]
     pub fn raw_stdp_delta(&self) -> i64 {
         self.raw_stdp_delta
     }
 
+    /// Unstable: behind `unstable-stdp`.
     /// The part of those deltas the `[min_weight, max_weight]` clamp
     /// absorbed: `Σ(delta − applied)`. When it is large beside
     /// [`raw_stdp_delta`](Self::raw_stdp_delta), the bounds' asymmetry, not
-    /// the pairing, shaped the trajectory. Reads 0 in a build without
-    /// `unstable-stdp`, as `raw_stdp_delta` does.
+    /// the pairing, shaped the trajectory.
+    #[cfg(feature = "unstable-stdp")]
     #[must_use]
     pub fn absorbed_delta(&self) -> i64 {
         self.absorbed_delta
@@ -189,8 +208,8 @@ impl Synapse {
 /// Test-only visualization helper (was pub; zero callers anywhere —
 /// the R8 census deferral, ruled in the 2026-08-22 consolidation:
 /// relocated under cfg(test) and pinned, not kept as dead pub
-/// surface).
-#[cfg(test)]
+/// surface). It reads `max_weight`, which exists with `unstable-stdp`.
+#[cfg(all(test, feature = "unstable-stdp"))]
 impl Synapse {
     /// Weight as a percentage of `max_weight`.
     fn normalized_weight(&self) -> i16 {
@@ -205,6 +224,7 @@ impl Synapse {
 
 /// The bounds (`max_weight`, `min_weight`) a weight's sign gives a
 /// synapse: excitatory from 0 up, inhibitory below.
+#[cfg(feature = "unstable-stdp")]
 fn bounds_by_sign(weight: i16) -> (i16, i16) {
     if weight >= 0 {
         (2000, 0) // AMPA
@@ -330,21 +350,28 @@ mod tests {
         assert_eq!(s.pre(), 3);
         assert_eq!(s.post(), 7);
         assert_eq!(s.weight(), 150);
-        assert_eq!(s.max_weight(), 2000); // AMPA
-        assert_eq!(s.min_weight(), 0);
-        assert_eq!((s.raw_stdp_delta(), s.absorbed_delta()), (0, 0));
+        #[cfg(feature = "unstable-stdp")]
+        {
+            assert_eq!(s.max_weight(), 2000); // AMPA
+            assert_eq!(s.min_weight(), 0);
+            assert_eq!((s.raw_stdp_delta(), s.absorbed_delta()), (0, 0));
+        }
     }
 
     #[test]
     fn negative_weight_makes_inhibitory() {
         let s = Synapse::new(3, 7, -150).expect("valid ids");
         assert_eq!((s.pre(), s.post(), s.weight()), (3, 7, -150));
-        assert_eq!(s.max_weight(), 0); // GABA
-        assert_eq!(s.min_weight(), -2000);
+        #[cfg(feature = "unstable-stdp")]
+        {
+            assert_eq!(s.max_weight(), 0); // GABA
+            assert_eq!(s.min_weight(), -2000);
+        }
     }
 
     /// The bounds follow the weight's sign alone, 0 counting as
     /// excitatory, at both ends of `i16` and on each side of 0.
+    #[cfg(feature = "unstable-stdp")]
     #[test]
     fn the_bounds_follow_the_sign() {
         for (weight, bounds) in [
@@ -366,6 +393,7 @@ mod tests {
         assert_eq!(err, Error::SelfConnection);
     }
 
+    #[cfg(feature = "unstable-stdp")]
     #[test]
     fn normalized_weight_is_percentage_of_max() {
         let mut s = Synapse::new(1, 2, 100).expect("valid ids");
