@@ -2456,7 +2456,6 @@ mod std_assembly {
             n.tau_membrane_us = 20_000;
             n.refractory_period_us = 1_000;
             n.resistance_mohm = 100;
-            n.capacitance_pf = 200;
             n.noise_amplitude_pa = 0;
             n
         }
@@ -3853,7 +3852,6 @@ mod std_assembly {
                 n.tau_membrane_us = p.tau_us;
                 n.refractory_period_us = 1_000; // NIR LIF has no refractory → minimum
                 n.resistance_mohm = p.resistance_mohm;
-                n.capacitance_pf = p.capacitance_pf;
                 n.noise_amplitude_pa = 0; // import is deterministic
                 neurons.push(n);
             }
@@ -5011,10 +5009,10 @@ mod std_assembly {
     /// and is deliberately not shared with this one:
     /// `chain_equivalence_both_builders_bit_exact` holds the two against
     /// each other on `chain.json`, which is only a comparison while they
-    /// are written twice. What that test sees is narrow — of the nine
-    /// assignments, three differ from the constructor's defaults on that
-    /// fixture, and the membrane coupling is not among them (its
-    /// `v_leak` is the default −70 on the mV grid). The coupling is
+    /// are written twice. What that test sees is narrow — of the eight
+    /// assignments, one differs from the constructor's defaults on that
+    /// fixture, the refractory period: the membrane coupling does not
+    /// (its `v_leak` is the default −70 on the mV grid). The coupling is
     /// pinned by the traces of `snntorch-two-layer` and
     /// `two-lif-neurons`, by the freezer's at-rest assert, and by
     /// `with_resting_potential`'s doctest.
@@ -5037,7 +5035,6 @@ mod std_assembly {
             .with_reset_potential(p.reset_q)
             .with_tau_membrane_us(p.tau_us)
             .with_refractory_period_us(refractory_us)
-            .with_capacitance_pf(p.capacitance_pf)
             .with_resistance_mohm(p.resistance_mohm)
             .with_noise_amplitude_pa(0) // import is deterministic
             // NIR's LIF has no adaptation: off in simulation units

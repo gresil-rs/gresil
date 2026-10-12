@@ -149,9 +149,9 @@ records it names in `evidence/INDEX.md`. Four lines, in order:
    neuron, a neuron at rest in its place at `from_neurons`, one word
    for the std network's clock and step, `time_us()` and `dt_us`,
    `Synapse`'s fields behind getters, the three no computation read
-   gone, `Spike`, `NetworkStats` and `FixedSynapse` not exhaustive, and
-   STDP's counters and bounds behind its feature are in. Then the
-   rename, the front door, the stamp.
+   gone, `Spike`, `NetworkStats` and `FixedSynapse` not exhaustive,
+   STDP's counters and bounds behind its feature, and a neuron with no
+   capacitance are in. Then the rename, the front door, the stamp.
 3. **0.1.0: the stamp.** The principal's call, once the fourteen checks
    of § 0.1.0 hold again at the final tree, after the rename.
 4. **After 0.1.0: the learning chapter** (`docs/VISION.md` § Realistic

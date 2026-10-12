@@ -20,7 +20,6 @@
 //!   the step's `R·I/1000` is mV ([`LIFNeuron::integrate_and_fire`]
 //!   § Semantics, item 5)
 //! - Resistance: `u16` MΩ
-//! - Capacitance: `u16` pF
 //!
 //! # The voltage grid and the dead zone (why resolution is configurable)
 //!
@@ -255,7 +254,7 @@ pub enum NeuronType {
 /// the four methods after it and the chain write the state: the chain's
 /// [`with_resting_potential`](Self::with_resting_potential) moves the
 /// membrane with the rest, on a live neuron too. A getter of the field's
-/// name reads each but the capacitance and the two stamps.
+/// name reads each but the two stamps.
 #[derive(Debug, Clone)]
 pub struct LIFNeuron {
     /// Unique identifier within the network.
@@ -295,8 +294,6 @@ pub struct LIFNeuron {
     /// Accumulated synaptic current (pA).
     pub(crate) synaptic_current_pa: i16,
 
-    /// Membrane capacitance (pF).
-    pub(crate) capacitance_pf: u16,
     /// Membrane resistance (MΩ).
     pub(crate) resistance_mohm: u16,
 
@@ -315,11 +312,11 @@ impl LIFNeuron {
     /// A neuron of `neuron_type` on the voltage grid `resolution`, at
     /// rest: the one constructor, with no default type or grid.
     ///
-    /// The type picks the threshold, the membrane time constant and the
-    /// capacitance. All four potentials are built on the grid (rest is
-    /// `-70` on the mV grid, `-7_000` on the centi-mV one); currents and
-    /// times do not depend on it. The noise amplitude is 0, silent: a
-    /// caller that wants noise sets it.
+    /// The type picks the threshold and the membrane time constant. All
+    /// four potentials are built on the grid (rest is `-70` on the mV
+    /// grid, `-7_000` on the centi-mV one); currents and times do not
+    /// depend on it. The noise amplitude is 0, silent: a caller that
+    /// wants noise sets it.
     ///
     /// ```
     /// use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
@@ -347,7 +344,7 @@ impl LIFNeuron {
     ///
     /// # The chain
     ///
-    /// This call is the head of the `with_*` chain: it and the nine
+    /// This call is the head of the `with_*` chain: it and the eight
     /// setters below are how a network is written as Rust source
     /// (`fixed::freeze`), so every one of them is
     /// `const`. What `const` costs, in one line: no formatted panic
@@ -361,7 +358,7 @@ impl LIFNeuron {
     ///    `with_neuron_type`, on purpose.** The grid is chosen once,
     ///    here, with the four potentials that live on it; `id` is the
     ///    neuron's position in its network and seeds its noise; the type
-    ///    picks the three parameters this constructor derives from it.
+    ///    picks the two parameters this constructor derives from it.
     ///    The three fields are the crate's, so the rule is a wall: no
     ///    caller assigns them after this call.
     /// 2. **A `with_*` assigns, never computes.** Arithmetic in a `const`
@@ -370,9 +367,9 @@ impl LIFNeuron {
     ///    that produced the value.
     #[must_use]
     pub const fn new(id: u16, neuron_type: NeuronType, resolution: VoltageResolution) -> Self {
-        let (threshold_mv, tau_membrane_us, capacitance_pf) = match neuron_type {
-            NeuronType::Excitatory => (-55, 20_000, 100), // 20 ms tau, pyramidal
-            NeuronType::Inhibitory => (-50, 10_000, 80),  // 10 ms tau, interneuron
+        let (threshold_mv, tau_membrane_us) = match neuron_type {
+            NeuronType::Excitatory => (-55, 20_000), // 20 ms tau, pyramidal
+            NeuronType::Inhibitory => (-50, 10_000), // 10 ms tau, interneuron
         };
         let s = resolution.scale();
         Self {
@@ -389,7 +386,6 @@ impl LIFNeuron {
             last_update_time_us: 0,
             last_spike_time_us: 0,
             synaptic_current_pa: 0,
-            capacitance_pf,
             resistance_mohm: 100,
             noise_amplitude_pa: 0,
             adaptation_current_pa: 0,
@@ -401,7 +397,7 @@ impl LIFNeuron {
     /// potential with it**: a neuron is built at rest.
     ///
     /// The one setter that touches two fields, which is why the order the
-    /// nine are called in cannot matter. A second such setter would end
+    /// eight are called in cannot matter. A second such setter would end
     /// that, and the order `fixed::freeze` emits them in would become
     /// load-bearing.
     ///
@@ -477,32 +473,6 @@ impl LIFNeuron {
         self
     }
 
-    /// The membrane capacitance (pF).
-    ///
-    /// No computation of this crate reads `capacitance_pf` — the membrane
-    /// update divides by neither it nor `tau/C` (§ Semantics of
-    /// [`integrate_and_fire`](Self::integrate_and_fire)). The field is
-    /// carried because an imported graph's value is part of what was
-    /// imported, and this setter lives and dies with it: the field's fate
-    /// is open before 0.1.0, and the day it goes, this goes with it.
-    ///
-    /// ```
-    /// use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
-    ///
-    /// let mut a = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
-    /// let mut b = a.clone().with_capacitance_pf(200);
-    /// for t in 0..100 {
-    ///     let spiked = a.integrate_and_fire(600, 1_000, t * 1_000);
-    ///     assert_eq!(b.integrate_and_fire(600, 1_000, t * 1_000), spiked);
-    ///     assert_eq!(b.membrane_potential(), a.membrane_potential());
-    /// }
-    /// ```
-    #[must_use]
-    pub const fn with_capacitance_pf(mut self, pf: u16) -> Self {
-        self.capacitance_pf = pf;
-        self
-    }
-
     /// The membrane resistance (MΩ): the R of the current term.
     ///
     /// ```
@@ -567,8 +537,8 @@ impl LIFNeuron {
         self.id
     }
 
-    /// The type it was built as, which picked its threshold, its membrane
-    /// time constant and its capacitance.
+    /// The type it was built as, which picked its threshold and its
+    /// membrane time constant.
     #[must_use]
     pub fn neuron_type(&self) -> NeuronType {
         self.neuron_type
@@ -1930,26 +1900,26 @@ mod tests {
     }
 
     /// The neuron's size, pinned (ISA round 31): no field is wider than a
-    /// `u32`, so the ESP32-C3 measures the same 44 bytes as this host.
+    /// `u32`, so the ESP32-C3 measures the same 40 bytes as this host.
     /// `repr(Rust)` lets the compiler order the fields, so a toolchain bump
     /// can move the number; the bump's commit re-pins it, as it does the
     /// firmware's `.text`.
     #[test]
-    fn the_neuron_is_44_bytes() {
-        assert_eq!(core::mem::size_of::<LIFNeuron>(), 44);
+    fn the_neuron_is_40_bytes() {
+        assert_eq!(core::mem::size_of::<LIFNeuron>(), 40);
     }
 
     /// The neuron's field count, pinned — **the second tripwire of the
     /// freezer**, and the one that does not go through it. A field added
     /// to `LIFNeuron` turns this red whatever `fixed::freeze`'s pattern
     /// says, so answering that pattern with a lazy `..` is no longer
-    /// silent (that pattern, the first tripwire, is answerable that way
-    /// and the traces, clippy and the size pin above all stay green:
-    /// `LIFNeuron` has two bytes of padding, the adaptation switch having
-    /// taken one, and a `bool` or a `u16` still fits).
+    /// silent (that pattern, the first tripwire, is answerable that way,
+    /// and the traces and clippy stay green; the size pin above sees a new
+    /// field only while `LIFNeuron` has no padding, as at 40 bytes, where
+    /// one `bool` more makes 44).
     ///
     /// TWO CHECKS, the literal first. The neuron below is built from a
-    /// `LIFNeuron { … }` literal naming all eighteen fields, so a field
+    /// `LIFNeuron { … }` literal naming all seventeen fields, so a field
     /// added or removed is `E0063` or `E0560` HERE, at the compiler,
     /// with the message below in front of whoever answers it. That is
     /// what the 31 literals of a frozen `frozen.rs` used to give and no
@@ -1976,9 +1946,9 @@ mod tests {
     /// literal above, which the compiler checks. The number can be edited,
     /// like any pin, with the same message in front of whoever edits it.
     ///
-    /// `18` has one home: this test.
+    /// `17` has one home: this test.
     #[test]
-    fn the_neuron_has_eighteen_fields() {
+    fn the_neuron_has_seventeen_fields() {
         // Arbitrary values, not the constructor's (doc above).
         let neuron = LIFNeuron {
             id: 9,
@@ -1994,7 +1964,6 @@ mod tests {
             last_update_time_us: 41,
             last_spike_time_us: 40,
             synaptic_current_pa: -17,
-            capacitance_pf: 222,
             resistance_mohm: 33,
             noise_amplitude_pa: 7,
             adaptation_current_pa: 6,
@@ -2010,7 +1979,7 @@ mod tests {
             })
             .count();
         assert_eq!(
-            fields, 18,
+            fields, 17,
             "a field was added to or taken from LIFNeuron (and the literal above compiled, \
              so this count is the second word, not the first). Adding one is a decision in \
              `fixed::freeze` (`neuron_chain`'s destructure, and its doc): bind it there \

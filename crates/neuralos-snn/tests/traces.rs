@@ -380,9 +380,9 @@ fn every_plasticity_off_case_steps_as_the_std_network() {
                 .unwrap_or_else(|e| panic!("{}: {e}", case.name));
             // THE EMITTED TEXT, before the first step: this is the only
             // test that holds both sides (the compiled constants and the
-            // case that wrote them), so for a field no step reads —
-            // `neuron_type`, `capacitance_pf` — these two lines are the
-            // only pin the text has. Each message names the case: the
+            // case that wrote them), so for a field no step reads,
+            // `neuron_type`, these two lines are the only pin the text
+            // has. Each message names the case: the
             // panic location is the macro's one call site for all of
             // them and says nothing.
             assert_eq!(
