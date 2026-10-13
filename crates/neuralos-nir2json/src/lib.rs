@@ -1485,7 +1485,7 @@ pub fn freeze(
     let mut step = 0u32;
     for (count, currents) in &runs {
         for _ in 0..*count {
-            let time_us = net.current_time_us();
+            let time_us = net.time_us();
             let spikes = net.step(currents).expect("an assembled network steps");
             fired.fill(false);
             for spike in spikes {

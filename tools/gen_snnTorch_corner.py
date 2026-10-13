@@ -8,9 +8,9 @@ pipeline, the pre-authorized class of that script. β and threshold are
 `[n]` tensors, one value per neuron: a `[1]` tensor makes the exporter
 type-check the layer as one neuron.
 
-The sizes come from a byte count, the bar's `44·N + 6·S` (a neuron is 44
-bytes of the frozen arrays, a synapse 6), so the corners regenerate from
-that number alone:
+The sizes come from a byte count, the bar's `44·N + 6·S` (it counts 44
+bytes of the frozen arrays a neuron, the size it was measured at, and 6 a
+synapse), so the corners regenerate from that number alone:
 
     neurons  Linear(1,N) → Leaky(N): N = bytes // 44, S = 0, the most
              neurons (the first Linear is the drive, not a synapse);

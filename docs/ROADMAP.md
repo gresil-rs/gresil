@@ -34,7 +34,7 @@ the PR that made the check hold, as of this tree.
 6. [x] A two-layer snnTorch, norse or rockpool graph builds (LIF→Linear→LIF). (PR G, #31: a two-layer snnTorch graph builds.)
 7. [x] `.nir` → fixed arrays → firmware, one documented command. (Arrays: PR G, #31. PR H, #32: `stranger.sh run` on the snnTorch witness, fifteen cases bit for bit.)
 8. [x] Worst case from capacity, measured at that case on the C3. (PR I, #33: the two corners of `44·N + 6·S ≤ 262,144` on the board, 0 red; the worst case measured, the neuron corner, 5,850,980 ns/step mean; all-to-all computed at 5,313,354 ns.)
-9. [x] STDP behind an unstable feature. (PR L, #37: `unstable-stdp`, off by default, holds `STDPRule`, `Synapse::update_weight`, `set_plasticity_enabled` and `stochastic_ternary_step`, and since round 46 the flip under it, `trit::stochastic_ternary_flip` and `trit::STOCHASTIC_FLIP_RATE`; anything behind it may change or go in a minor release. A network starts with plasticity off, feature or not, so a default build does not learn; the getter and the counter fields stay stable. The 14 plasticity-off traces replay with the feature off and on, the 15 with it on; the default config is a gate, `cargo test -p neuralos-snn`.)
+9. [x] STDP behind an unstable feature. (PR L, #37: `unstable-stdp`, off by default, holds `STDPRule`, `Synapse::update_weight`, `set_plasticity_enabled` and `stochastic_ternary_step`, and since round 46 the flip under it, `trit::stochastic_ternary_flip` and `trit::STOCHASTIC_FLIP_RATE`, and since round 67 STDP's instruments, `Synapse`'s two bounds and two counters and `NetworkStats`' four counters; anything behind it may change or go in a minor release. A network starts with plasticity off, feature or not, so a default build does not learn; the getter `plasticity_enabled()` stays stable. The 14 plasticity-off traces replay with the feature off and on, the 15 with it on; the default config is a gate, `cargo test -p neuralos-snn`.)
 10. [x] The README's first example is a real doctest; `missing_docs` on. (PR J, #34: § Quick start is the board's own neuron, asserting the 147 spikes and the first spike's index 55 the C3 prints; § Usage sketch compiles too; `missing_docs` on with 53 fields documented.)
 11. [x] Rustdoc states rounding, saturation, reset, leak, step order, the one-step delay. (PR K, #36: `LIFNeuron::integrate_and_fire` § Semantics and `SpikingNeuralNetwork::step` § Order, each sentence a doctest or a named test, the pulse a refractory `post` drops among them; `cargo doc -D warnings` is a gate. Reworded from "delay is the edge's": no edge carries a delay in this code.)
 12. [x] The default build forbids `unsafe` (only `simd` has it). (PR J, #34: the library forbids `unsafe_code` with the feature off and denies it with the feature on, `pub mod simd` carrying the one `allow`; both falsifiers in the commit.)
@@ -146,8 +146,12 @@ records it names in `evidence/INDEX.md`. Four lines, in order:
    membrane the network's step can move, the current named in pA, one
    neuron constructor that names its type and grid, `LIFNeuron`'s
    fields behind fifteen getters and the chain, adaptation a switch per
-   neuron, and a neuron at rest in its place at `from_neurons` are in.
-   Then the rename, the front door, the stamp.
+   neuron, a neuron at rest in its place at `from_neurons`, one word
+   for the std network's clock and step, `time_us()` and `dt_us`,
+   `Synapse`'s fields behind getters, the three no computation read
+   gone, `Spike`, `NetworkStats` and `FixedSynapse` not exhaustive,
+   STDP's counters and bounds behind its feature, and a neuron with no
+   capacitance are in. Then the rename, the front door, the stamp.
 3. **0.1.0: the stamp.** The principal's call, once the fourteen checks
    of § 0.1.0 hold again at the final tree, after the rename.
 4. **After 0.1.0: the learning chapter** (`docs/VISION.md` § Realistic

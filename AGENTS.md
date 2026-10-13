@@ -147,9 +147,13 @@ is only worth the multi-minute link when you want real smoothness.
   target), `unstable-stdp` (STDP, outside the semver promise:
   `STDPRule`, `Synapse::update_weight`,
   `set_plasticity_enabled`, `stochastic_ternary_step`,
-  `trit::stochastic_ternary_flip`, `trit::STOCHASTIC_FLIP_RATE`; works
-  without std; rt, the app and `proofs/qemu-riscv-leg-a` ask for it, so
-  every `--workspace` line builds the library with it on),
+  `trit::stochastic_ternary_flip`, `trit::STOCHASTIC_FLIP_RATE`, and
+  STDP's instruments, `Synapse`'s bounds and counters (`min_weight`,
+  `max_weight`, `raw_stdp_delta`, `absorbed_delta`) and `NetworkStats`'
+  `plasticity_events` and three `stdp_pairs_*`, not the stable getter
+  `plasticity_enabled()`; works without std; rt, the app and
+  `proofs/qemu-riscv-leg-a` ask for it, so every `--workspace` line
+  builds the library with it on),
   `unstable-bridge` (the closed bridge chapter, outside the semver
   promise: the `bridge` codecs and the `kernel` matvec; works without
   std; rt and `proofs/qemu-riscv-leg-a` ask for it, so every

@@ -27,7 +27,9 @@ simd = ["std"]
 # STDP, outside the semver promise: `STDPRule`, `Synapse::update_weight`,
 # `SpikingNeuralNetwork::set_plasticity_enabled`,
 # `SpikingNeuralNetwork::stochastic_ternary_step`,
-# `trit::stochastic_ternary_flip` and `trit::STOCHASTIC_FLIP_RATE`.
+# `trit::stochastic_ternary_flip`, `trit::STOCHASTIC_FLIP_RATE`, and
+# STDP's instruments: `Synapse`'s two bounds and two counters and
+# `NetworkStats`' four counters.
 # Anything behind it may change or go in a minor release. Off by
 # default: a default build does not learn.
 unstable-stdp = []

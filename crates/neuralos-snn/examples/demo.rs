@@ -69,7 +69,7 @@ fn run_demo() {
     println!();
 
     // --- Phase 2: Snapshot initial state ---
-    let initial_weights: Vec<i16> = net.synapses().iter().map(|s| s.weight).collect();
+    let initial_weights: Vec<i16> = net.synapses().iter().map(|s| s.weight()).collect();
 
     // --- Phase 3: Run simulation ---
     println!(
@@ -111,7 +111,7 @@ fn run_demo() {
     print_final_stats(&net);
 
     // --- Phase 7: Weight evolution (STDP learning evidence) ---
-    let final_weights: Vec<i16> = net.synapses().iter().map(|s| s.weight).collect();
+    let final_weights: Vec<i16> = net.synapses().iter().map(|s| s.weight()).collect();
     let changed = initial_weights
         .iter()
         .zip(final_weights.iter())
@@ -228,7 +228,7 @@ fn print_final_stats(net: &SpikingNeuralNetwork) {
     );
     println!(
         "│ Synapses:               {:>8}                         │",
-        s.total_synapses
+        net.synapse_count()
     );
     println!(
         "│ Avg firing rate:        {:>8.2} Hz                    │",
@@ -240,8 +240,8 @@ fn print_final_stats(net: &SpikingNeuralNetwork) {
     );
     println!(
         "│ Simulation time:        {:>8} μs ({:.1} ms)             │",
-        net.current_time_us(),
-        net.current_time_us() as f64 / 1000.0
+        net.time_us(),
+        net.time_us() as f64 / 1000.0
     );
     println!("└────────────────────────────────────────────────────────────┘");
     println!();

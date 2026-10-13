@@ -118,7 +118,7 @@ pub fn header(
             Kind::Stranger => "stranger",
         },
         net.neurons().len(),
-        net.time_step_us(),
+        net.dt_us(),
         match grid {
             VoltageResolution::Millivolt => "mV",
             VoltageResolution::CentiMillivolt => "cmV",

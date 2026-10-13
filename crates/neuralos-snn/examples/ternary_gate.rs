@@ -56,7 +56,7 @@ fn run_learning_baseline(
     steps: usize,
     inputs: &[i16],
 ) -> (u64, u64, f64) {
-    let initial: Vec<i16> = net.synapses().iter().map(|s| s.weight).collect();
+    let initial: Vec<i16> = net.synapses().iter().map(|s| s.weight()).collect();
     net.set_plasticity_enabled(true);
     for _ in 0..steps {
         let _ = net.step(inputs).expect("step");
@@ -65,9 +65,9 @@ fn run_learning_baseline(
     let mut changed = 0u64;
     let mut sum_abs_delta = 0i64;
     for (s, &init) in net.synapses().iter().zip(initial.iter()) {
-        if s.weight != init {
+        if s.weight() != init {
             changed += 1;
-            sum_abs_delta += i64::from((s.weight - init).abs());
+            sum_abs_delta += i64::from((s.weight() - init).abs());
         }
     }
     let mean_delta = if changed > 0 {
@@ -89,7 +89,7 @@ fn run_learning_ternary(
     let mut prev_buckets: Vec<Trit> = net
         .synapses()
         .iter()
-        .map(|s| Trit::from_weight(s.weight, gamma))
+        .map(|s| Trit::from_weight(s.weight(), gamma))
         .collect();
     net.set_plasticity_enabled(true);
     let mut bucket_flips = 0u64;
@@ -97,7 +97,7 @@ fn run_learning_ternary(
         let _ = net.step(inputs).expect("step");
         net.reproject_ternary(gamma);
         for (i, s) in net.synapses().iter().enumerate() {
-            let cur = Trit::from_weight(s.weight, gamma);
+            let cur = Trit::from_weight(s.weight(), gamma);
             if cur != prev_buckets[i] {
                 bucket_flips += 1;
                 prev_buckets[i] = cur;
@@ -120,7 +120,7 @@ fn run_learning_stochastic(
     let mut prev_buckets: Vec<Trit> = net
         .synapses()
         .iter()
-        .map(|s| Trit::from_weight(s.weight, gamma))
+        .map(|s| Trit::from_weight(s.weight(), gamma))
         .collect();
     net.set_plasticity_enabled(true);
     let mut bucket_flips = 0u64;
@@ -128,7 +128,7 @@ fn run_learning_stochastic(
         let _ = net.step(inputs).expect("step");
         net.stochastic_ternary_step(gamma);
         for (i, s) in net.synapses().iter().enumerate() {
-            let cur = Trit::from_weight(s.weight, gamma);
+            let cur = Trit::from_weight(s.weight(), gamma);
             if cur != prev_buckets[i] {
                 bucket_flips += 1;
                 prev_buckets[i] = cur;
@@ -148,7 +148,7 @@ fn bucket_distribution(net: &SpikingNeuralNetwork, gamma: i16) -> (u64, u64, u64
     let mut zero = 0u64;
     let mut plus = 0u64;
     for s in net.synapses() {
-        match Trit::from_weight(s.weight, gamma) {
+        match Trit::from_weight(s.weight(), gamma) {
             Trit::MinusOne => minus += 1,
             Trit::Zero => zero += 1,
             Trit::One => plus += 1,

@@ -150,7 +150,7 @@ pub fn render(case: &Case) -> String {
     let mut out = header(case, &net);
     out.push('\n');
     for step in 0..case.steps {
-        let time_us = net.current_time_us();
+        let time_us = net.time_us();
         let spikes = net.step(&drive(step)).expect("a built case steps");
         if matches!(case.rows, Rows::Spikes) && spikes.is_empty() {
             continue;

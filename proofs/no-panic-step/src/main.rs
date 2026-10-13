@@ -21,36 +21,12 @@ use neuralos_snn::{FixedNetwork, FixedSynapse, LIFNeuron, NeuronType, VoltageRes
 /// `feedforward-8`'s synapses: layer 0 (ids 0 to 2) to layer 1 (3 to 5),
 /// then layer 1 to layer 2 (6 and 7), weight 100 at divisor 1.
 const SYNAPSES: [FixedSynapse; 6] = [
-    FixedSynapse {
-        pre: 0,
-        post: 3,
-        pulse_pa: 100,
-    },
-    FixedSynapse {
-        pre: 1,
-        post: 4,
-        pulse_pa: 100,
-    },
-    FixedSynapse {
-        pre: 2,
-        post: 5,
-        pulse_pa: 100,
-    },
-    FixedSynapse {
-        pre: 3,
-        post: 6,
-        pulse_pa: 100,
-    },
-    FixedSynapse {
-        pre: 4,
-        post: 7,
-        pulse_pa: 100,
-    },
-    FixedSynapse {
-        pre: 5,
-        post: 6,
-        pulse_pa: 100,
-    },
+    FixedSynapse::new(0, 3, 100),
+    FixedSynapse::new(1, 4, 100),
+    FixedSynapse::new(2, 5, 100),
+    FixedSynapse::new(3, 6, 100),
+    FixedSynapse::new(4, 7, 100),
+    FixedSynapse::new(5, 6, 100),
 ];
 
 fn neuron(id: u16, kind: NeuronType) -> LIFNeuron {

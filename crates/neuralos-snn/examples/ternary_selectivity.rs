@@ -163,9 +163,9 @@ fn ee_map() -> EeMap {
     let mut intra = Vec::new();
     let mut inter = Vec::new();
     for (idx, s) in net.synapses().iter().enumerate() {
-        if s.pre_neuron_id < exc && s.post_neuron_id < exc {
-            all.push((idx, s.pre_neuron_id, s.post_neuron_id));
-            if group_of(s.pre_neuron_id, exc) == group_of(s.post_neuron_id, exc) {
+        if s.pre() < exc && s.post() < exc {
+            all.push((idx, s.pre(), s.post()));
+            if group_of(s.pre(), exc) == group_of(s.post(), exc) {
                 intra.push(idx);
             } else {
                 inter.push(idx);
@@ -229,7 +229,7 @@ fn run_i16(inputs: &[Vec<i16>]) -> (Vec<i16>, f64, u64, Vec<Vec<u8>>) {
             spike_matrix[t][sp.neuron_id as usize] = 1;
         }
     }
-    let final_w: Vec<i16> = net.synapses().iter().map(|s| s.weight).collect();
+    let final_w: Vec<i16> = net.synapses().iter().map(|s| s.weight()).collect();
     let learn_spikes = net.stats().total_spikes - before;
     let secs = learn.len() as f64 * f64::from(DT_US) / 1_000_000.0;
     let rate = learn_spikes as f64 / (secs * f64::from(NEURONS));
@@ -249,7 +249,7 @@ fn run_ternary(inputs: &[Vec<i16>]) -> (Vec<i16>, i16, f64, u64, u64) {
     let mut prev: Vec<Trit> = net
         .synapses()
         .iter()
-        .map(|s| Trit::from_weight(s.weight, gamma))
+        .map(|s| Trit::from_weight(s.weight(), gamma))
         .collect();
     net.set_plasticity_enabled(true);
     let learn = &inputs[INIT_STEPS..];
@@ -259,14 +259,14 @@ fn run_ternary(inputs: &[Vec<i16>]) -> (Vec<i16>, i16, f64, u64, u64) {
         let _ = net.step(inp).expect("step");
         net.stochastic_ternary_step(gamma);
         for (i, s) in net.synapses().iter().enumerate() {
-            let cur = Trit::from_weight(s.weight, gamma);
+            let cur = Trit::from_weight(s.weight(), gamma);
             if cur != prev[i] {
                 flips += 1;
                 prev[i] = cur;
             }
         }
     }
-    let final_w: Vec<i16> = net.synapses().iter().map(|s| s.weight).collect();
+    let final_w: Vec<i16> = net.synapses().iter().map(|s| s.weight()).collect();
     let learn_spikes = net.stats().total_spikes - before;
     let secs = learn.len() as f64 * f64::from(DT_US) / 1_000_000.0;
     let rate = learn_spikes as f64 / (secs * f64::from(NEURONS));
@@ -354,7 +354,7 @@ fn main() {
 
     // Rule-direction check (depression-only claim): count weights that moved up.
     let net0 = build();
-    let init_w: Vec<i16> = net0.synapses().iter().map(|s| s.weight).collect();
+    let init_w: Vec<i16> = net0.synapses().iter().map(|s| s.weight()).collect();
     let (mut up, mut down, mut same) = (0u32, 0u32, 0u32);
     for (a, b) in init_w.iter().zip(i16_w.iter()) {
         if b > a {

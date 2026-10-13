@@ -67,7 +67,7 @@ pub fn preamble() -> &'static str {
 /// `rows` name the trace, and `drive` is its run.
 ///
 /// No state is emitted: a frozen neuron is its parameters, at rest. The
-/// nine setters are written default or not, so a frozen file does not
+/// eight setters are written default or not, so a frozen file does not
 /// move when a default does — the per-type table and the per-grid
 /// scaling are what an old file would otherwise be silently rebound to.
 ///
@@ -101,7 +101,7 @@ pub fn module(
         "{case}: plasticity is on, and a FixedNetwork has none"
     );
     assert_eq!(
-        net.current_time_us(),
+        net.time_us(),
         0,
         "{case}: the network has stepped, and a frozen file starts at 0"
     );
@@ -117,7 +117,7 @@ pub fn module(
         .expect("one grid and a case name by the rule, both checked above");
     let neurons = net.neurons();
     let synapses = FixedSynapse::from_network(net);
-    let dt_us = net.time_step_us();
+    let dt_us = net.dt_us();
     let spikes_only = matches!(rows, Rows::Spikes);
     let name = case.replace('-', "_");
     assert!(
@@ -146,7 +146,7 @@ pub fn module(
         // is what "the emitted list of setters is complete" means here.
         // It is not the tripwire a field added to `LIFNeuron` trips:
         // that one is `neuron_chain`'s destructure, and behind it
-        // `the_neuron_has_eighteen_fields`, whose neuron is a literal.
+        // `the_neuron_has_seventeen_fields`, whose neuron is a literal.
         // WHAT IT ALONE COVERS, since the test lines in `tests/traces.rs`
         // catch a missing setter in-tree too: the stranger path, where
         // no test line exists, and an earlier error, at regeneration.
@@ -227,10 +227,10 @@ pub fn tail(cases: &[&str]) -> String {
 /// right for every frozen file ever written. THIS DESTRUCTURE IS THE
 /// FIRST TRIPWIRE, and it is only as strong as its bindings' readers: a
 /// binding with no reader can be answered with `..` and the tripwire is
-/// gone. Every one of the eighteen has one — the nine parameters and
+/// gone. Every one of the seventeen has one — the eight parameters and
 /// the three constructor arguments below, the six state fields in the
 /// at-rest assert. The second tripwire does not come through here at
-/// all: it is `the_neuron_has_eighteen_fields`, whose neuron is a
+/// all: it is `the_neuron_has_seventeen_fields`, whose neuron is a
 /// `LIFNeuron { … }` literal, so a field added is the compiler's error
 /// there whatever this pattern says.
 ///
@@ -252,7 +252,6 @@ fn neuron_chain(case: &str, i: usize, n: &LIFNeuron) -> (String, LIFNeuron) {
         last_update_time_us,
         last_spike_time_us,
         synaptic_current_pa,
-        capacitance_pf,
         resistance_mohm,
         noise_amplitude_pa,
         adaptation_current_pa,
@@ -307,7 +306,6 @@ fn neuron_chain(case: &str, i: usize, n: &LIFNeuron) -> (String, LIFNeuron) {
         with_reset_potential => *reset_potential,
         with_tau_membrane_us => *tau_membrane_us,
         with_refractory_period_us => *refractory_period_us,
-        with_capacitance_pf => *capacitance_pf,
         with_resistance_mohm => *resistance_mohm,
         with_noise_amplitude_pa => *noise_amplitude_pa,
         with_adaptation_enabled => *adaptation_enabled,

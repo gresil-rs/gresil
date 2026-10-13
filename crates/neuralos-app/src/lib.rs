@@ -18,7 +18,7 @@
     clippy::cast_precision_loss // stats counters are tiny; usize/i64 → f64 is lossless in practice
 )]
 
-use neuralos_snn::{NetworkTopology, NeuronType, SpikingNeuralNetwork};
+use neuralos_snn::{NetworkTopology, NeuronType, SpikingNeuralNetwork, Synapse};
 
 /// Raster columns = visible timesteps. Newest spike column appears on the right.
 /// At ~60 ticks/s this shows ~3.3 s of recent activity.
@@ -84,9 +84,8 @@ impl SimRunner {
     /// # Errors
     /// Propagates [`neuralos_snn::Error`] if the network cannot be constructed
     /// or the topology fails to build (e.g. `neuron_count == 0`).
-    pub fn new(neuron_count: u16, time_step_us: u32) -> neuralos_snn::Result<Self> {
-        let mut net =
-            SpikingNeuralNetwork::new(neuron_count, time_step_us, NetworkTopology::default())?;
+    pub fn new(neuron_count: u16, dt_us: u32) -> neuralos_snn::Result<Self> {
+        let mut net = SpikingNeuralNetwork::new(neuron_count, dt_us, NetworkTopology::default())?;
         net.build_topology()?;
         let rows = usize::from(neuron_count);
 
@@ -107,7 +106,7 @@ impl SimRunner {
         }
 
         // Snapshot initial weights for the "% synapses changed" stat.
-        let initial_weights: Vec<i16> = net.synapses().iter().map(|s| s.weight).collect();
+        let initial_weights: Vec<i16> = net.synapses().iter().map(Synapse::weight).collect();
         let wm_cells = rows * rows;
         let mut weight_matrix = vec![0u8; wm_cells * 4];
         for cell in weight_matrix.as_chunks_mut::<4>().0 {
@@ -208,11 +207,11 @@ impl SimRunner {
             cell.copy_from_slice(&WM_BG);
         }
         for s in self.net.synapses() {
-            let pre = usize::from(s.pre_neuron_id);
-            let post = usize::from(s.post_neuron_id);
+            let pre = usize::from(s.pre());
+            let post = usize::from(s.post());
             if pre < n && post < n {
                 let off = (pre * n + post) * 4;
-                self.weight_matrix[off..off + 4].copy_from_slice(&weight_color(s.weight));
+                self.weight_matrix[off..off + 4].copy_from_slice(&weight_color(s.weight()));
             }
         }
         (n, n, &self.weight_matrix)
@@ -222,19 +221,19 @@ impl SimRunner {
     #[must_use]
     pub fn stats_text(&self) -> String {
         let s = self.net.stats();
-        let sim_ms = self.net.current_time_us() as f64 / 1000.0;
+        let sim_ms = self.net.time_us() as f64 / 1000.0;
 
         // STDP learning readouts: mean weight + % of synapses changed since start.
         let syns = self.net.synapses();
         let (mean_w, pct_changed) = if syns.is_empty() {
             (0.0_f64, 0.0_f64)
         } else {
-            let sum: i64 = syns.iter().map(|s| i64::from(s.weight)).sum();
+            let sum: i64 = syns.iter().map(|s| i64::from(s.weight())).sum();
             let mean = sum as f64 / syns.len() as f64;
             let changed = syns
                 .iter()
                 .zip(self.initial_weights.iter())
-                .filter(|(s, init)| s.weight != **init)
+                .filter(|(s, init)| s.weight() != **init)
                 .count();
             (mean, changed as f64 * 100.0 / syns.len() as f64)
         };
@@ -339,5 +338,43 @@ mod tests {
         }
         assert!(warm > 0, "no excitatory cells in the weight matrix");
         assert!(cool > 0, "no inhibitory cells in the weight matrix");
+    }
+
+    /// Each synapse's cell is at row `pre()` and column `post()`, in the
+    /// color of its `weight()`, and every other cell is the background: the
+    /// matrix reads the two ends the right way round, at their own places.
+    #[test]
+    fn weight_matrix_places_each_synapse_at_its_ends() {
+        let mut r = SimRunner::new(64, 1000).expect("64 neurons valid");
+        let n = r.rows;
+        let mut want = vec![WM_BG; n * n];
+        for s in r.net.synapses() {
+            want[usize::from(s.pre()) * n + usize::from(s.post())] = weight_color(s.weight());
+        }
+        let (w, h, bytes) = r.weight_matrix_display();
+        assert_eq!((w, h), (n, n));
+        let got = bytes.as_chunks::<4>().0;
+        assert_eq!(got.len(), want.len());
+        let wrong = got.iter().zip(&want).position(|(a, b)| a != b);
+        assert_eq!(wrong, None, "the first cell that differs, row-major");
+    }
+
+    /// The status bar's two learning readouts while learning is off, as
+    /// `new` leaves it: the mean of the weights `weight()` reads, and 0% of
+    /// the synapses changed, each `weight()` equal to the snapshot `new`
+    /// took.
+    #[test]
+    fn stats_text_reads_the_weights_without_learning() {
+        let mut runner = SimRunner::new(80, 1000).expect("80 neurons valid");
+        assert!(!runner.learning());
+        for _ in 0..200 {
+            runner.tick(600);
+        }
+        let syns = runner.net.synapses();
+        let sum: i64 = syns.iter().map(|s| i64::from(s.weight())).sum();
+        let mean = sum as f64 / syns.len() as f64;
+        let text = runner.stats_text();
+        let readouts = format!("  ·  mean w {mean:.0}  ·  0% synapses changed  ·  ");
+        assert!(text.contains(&readouts), "{text}");
     }
 }

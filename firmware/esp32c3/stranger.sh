@@ -44,17 +44,19 @@
 # reads N and S from the module's two `pub const` lines, matched whole
 # (the freezer's tested format; the sidecar carries no counts), refuses
 # unless exactly one of each is found, and refuses by name, exit 2, when
-# 44·N + 6·S exceeds the bar: a neuron is 44 bytes and a synapse 6, both
-# pinned by tests, so 5,957 neurons at S = 0, or 43,690 synapses' bytes
-# at N = 0. The arrays live in `main`'s frame, one copy, so RAM is the
-# stack: the frame is the arrays, the fired array and about a kilobyte
-# more, and the callees add a few hundred bytes. Ids are u16 (the
-# converter refuses past 65,535 neurons); flash holds the arrays again
-# in .rodata and is never the bound; the link bounds a capture, not a
-# graph (--steps, --seconds). The bar holds because at both of its
-# corners, the most neurons and the most synapses of the feedforward
-# pair under it (tools/gen_snnTorch_corner.py), the stack's high-water
-# mark on the board leaves at least 16 KiB of .stack free.
+# 44·N + 6·S exceeds the bar: 5,957 neurons at S = 0, or 43,690
+# synapses' bytes at N = 0. The bar counts 44 bytes a neuron, the size
+# it was measured at, and 6 a synapse; a neuron is 40 bytes and a
+# synapse 6, both pinned by tests, so the count is an upper bound. The
+# arrays live in `main`'s frame, one copy, so RAM is the stack: the
+# frame is the arrays, the fired array and about a kilobyte more, and
+# the callees add a few hundred bytes. Ids are u16 (the converter
+# refuses past 65,535 neurons); flash holds the arrays again in .rodata
+# and is never the bound; the link bounds a capture, not a graph
+# (--steps, --seconds). The bar holds because at both of its corners,
+# the most neurons and the most synapses of the feedforward pair under
+# it (tools/gen_snnTorch_corner.py), the stack's high-water mark on the
+# board leaves at least 16 KiB of .stack free.
 set -euo pipefail
 
 usage() {
