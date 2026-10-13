@@ -43,6 +43,7 @@ low), red LED is power. Host: the laptop, espflash 4.5.0, Rust 1.92.0
 | `board-r36-dense.log` | the ninth entry: the dense corner (402 neurons, 40,401 synapses) the same way (ELF `3eeb2d72…`), 30 s after reset; `target/stranger/dense.capture.log`, byte for byte (§ Ninth entry) |
 | `board-r52-head.log` | the tenth entry (ISA round 52, 2026-09-28): the default firmware at head, the two NIR witnesses of its replay in simulation units at 0.1 ms, built by `build.sh` on 1.98.1 in the main clone (ELF `dad40393…`), 20 s after reset (§ Tenth entry) |
 | `board-r61-head.log` | the eleventh entry (ISA round 61, 2026-10-07): the default firmware at head, its neuron built silent and the networks' clock a `u64`, built by `build.sh` on 1.98.1 in the main clone (ELF `ad5dc163…`), 20 s after reset (§ Eleventh entry) |
+| `board-r67-head.log` | the twelfth entry (ISA round 67, 2026-10-13): the default firmware at head, its neuron without its capacitance, built by `build.sh` on 1.98.1 in the main clone at `0182042` (ELF `49e0830a…`), 20 s after reset (§ Twelfth entry) |
 | `SHA256SUMS` | pins the logs and this README |
 | `../../tools/esp32c3_capture.py` | the capture tool (reset + read from one process) |
 | `../../tools/esp32c3_trace_diff.py` | the replay diff: every plasticity-off trace of `crates/neuralos-snn/tests/traces/` against its case in a capture, one line per case (§ Sixth entry) |
@@ -1104,6 +1105,81 @@ was then given back the image it held before the flash (the 4 MB read
 out and written back, on-chip MD5 `582b942d…` equal to the read-out's),
 and a capture of that image reads round 52's burst figures to 1 µs.
 
+## Twelfth entry: round 67, the neuron without its capacitance (2026-10-13)
+
+Same SuperMini (MAC `70:af:09:07:f6:3c`, esp32c3 revision v0.4, as
+`espflash board-info` read them), same port, same tool, 20 s after
+reset, the ELF built and flashed from the main clone. Why this entry
+exists: round 67 removes the neuron's capacitance, which no computation
+read, and its setter: `LIFNeuron` is 40 bytes where it was 44, and the
+frozen format writes eight setters where it wrote nine. The firmware
+compiles the frozen cases into `main`, so its `.text` moves there alone;
+its own source changes in two comments. The board held round 52's head
+ELF (§ Eleventh entry, the last paragraph), so this flash is also the
+first board run of round 65's moves: the `.text` at its commits 1 (the
+banner, its current now in pA) and 4 (the switch), and the two traces
+that commit moved, `snntorch-two-layer` and `two-lif-neurons`, which the
+replay reads.
+
+Head: `build.sh` at `0182042` on 1.98.1 in the main clone,
+`NEURALOS_GRAPH` unset; the commit that adds this entry changes
+`evidence/` alone, so these are its sources: ELF `49e0830a…`, `.text`
+`b6c2d09d…` and 150,102 B, the pin appended as "round 67, the neuron
+without its capacitance" (§ Rebuild + run); the gate 0 hits, the
+trim-paths canary still unstable on 1.98.1 (exit 101); `main`'s frame
+`0x3e0`, 80 B less than round 61's `0x430`. At a scratch path the same
+sources read `.text` `e3f9f169…`, as the round's scratch builds did: the
+same code in another order, the same 271 symbols at the same sizes by
+`llvm-nm`, laid out by crate hashes that follow the clone's path
+(`tools/remap.sh`). Flashed from the head's ELF, `board-r67-head.log`,
+53,242 bytes. A first capture right after the flash overlaps the run the
+flash started and was dropped; this one opens with the last spike line
+of the boot the dropped capture started, cut by the capture's reset.
+Every figure below is from after the `rst:` line.
+
+| Measurement | Round 61 (head) | Round 67 (head) |
+|---|---|---|
+| Burst, pinned arm | 15,041 µs → 1,504 ns/step | 15,045 µs → 1,504 ns/step |
+| Burst, free arm | 2,996 µs → 299 ns/step | 2,939 µs → 293 ns/step |
+| Burst spikes, first spike step, checksum, both neuron arms | 147, 55, `8cd1e63b` | 147, 55, `8cd1e63b` |
+| Burst, network arm (8 neurons, 6 synapses a step) | 140,959 µs → 14,095 ns/step | 141,438 µs → 14,143 ns/step |
+| Network arm: spikes, first spike step, checksum | 3,377, 5, `7e700ee1` | 3,377, 5, `7e700ee1` |
+| `main`'s frame, from the prologue | 1,072 B | 992 B |
+| Stack high-water mark, of `.stack` | 1,448 of 316,316 B | 1,368 of 316,316 B |
+| `.stack` free at the mark | 314,868 B | 314,948 B |
+| First spike, real-time loop | step 55, 55,156 µs | step 55, 55,158 µs |
+| Spikes after the reset | 288 in 20 s | 288 in 20 s |
+| Replay diff, last line | `14 cases, 0 red` | `14 cases, 0 red` |
+
+The gates hold.
+`python3 tools/esp32c3_trace_diff.py evidence/esp32c3-bringup/board-r67-head.log`
+reads the fourteen plasticity-off cases identical, round 65's two moved
+traces among them, and ends `14 cases, 0 red`; round 67 moves no trace.
+Both neuron arms fold to `8cd1e63b`, 147 spikes from step 55, and the
+network arm to `7e700ee1`, 3,377 spikes from step 5, round 61's figures
+each; the real-time loop's first spikes land on steps 55, 123, 191 and
+every 68 steps on, as round 61's did.
+
+Two labels. The before column is round 61's head, the last capture on
+record, not the pin's build (`main@d40ef98`): the `.text` moved at round
+65, at its commits 1 and 4, and here. For this round's own change
+compare the instruction counts under QEMU, counted at the pin and at
+this round's code by a harness kept outside the repo that runs the
+firmware's arms line for line on QEMU `virt` rv32: the free and pinned
+arms count the same, the network arm 15,485,604 → 15,488,721 over its
+10,000 steps (+0.31 a step), and every spike count, first step and
+checksum is the same.
+
+The rest is reported, not gated: the free burst runs 1.9 % faster than
+round 61's head, the pinned within 4 µs of it, the network burst 0.34 %
+slower, figures of two builds and not of this round's change alone (the
+labels); the stack's mark falls 80 B, as `main`'s frame does; the loop
+holds 288 spikes in the window, as round 61's did; not read further. The
+board was then given back the image it held before the flash (the 4 MB
+read out and written back, on-chip MD5 `582b942d…` equal to the
+read-out's), and a capture of that image reads round 52's burst figures
+to 1 µs.
+
 ## Rebuild + run (from the repo root; board on /dev/ttyACM0)
 
 ```bash
@@ -1146,6 +1222,7 @@ llvm-objcopy -O binary --only-section=.text <ELF> text.bin && sha256sum text.bin
 #   9e2e6ef1e0e0627d3d245e64b004f0d42ce91f39f4c77ef7034e265b71d48c9b  round 36, the mark (build.sh on 1.98.1, main clone, NEURALOS_GRAPH unset, from the sources of the commit that adds this line: the stack's paint and scan, report()'s step count)
 #   768a1957e7103b69c8cda65b01ddd03f30d916e85b5da7c3aa74eb7aa8a621fb  round 52, the witnesses at 0.1 ms (build.sh on 1.98.1, main clone, NEURALOS_GRAPH unset, from the sources of the commit that adds this line)
 #   3a9eb352b4ad8b392ad6044a7671cba93d760ce39990cd3d816cd360870ca87c  round 61, the noise default and the clock (build.sh on 1.98.1, main clone, NEURALOS_GRAPH unset, from the sources of the commit that adds this line)
+#   b6c2d09d6d350ae49fb7e174f4823b1e86c63be8422834977c12d259dd71a334  round 67, the neuron without its capacitance (build.sh at 0182042 on 1.98.1, main clone, NEURALOS_GRAPH unset: the sources of the commit that adds this line, which changes evidence/ alone)
 ```
 
 The third pin is the second one rebuilt by `build.sh` (round 26,
@@ -1192,7 +1269,12 @@ whose modules in `frozen.rs` move the `.text` on their own (§ Tenth
 entry). The fifteenth is round 61's, the default build of the commit
 that adds it: the fourteenth's firmware sources but two comments, on a
 library whose neuron is built silent and whose networks' clock is a
-`u64` (§ Eleventh entry).
+`u64` (§ Eleventh entry). The sixteenth is round 67's, built at
+`0182042`, whose sources are those of the commit that adds it: the
+fifteenth's firmware sources under round 65's names and unit and this
+round's two comments, on a library whose neuron has no capacitance,
+which moves the `.text` on its own (§ Twelfth entry); round 65's two
+moves, which this list never pinned, are in it too.
 
 ### Release asset (the procedure since round 26)
 
