@@ -15,6 +15,7 @@ use std::path::Path;
 use std::process::Command;
 
 use neuralos_nir2json::{ConvertError, SIM_DT_US, convert_file, convert_file_opts};
+use neuralos_snn::VoltageResolution;
 use neuralos_snn::nir::NirImportOptions;
 
 fn fixture(name: &str) -> std::path::PathBuf {
@@ -84,12 +85,12 @@ fn f32_twin_matches_f64_origin_within_f32_tolerance() {
     for name in ["chain_population", "merge"] {
         let origin = convert_file(
             &rt_fixture(&format!("{name}.nir")),
-            NirImportOptions::default(),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
         )
         .expect("f64 origin converts");
         let twin = convert_file(
             &fixture(&format!("{name}_f32.nir")),
-            NirImportOptions::default(),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
         )
         .expect("f32 twin converts");
         assert!(
@@ -108,11 +109,14 @@ fn f32_twin_matches_f64_origin_within_f32_tolerance() {
 fn f32_twin_still_imports_into_snn() {
     let twin = convert_file(
         &fixture("chain_population_f32.nir"),
-        NirImportOptions::default(),
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
     )
     .expect("converts");
-    neuralos_snn::nir::NirImport::from_json(&twin.json, NirImportOptions::default())
-        .expect("the widened document is first-class import material");
+    neuralos_snn::nir::NirImport::from_json(
+        &twin.json,
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+    )
+    .expect("the widened document is first-class import material");
 }
 
 // ---- (b) lzf refusal through the binary ----------------------------------
@@ -134,8 +138,11 @@ fn binary_refuses_lzf_with_named_exit_2() {
 #[test]
 fn big_linear_converts_bounded() {
     let t0 = std::time::Instant::now();
-    let c = convert_file(&fixture("big_linear.nir"), NirImportOptions::default())
-        .expect("the 1M-weight graph converts");
+    let c = convert_file(
+        &fixture("big_linear.nir"),
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+    )
+    .expect("the 1M-weight graph converts");
     let elapsed = t0.elapsed();
     // 1024×1024 f64 weights + one Input + one Output. The honest
     // bound: generous (this box also runs a live burn), but finite —
@@ -152,8 +159,11 @@ fn big_linear_converts_bounded() {
         "linear weights present"
     );
     // and it imports — the full path, at scale
-    neuralos_snn::nir::NirImport::from_json(&c.json, NirImportOptions::default())
-        .expect("imports at scale");
+    neuralos_snn::nir::NirImport::from_json(
+        &c.json,
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+    )
+    .expect("imports at scale");
 }
 
 // ---- (d) the SEALED stranger nomination ----------------------------------
@@ -174,7 +184,7 @@ fn stranger_smoke_two_lif_neurons_is_detected_sim_units_both_walls() {
     // voltage wall too (the fact-check finding).
     let err = convert_file(
         &fixture("community/two_lif_neurons.nir"),
-        NirImportOptions::default(),
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
     )
     .expect_err("sim-unit file refused natively");
     match &err {
@@ -201,7 +211,7 @@ fn stranger_smoke_two_lif_with_sim_units_pins_discrete_centi() {
     // (tau 10 ms, r 1.0, leak 0.0, th 20.0).
     let c = convert_file_opts(
         &fixture("community/two_lif_neurons.nir"),
-        NirImportOptions::default(),
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
         true,
     )
     .expect("the transform converts the smoke file");
@@ -264,18 +274,18 @@ fn stranger_smoke_two_lif_with_sim_units_pins_discrete_centi() {
 #[test]
 fn stranger_emitter_skew_rockpool_transform_pins_the_f32_path() {
     // rockpool: f32 datasets (real emitter float32) + the 0.1-threshold
-    // family — the file that DIES at ThresholdZero on the default grid
+    // family — the file that DIES at ThresholdZero on the mV grid
     // and lives on centi. Both stamps in one stranger.
     let err = convert_file(
         &fixture("community/lif_rockpool.nir"),
-        NirImportOptions::default(),
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
     )
     .expect_err("detected sim-units");
     assert!(matches!(err, ConvertError::SimUnits { .. }));
 
     let c = convert_file_opts(
         &fixture("community/lif_rockpool.nir"),
-        NirImportOptions::default(),
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
         true,
     )
     .expect("the transform converts rockpool");
@@ -308,7 +318,7 @@ fn stranger_fallback_snntorch_head_completes_full_path_f32() {
     // weights by default — this is the REAL f32 stranger case.
     let c = convert_file(
         &fixture("community/snnTorch_linear_head.nir"),
-        NirImportOptions::default(),
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
     )
     .expect("the snnTorch head completes the full path");
     assert!(
@@ -316,8 +326,11 @@ fn stranger_fallback_snntorch_head_completes_full_path_f32() {
         "the f32 widening is stamped: {:?}",
         c.stamp.f32_datasets
     );
-    let g = neuralos_snn::nir::NirImport::from_json(&c.json, NirImportOptions::default())
-        .expect("snn imports the snnTorch emission");
+    let g = neuralos_snn::nir::NirImport::from_json(
+        &c.json,
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+    )
+    .expect("snn imports the snnTorch emission");
     assert_eq!(g.nodes.len(), 3, "Input, Linear, Output");
     assert_eq!(g.edges.len(), 2);
     assert_eq!(c.stamp.nir_version, "1.0.8");
@@ -331,14 +344,14 @@ fn stranger_fallback_snntorch_two_layer_completes_full_path_sim_units() {
     // the simulation-unit r = 50 Ω, so it refuses natively and converts
     // under --sim-units; the two-layer graph then builds (D8).
     let path = fixture("community/snnTorch_two_layer.nir");
-    let err =
-        convert_file(&path, NirImportOptions::default()).expect_err("r = 50 Ω refuses natively");
+    let err = convert_file(
+        &path,
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+    )
+    .expect_err("r = 50 Ω refuses natively");
     assert!(matches!(err, ConvertError::SimUnits { .. }), "{err:?}");
     // the CLI's --sim-units defaults: snnTorch's 0.1 ms step
-    let sim_step = NirImportOptions {
-        dt_us: SIM_DT_US,
-        ..NirImportOptions::default()
-    };
+    let sim_step = NirImportOptions::sim_units(SIM_DT_US);
     let c = convert_file_opts(&path, sim_step, true).expect("converts under --sim-units");
     assert_eq!(c.stamp.nir_version, "1.0.9.dev1+g7883c3c85");
     assert!(
@@ -386,10 +399,7 @@ fn the_snn_witness_fixtures_are_this_converter_s_bytes() {
         ("community/two_lif_neurons.nir", "two_lif_neurons_sim.json"),
     ] {
         // the CLI's --sim-units default step, 0.1 ms
-        let sim_step = NirImportOptions {
-            dt_us: SIM_DT_US,
-            ..NirImportOptions::default()
-        };
+        let sim_step = NirImportOptions::sim_units(SIM_DT_US);
         let c =
             convert_file_opts(&fixture(nir), sim_step, true).expect("converts under --sim-units");
         let committed = std::fs::read(
@@ -413,7 +423,7 @@ fn stranger_emitter_skew_norse_is_a_named_wall() {
     // not ours, and its refusal is honest).
     let err = convert_file(
         &fixture("community/lif_norse.nir"),
-        NirImportOptions::default(),
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
     )
     .expect_err("Affine is refused in native units");
     match &err {
@@ -431,10 +441,7 @@ fn stranger_emitter_skew_norse_converts_under_sim_units() {
     // under --sim-units the all-zero bias adds nothing, and the Affine
     // is a plain Linear under its own name.
     use neuralos_snn::nir::NirNodeKind::{Input, Lif, Linear, Output};
-    let sim_step = NirImportOptions {
-        dt_us: SIM_DT_US,
-        ..NirImportOptions::default()
-    };
+    let sim_step = NirImportOptions::sim_units(SIM_DT_US);
     let c = convert_file_opts(&fixture("community/lif_norse.nir"), sim_step, true)
         .expect("converts under --sim-units");
     assert!(c.stamp.bias.is_empty(), "{:?}", c.stamp.bias);
@@ -471,7 +478,7 @@ fn stranger_wall_probes_are_all_named_rejections() {
     ] {
         let err = convert_file(
             &fixture(&format!("community/{name}")),
-            NirImportOptions::default(),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
         )
         .err()
         .unwrap_or_else(|| panic!("{name}: expected a refusal"));
@@ -508,6 +515,10 @@ fn binary_end_to_end_smoke_happy_and_sad() {
     assert!(
         head_sidecar.contains("\"dt_us\":1000,"),
         "without --sim-units the step stays 1 ms: {head_sidecar}"
+    );
+    assert!(
+        head_sidecar.contains("\"resolution\":\"mv\""),
+        "without --sim-units the grid stays mV: {head_sidecar}"
     );
 
     // the transform through the binary: two_lif + --sim-units exits 0

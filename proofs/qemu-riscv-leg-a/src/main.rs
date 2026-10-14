@@ -141,15 +141,9 @@ fn quiet_neuron(id: u16, r: VoltageResolution) -> LIFNeuron {
 }
 
 fn lin_sentinel() -> NirLinear {
-    NirLinear {
-        rows: 0,
-        cols: 0,
-        weight_offset: 0,
-        scale: 0.0,
-        absmax: 0.0,
-        max_abs_err: f64::NAN,
-        zero_tensor: false,
-    }
+    let mut lin = NirLinear::BLANK;
+    lin.max_abs_err = f64::NAN;
+    lin
 }
 
 #[unsafe(no_mangle)]
@@ -751,25 +745,25 @@ fn kernel_checks() {
 }
 
 fn nir_checks() {
-    let default = NirImportOptions::default();
+    let mv = NirImportOptions::new(1_000, VoltageResolution::Millivolt);
     ck(
         "nir::lif_hard_failures tau=0",
-        quantize_lif(0.0, 1e8, -0.07, -0.055, -0.08, false, default),
+        quantize_lif(0.0, 1e8, -0.07, -0.055, -0.08, false, mv),
         Err(NirError::BadNumber("tau")),
     );
     ck(
         "nir::lif_hard_failures tau<0",
-        quantize_lif(-0.02, 1e8, -0.07, -0.055, -0.08, false, default),
+        quantize_lif(-0.02, 1e8, -0.07, -0.055, -0.08, false, mv),
         Err(NirError::BadNumber("tau")),
     );
     ck(
         "nir::lif_hard_failures r=0",
-        quantize_lif(0.02, 0.0, -0.07, -0.055, -0.08, false, default),
+        quantize_lif(0.02, 0.0, -0.07, -0.055, -0.08, false, mv),
         Err(NirError::BadNumber("r")),
     );
     ck(
         "nir::lif_hard_failures threshold-zero",
-        quantize_lif(0.02, 1e8, -0.07, -0.0004, -0.08, false, default),
+        quantize_lif(0.02, 1e8, -0.07, -0.0004, -0.08, false, mv),
         Err(NirError::ThresholdZero),
     );
     ck(
@@ -787,7 +781,7 @@ fn nir_checks() {
     );
     ck(
         "nir::lif_hard_failures threshold out of range",
-        quantize_lif(0.02, 1e8, -0.07, 0.06, -0.08, false, default),
+        quantize_lif(0.02, 1e8, -0.07, 0.06, -0.08, false, mv),
         Err(NirError::PotentialOutOfRange("v_threshold")),
     );
     let lif = quantize_lif(
@@ -815,7 +809,7 @@ fn nir_checks() {
             -0.055,
             -0.08,
             false,
-            default,
+            mv,
         ),
         Err(NirError::BadNumber("r")),
     );

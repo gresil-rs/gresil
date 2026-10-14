@@ -84,8 +84,9 @@
 //! the total weight count; the arena keeps exactly the quantized
 //! result. Export writes into a caller byte slice. Strings are
 //! borrowed from the input (schema strings must be escape-free
-//! printable ASCII — loud error otherwise). `f64` appears in the
-//! setup path only, never in any per-step hot path.
+//! printable ASCII — loud error otherwise); an error copies the names
+//! it reports, so it borrows nothing. `f64` appears in the setup path
+//! only, never in any per-step hot path.
 //!
 //! The structured-entry seam: callers that already hold materialized
 //! values (HDF5 import, builders) skip the JSON reader and call
@@ -124,11 +125,100 @@ const I16_FS: f64 = 32_767.0;
 // Errors — loud, no clamping, no guessing
 // ---------------------------------------------------------------------------
 
-/// Everything that can go wrong importing/exporting NIR. Copy +
-/// borrowed strings only (no alloc).
+/// A name a [`NirError`] reports (a node's key, a node kind, a field),
+/// copied, so that the error borrows nothing from the document or the
+/// caller. It keeps 32 bytes at most: a longer name is cut at the last
+/// char boundary that fits and marked, so [`is_cut`](Self::is_cut) says
+/// so, its `Display` ends with "…", and it equals no `&str`, since it is
+/// not the name. Two names compare by the bytes they kept and the mark.
+/// `Copy`, no allocation.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct NirName {
+    len: u8,
+    cut: bool,
+    bytes: [u8; NirName::CAP],
+}
+
+impl NirName {
+    /// The most bytes a name keeps, 32 as the type's doc says; private,
+    /// so it can grow in a minor release.
+    const CAP: usize = 32;
+
+    /// `name`, whole if it fits 32 bytes; else its bytes up to the last
+    /// char boundary that fits, marked cut.
+    #[must_use]
+    pub fn new(name: &str) -> Self {
+        let mut end = name.len().min(Self::CAP);
+        while !name.is_char_boundary(end) {
+            end -= 1;
+        }
+        let mut bytes = [0u8; Self::CAP];
+        bytes[..end].copy_from_slice(&name.as_bytes()[..end]);
+        Self {
+            len: end as u8,
+            cut: end < name.len(),
+            bytes,
+        }
+    }
+
+    /// The bytes kept: the whole name, or the cut one's first part.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        core::str::from_utf8(&self.bytes[..usize::from(self.len)]).unwrap_or("")
+    }
+
+    /// Whether the name was longer than 32 bytes, and cut.
+    #[must_use]
+    pub fn is_cut(&self) -> bool {
+        self.cut
+    }
+}
+
+/// The kept bytes, then "…" when the name was cut.
+impl core::fmt::Display for NirName {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.as_str())?;
+        if self.cut {
+            f.write_str("…")?;
+        }
+        Ok(())
+    }
+}
+
+/// The kept bytes as `&str`'s `Debug` writes them, quoted, then "…" when
+/// the name was cut.
+impl core::fmt::Debug for NirName {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Debug::fmt(self.as_str(), f)?;
+        if self.cut {
+            f.write_str("…")?;
+        }
+        Ok(())
+    }
+}
+
+/// The name is `other`, whole: a cut name equals no `str`.
+impl PartialEq<str> for NirName {
+    fn eq(&self, other: &str) -> bool {
+        !self.cut && self.as_str() == other
+    }
+}
+
+/// As `PartialEq<str>`.
+impl PartialEq<&str> for NirName {
+    fn eq(&self, other: &&str) -> bool {
+        *self == **other
+    }
+}
+
+/// Everything that can go wrong importing/exporting NIR. `Copy`, no
+/// allocation, no lifetime: a name it reports is copied into a
+/// [`NirName`], so `?` carries it past the document it reports on. Not
+/// exhaustive, nor are its four struct variants: a variant, or a field
+/// of one, may come in a minor release.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum NirError<'a> {
+pub enum NirError {
     /// JSON the reader cannot read, at byte `pos`: malformed, nested
     /// deeper than the reader walks, or well-formed with a value of
     /// another JSON type than the schema's (a string where `tau`'s array
@@ -141,10 +231,10 @@ pub enum NirError<'a> {
     /// JSON container can write (carries the name). The
     /// structured-entry builder accepts any `&str`; this gate fires
     /// only at the JSON boundary — [`nir_export`].
-    NonAsciiNodeName(&'a str),
+    NonAsciiNodeName(NirName),
     /// A node kind outside the slice-1 subset (includes `Affine`,
     /// `CubaLIF`, `Conv1d`, …). Carries the kind name.
-    UnsupportedNodeKind(&'a str),
+    UnsupportedNodeKind(NirName),
     /// A required field is missing from a node/graph object.
     MissingField(&'static str),
     /// A field has the wrong JSON shape (e.g. scalar where the
@@ -177,7 +267,7 @@ pub enum NirError<'a> {
     /// More nodes/edges/weights than the caller's buffers hold.
     BufferOverflow,
     /// An edge endpoint names no node.
-    UnknownEdgeEndpoint(&'a str),
+    UnknownEdgeEndpoint(NirName),
     /// The same edge appears twice (reference `validate_structure`).
     DuplicateEdge,
     /// A node name appears twice in `nodes`.
@@ -188,22 +278,24 @@ pub enum NirError<'a> {
     /// reference's `from_dict` is `cls(**kwargs)`, which refuses any
     /// other key, a field of another kind included; at the document, of
     /// which its reader takes only `node`, the rule is this module's.
+    #[non_exhaustive]
     UnexpectedField {
         /// The node's key in `nodes`; `None` for the graph object and
         /// the document.
-        node: Option<&'a str>,
+        node: Option<NirName>,
         /// The key.
-        field: &'a str,
+        field: NirName,
     },
     /// A key given twice in one object. JSON leaves its meaning open
     /// and the reference reads no JSON, so the reader refuses it, as it
     /// refuses a node name or an edge given twice.
+    #[non_exhaustive]
     DuplicateField {
         /// The node's key in `nodes`; `None` for the graph object and
         /// the document.
-        node: Option<&'a str>,
+        node: Option<NirName>,
         /// The key.
-        field: &'a str,
+        field: NirName,
     },
     /// A graph the assembly does not build, though the format layer
     /// imports it. Both builders refuse by name:
@@ -223,6 +315,7 @@ pub enum NirError<'a> {
     /// import reads a mark on any node, and a LIF node with no mark
     /// reads as [`NirUnits::Native`]: under the other units every
     /// potential, `r` and weight would read on another scale.
+    #[non_exhaustive]
     UnitsMismatch {
         /// The units a node of the file is in: its mark, or native
         /// units for a LIF node with none.
@@ -232,17 +325,18 @@ pub enum NirError<'a> {
     },
     /// A per-edge type-shape mismatch (reference `check_types`
     /// parity): the `src → dst` edge's tensor shapes disagree.
+    #[non_exhaustive]
     EdgeShapeMismatch {
         /// The source node's key in the document.
-        src: &'a str,
+        src: NirName,
         /// The destination node's key in the document.
-        dst: &'a str,
+        dst: NirName,
     },
     /// The export byte buffer is too small.
     ExportTooSmall,
 }
 
-impl core::fmt::Display for NirError<'_> {
+impl core::fmt::Display for NirError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Json(p) => write!(
@@ -342,9 +436,9 @@ const fn units_name(u: NirUnits) -> &'static str {
 const fn units_remedy(file: NirUnits) -> &'static str {
     match file {
         NirUnits::Native => {
-            "import it with NirImportOptions::default(), or a graph with a spike edge with \
-             NirImportOptions { resolution: VoltageResolution::CentiMillivolt, \
-             ..NirImportOptions::default() }; a neuralos-nir2json --sim-units file written \
+            "import it with NirImportOptions::new(dt_us, VoltageResolution::Millivolt), or a \
+             graph with a spike edge with NirImportOptions::new(dt_us, \
+             VoltageResolution::CentiMillivolt); a neuralos-nir2json --sim-units file written \
              before the units mark has none: convert its .nir again"
         }
         NirUnits::Simulation => {
@@ -353,13 +447,13 @@ const fn units_remedy(file: NirUnits) -> &'static str {
     }
 }
 
-impl core::error::Error for NirError<'_> {}
+impl core::error::Error for NirError {}
 
 // The same pin as the crate `Error`'s, in every configuration (lib.rs
 // carries the why).
 const _: fn() = || {
     fn a<T: core::error::Error>() {}
-    a::<NirError<'_>>();
+    a::<NirError>();
 };
 
 // ---------------------------------------------------------------------------
@@ -399,7 +493,7 @@ impl<'a> Reader<'a> {
         self.b.get(self.pos).copied()
     }
 
-    fn eat(&mut self, c: u8) -> Result<(), NirError<'static>> {
+    fn eat(&mut self, c: u8) -> Result<(), NirError> {
         if self.peek() == Some(c) {
             self.pos += 1;
             Ok(())
@@ -408,7 +502,7 @@ impl<'a> Reader<'a> {
         }
     }
 
-    fn eat_lit(&mut self, lit: &str) -> Result<(), NirError<'static>> {
+    fn eat_lit(&mut self, lit: &str) -> Result<(), NirError> {
         if self.b[self.pos..].starts_with(lit.as_bytes()) {
             self.pos += lit.len();
             Ok(())
@@ -419,7 +513,7 @@ impl<'a> Reader<'a> {
 
     /// A string we must READ: escape-free printable ASCII, borrowed.
     /// (`\` is 0x5c — printable — so it is checked explicitly first.)
-    fn read_string(&mut self) -> Result<&'a str, NirError<'static>> {
+    fn read_string(&mut self) -> Result<&'a str, NirError> {
         self.eat(b'"')?;
         let start = self.pos;
         loop {
@@ -443,7 +537,7 @@ impl<'a> Reader<'a> {
     /// errors in Python's `json`). The reference emitter never
     /// produces these forms and the numeric values agree wherever
     /// both accept — a documented laxity, not an accident.
-    fn read_number(&mut self) -> Result<f64, NirError<'static>> {
+    fn read_number(&mut self) -> Result<f64, NirError> {
         self.ws();
         let start = self.pos;
         while let Some(&c) = self.b.get(self.pos) {
@@ -464,7 +558,7 @@ impl<'a> Reader<'a> {
     /// Array-element stepper: `first` gates the opening `[`; returns
     /// `true` when an element follows (caller parses it), `false` at
     /// `]`.
-    fn array_step(&mut self, first: &mut bool) -> Result<bool, NirError<'static>> {
+    fn array_step(&mut self, first: &mut bool) -> Result<bool, NirError> {
         if *first {
             self.eat(b'[')?;
             *first = false;
@@ -489,7 +583,7 @@ impl<'a> Reader<'a> {
     /// back each time it occurs: the document, the graph object and a
     /// node refuse the repeat (`see_field`, `NodeKeys`), and a repeat
     /// inside `metadata`, whose contents stay free, is not refused.
-    fn object_step(&mut self, first: &mut bool) -> Result<Option<&'a str>, NirError<'static>> {
+    fn object_step(&mut self, first: &mut bool) -> Result<Option<&'a str>, NirError> {
         if *first {
             self.eat(b'{')?;
             *first = false;
@@ -515,7 +609,7 @@ impl<'a> Reader<'a> {
     /// Depth-capped: nesting beyond [`MAX_SKIP_DEPTH`] is rejected as
     /// malformed instead of overflowing the call stack (a 50k-deep
     /// junk array is adversarial input, not a document).
-    fn skip_value(&mut self, depth: usize) -> Result<(), NirError<'static>> {
+    fn skip_value(&mut self, depth: usize) -> Result<(), NirError> {
         if depth > MAX_SKIP_DEPTH {
             return Err(NirError::Json(self.pos));
         }
@@ -576,8 +670,11 @@ pub enum NirNodeKind {
 
 /// A quantized LIF node: provenance floats + derived substrate
 /// integers. Export renders the derived fields; provenance rides
-/// `metadata`.
+/// `metadata`. Not exhaustive: a field may come in a minor release, so
+/// outside this crate a record comes from [`quantize_lif`], or a caller
+/// writes one from [`BLANK`](Self::BLANK).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[non_exhaustive]
 pub struct NirLif {
     // provenance (source units: s, Ω, V)
     /// Source `tau`, seconds.
@@ -617,11 +714,45 @@ pub struct NirLif {
     pub max_v_err_v: f64,
 }
 
+impl NirLif {
+    /// A blank record, every number 0 and every flag `false`, as
+    /// `NirLif::default()` gives: what a lifs buffer holds before the
+    /// import writes it. A `const`, so it fills a `static` buffer, which
+    /// `default()`, a function call, cannot.
+    ///
+    /// ```
+    /// use neuralos_snn::nir::NirLif;
+    ///
+    /// static LIFS: [NirLif; 4] = [NirLif::BLANK; 4];
+    /// assert_eq!(LIFS[3], NirLif::default());
+    /// ```
+    pub const BLANK: Self = Self {
+        tau_s: 0.0,
+        r_ohm: 0.0,
+        v_leak_v: 0.0,
+        v_threshold_v: 0.0,
+        v_reset_v: 0.0,
+        v_reset_defaulted: false,
+        tau_us: 0,
+        resistance_mohm: 0,
+        capacitance_pf: 0,
+        capacitance_clamped: false,
+        leak_q: 0,
+        threshold_q: 0,
+        reset_q: 0,
+        tau_err_s: 0.0,
+        max_v_err_v: 0.0,
+    };
+}
+
 /// A quantized LIF population view: `len` neurons with per-neuron
 /// records in the caller's lifs buffer ([`NirBuffers::lifs`] or
 /// `NirImport::lifs`), starting at `offset`. A length-1
-/// population is the slice-1 single neuron.
+/// population is the slice-1 single neuron. Not exhaustive: a field may
+/// come in a minor release, so outside this crate a caller writes one
+/// from [`BLANK`](Self::BLANK).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct NirLifPopulation {
     /// First record index in the lifs buffer.
     pub offset: usize,
@@ -629,10 +760,43 @@ pub struct NirLifPopulation {
     pub len: usize,
 }
 
+impl NirLifPopulation {
+    /// A blank view, offset 0 and length 0: its length is written after
+    /// it, and its offset when the records do not start at 0. A LIF node
+    /// written by hand, as the structured-entry seam builds one where
+    /// `NirBuilder` (std) is not there, takes one.
+    ///
+    /// ```
+    /// use neuralos_snn::nir::{nir_export, quantize_lif, NirLifPopulation, NirNode, NirNodeKind};
+    /// use neuralos_snn::{NirImportOptions, VoltageResolution};
+    ///
+    /// let opts = NirImportOptions::new(1_000, VoltageResolution::Millivolt);
+    /// let lif = quantize_lif(0.02, 1e8, -0.07, -0.055, -0.08, false, opts).unwrap();
+    /// let mut pop = NirLifPopulation::BLANK;
+    /// pop.len = 1; // one record, at offset 0 of the lifs buffer
+    /// let mut input = NirNode::BLANK;
+    /// input.name = "input";
+    /// input.shape[0] = 1;
+    /// input.shape_len = 1;
+    /// let mut neuron = NirNode::BLANK;
+    /// neuron.name = "lif";
+    /// neuron.kind = NirNodeKind::Lif;
+    /// neuron.lif = Some(pop);
+    /// let mut out = [0u8; 1024];
+    /// let n = nir_export(&[input, neuron], &[(0, 1)], &[], &[lif], opts, &mut out).unwrap();
+    /// assert!(out[..n].starts_with(b"{\"version\""));
+    /// ```
+    pub const BLANK: Self = Self { offset: 0, len: 0 };
+}
+
 /// Per-neuron source-unit LIF parameters (population form) for the
 /// structured-entry builder: every slice must have equal length
 /// ≥ 1; `v_reset_v` `None` = the reference's absent-`v_reset`
 /// zeros semantics.
+///
+/// Exhaustive on purpose: a caller builds one by a literal, which puts
+/// each of the five slices beside its name, and a sixth field would be a
+/// breaking release.
 #[derive(Debug, Clone, Copy)]
 pub struct NirLifParams<'v> {
     /// Source `tau`, one per neuron, seconds.
@@ -648,8 +812,12 @@ pub struct NirLifParams<'v> {
     pub v_reset_v: Option<&'v [f64]>,
 }
 
-/// A quantized Linear node: weights live in the shared i16 arena.
+/// A quantized Linear node: weights live in the shared i16 arena. Not
+/// exhaustive: a field may come in a minor release, so outside this crate
+/// a view comes from [`quantize_linear`], or a caller writes one from
+/// [`BLANK`](Self::BLANK).
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct NirLinear {
     /// The `weight` tensor's out dimension.
     pub rows: usize,
@@ -668,10 +836,36 @@ pub struct NirLinear {
     pub zero_tensor: bool,
 }
 
+impl NirLinear {
+    /// A blank view: no rows, no cols, offset 0, every number 0, not a
+    /// zero tensor. A slot to be overwritten, or a value with a field
+    /// written after it.
+    ///
+    /// ```
+    /// use neuralos_snn::nir::NirLinear;
+    ///
+    /// let mut mark = NirLinear::BLANK;
+    /// mark.max_abs_err = f64::NAN;
+    /// assert_eq!((mark.rows, mark.cols, mark.scale), (0, 0, 0.0));
+    /// ```
+    pub const BLANK: Self = Self {
+        rows: 0,
+        cols: 0,
+        weight_offset: 0,
+        scale: 0.0,
+        absmax: 0.0,
+        max_abs_err: 0.0,
+        zero_tensor: false,
+    };
+}
+
 /// One node, imported or built. Shapes are `[u32; 4]` + length (≤ 4 dims,
 /// reference shapes are 1–4-D). A LIF node carries a population
-/// view into the lifs buffer.
+/// view into the lifs buffer. Not exhaustive: a field may come in a
+/// minor release, so outside this crate a caller writes a node from
+/// [`BLANK`](Self::BLANK).
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct NirNode<'a> {
     /// This node's key in the document's `nodes` object, or the name a
     /// `NirBuilder` caller gave it.
@@ -688,6 +882,29 @@ pub struct NirNode<'a> {
     pub lif: Option<NirLifPopulation>,
     /// The quantized tensor of a `Linear` node, `None` on any other kind.
     pub linear: Option<NirLinear>,
+}
+
+impl NirNode<'_> {
+    /// A blank node: an `Input` with an empty name, no shape and no view,
+    /// what a node buffer holds before the import writes it. A `const`,
+    /// so it fills a `static` arena.
+    ///
+    /// ```
+    /// use neuralos_snn::nir::{NirNode, NirNodeKind};
+    ///
+    /// static NODES: [NirNode<'static>; 4] = [NirNode::BLANK; 4];
+    /// assert_eq!(NODES[3].kind, NirNodeKind::Input);
+    /// assert_eq!((NODES[3].name, NODES[3].shape_len), ("", 0));
+    /// assert!(NODES[3].lif.is_none() && NODES[3].linear.is_none());
+    /// ```
+    pub const BLANK: Self = Self {
+        name: "",
+        kind: NirNodeKind::Input,
+        shape: [0; 4],
+        shape_len: 0,
+        lif: None,
+        linear: None,
+    };
 }
 
 /// Import notes (loud lossiness — each counted, none silent).
@@ -710,8 +927,10 @@ pub enum NirNote {
     QuantizationLoss,
 }
 
-/// The loud import report.
+/// The loud import report. The import builds it and a caller reads it.
+/// Not exhaustive: a field may come in a minor release.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct NirReport {
     /// `Input` nodes.
     pub inputs: usize,
@@ -805,8 +1024,11 @@ impl NoteCounts {
     }
 }
 
-/// First pass: buffer sizes + the version string.
+/// First pass: buffer sizes + the version string. [`nir_scan`] builds
+/// it and a caller reads it. Not exhaustive: a field may come in a minor
+/// release.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct NirScan<'a> {
     /// The document's `version` string, borrowed from the JSON.
     pub version: &'a str,
@@ -835,6 +1057,9 @@ pub struct NirScan<'a> {
 /// weights and each LIF's five param arrays into `scratch`
 /// (transiently) while quantizing into the arena and the lifs
 /// buffer, which keep exactly the results.
+///
+/// Exhaustive on purpose: a caller lends its five buffers by a literal,
+/// each beside its name, and a sixth field would be a breaking release.
 #[derive(Debug)]
 pub struct NirBuffers<'buf, 'a> {
     /// `bufs` borrow lifetime (`'buf`) and json-data lifetime (`'a`).
@@ -852,8 +1077,11 @@ pub struct NirBuffers<'buf, 'a> {
 }
 
 /// Import options: the three things NIR does not carry that the
-/// substrate needs.
+/// substrate needs. Not exhaustive: a field may come in a minor release,
+/// so outside this crate no struct literal builds options:
+/// [`new`](Self::new) and [`sim_units`](Self::sim_units) do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct NirImportOptions {
     /// Simulation timestep (μs). Hard requirement: `dt ≤ tau ≤ 1000·dt`
     /// (`TauBelowDt` below it, `TauTooLongForDt` above it).
@@ -889,7 +1117,7 @@ impl NirImportOptions {
 }
 
 /// How an imported graph's numbers read. NIR carries no units, so the
-/// caller says: [`NirImportOptions::new`] and `Default` give
+/// caller says: [`NirImportOptions::new`] gives
 /// [`Native`](Self::Native), [`NirImportOptions::sim_units`] gives
 /// [`Simulation`](Self::Simulation). The export marks a graph in
 /// simulation units, and the JSON import refuses a file whose units
@@ -928,12 +1156,6 @@ pub enum NirUnits {
 /// the product `r·I` keeps the source's scale.
 pub const SIM_CURRENT_QUANTA: i16 = 1_000;
 
-impl Default for NirImportOptions {
-    fn default() -> Self {
-        Self::new(1_000, VoltageResolution::Millivolt)
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Quantization (pure, unit-tested below)
 // ---------------------------------------------------------------------------
@@ -961,11 +1183,7 @@ fn round_half_away(x: f64) -> f64 {
 }
 
 /// Quantize one potential (V) onto the grid. Loud on out-of-range.
-fn quant_potential(
-    v_v: f64,
-    field: &'static str,
-    scale: i32,
-) -> Result<(i16, f64), NirError<'static>> {
+fn quant_potential(v_v: f64, field: &'static str, scale: i32) -> Result<(i16, f64), NirError> {
     if !v_v.is_finite() {
         return Err(NirError::BadNumber(field));
     }
@@ -1000,7 +1218,7 @@ pub fn quantize_lif(
     v_reset_v: f64,
     v_reset_defaulted: bool,
     opts: NirImportOptions,
-) -> Result<NirLif, NirError<'static>> {
+) -> Result<NirLif, NirError> {
     if [tau_s, r_ohm, v_leak_v, v_threshold_v, v_reset_v]
         .iter()
         .any(|v| !v.is_finite())
@@ -1097,7 +1315,7 @@ pub fn quantize_linear(
     cols: usize,
     arena: &mut [i16],
     offset: usize,
-) -> Result<NirLinear, NirError<'static>> {
+) -> Result<NirLinear, NirError> {
     if rows == 0 || cols == 0 {
         return Err(NirError::BadShape("weight"));
     }
@@ -1205,18 +1423,18 @@ fn kind_fields(kind: &str) -> Option<(NirNodeKind, &'static [&'static str])> {
 
 /// One key of the document or the graph object, judged as it is read:
 /// refused when `fields` lacks it, or when `seen` holds it already.
-fn see_field<'a>(seen: &mut u8, fields: &[&str], key: &'a str) -> Result<(), NirError<'a>> {
+fn see_field(seen: &mut u8, fields: &[&str], key: &str) -> Result<(), NirError> {
     let i = fields
         .iter()
         .position(|&f| f == key)
-        .ok_or(NirError::UnexpectedField {
+        .ok_or_else(|| NirError::UnexpectedField {
             node: None,
-            field: key,
+            field: NirName::new(key),
         })?;
     if *seen & (1 << i) != 0 {
         return Err(NirError::DuplicateField {
             node: None,
-            field: key,
+            field: NirName::new(key),
         });
     }
     *seen |= 1 << i;
@@ -1254,17 +1472,17 @@ impl<'a> NodeKeys<'a> {
     /// The node's keys against its kind's, `own`: refuses a key given
     /// twice, a key no kind carries or a key of another kind. Which one
     /// is named when a node has several is not part of the contract.
-    fn check(&self, node: &'a str, own: &[&str]) -> Result<(), NirError<'a>> {
+    fn check(&self, node: &'a str, own: &[&str]) -> Result<(), NirError> {
         if let Some(field) = self.twice {
             return Err(NirError::DuplicateField {
-                node: Some(node),
-                field,
+                node: Some(NirName::new(node)),
+                field: NirName::new(field),
             });
         }
         if let Some(field) = self.unknown {
             return Err(NirError::UnexpectedField {
-                node: Some(node),
-                field,
+                node: Some(NirName::new(node)),
+                field: NirName::new(field),
             });
         }
         match NODE_FIELDS
@@ -1273,8 +1491,8 @@ impl<'a> NodeKeys<'a> {
             .find(|&(i, f)| self.seen & (1 << i) != 0 && !own.contains(f))
         {
             Some((_, &field)) => Err(NirError::UnexpectedField {
-                node: Some(node),
-                field,
+                node: Some(NirName::new(node)),
+                field: NirName::new(field),
             }),
             None => Ok(()),
         }
@@ -1290,7 +1508,7 @@ impl<'a> NodeKeys<'a> {
 /// carry and a key given twice included); param values are NOT
 /// validated — that is import's job, as is a node kind outside the
 /// subset.
-pub fn nir_scan(json: &[u8]) -> Result<NirScan<'_>, NirError<'_>> {
+pub fn nir_scan(json: &[u8]) -> Result<NirScan<'_>, NirError> {
     let mut r = Reader::new(json);
     let mut version: Option<&str> = None;
     let mut node_count = 0usize;
@@ -1334,13 +1552,13 @@ pub fn nir_scan(json: &[u8]) -> Result<NirScan<'_>, NirError<'_>> {
     })
 }
 
-fn scan_graph<'a>(
-    r: &mut Reader<'a>,
+fn scan_graph(
+    r: &mut Reader<'_>,
     node_count: &mut usize,
     edge_count: &mut usize,
     weight_cells: &mut usize,
     lif_neurons: &mut usize,
-) -> Result<(), NirError<'a>> {
+) -> Result<(), NirError> {
     let mut first = true;
     let mut seen = 0u8;
     while let Some(key) = r.object_step(&mut first)? {
@@ -1384,7 +1602,7 @@ fn scan_node<'a>(
     name: &'a str,
     weight_cells: &mut usize,
     lif_neurons: &mut usize,
-) -> Result<(), NirError<'a>> {
+) -> Result<(), NirError> {
     // per-node LIF population bookkeeping: the five param arrays
     // must all be present-at-equal-length (v_reset may be absent)
     let mut pop: Option<usize> = None;
@@ -1427,7 +1645,7 @@ fn scan_node<'a>(
 /// Walk one LIF param array, counting elements (each must be a
 /// number — nesting is a wrong-shape rejection here, matching
 /// [`count_array`]'s strictness).
-fn count_param_array(r: &mut Reader<'_>) -> Result<usize, NirError<'static>> {
+fn count_param_array(r: &mut Reader<'_>) -> Result<usize, NirError> {
     let mut n = 0usize;
     let mut first = true;
     while r.array_step(&mut first)? {
@@ -1445,11 +1663,7 @@ fn count_param_array(r: &mut Reader<'_>) -> Result<usize, NirError<'static>> {
 /// shapes all fail here (scan's "malformed structure fails here"
 /// contract); ragged rows still fail at import (shape is checked,
 /// not counted, there).
-fn count_array(
-    r: &mut Reader<'_>,
-    depth: &mut usize,
-    leaves: &mut usize,
-) -> Result<(), NirError<'static>> {
+fn count_array(r: &mut Reader<'_>, depth: &mut usize, leaves: &mut usize) -> Result<(), NirError> {
     if *depth >= 2 {
         // 2-D max (a weight tensor); deeper = wrong shape
         return Err(NirError::BadShape("weight"));
@@ -1491,8 +1705,12 @@ fn count_array(
 /// ([`NirError::UnitsMismatch`]). A key its object does not carry, or
 /// one given twice, is refused by name ([`NirError::UnexpectedField`],
 /// [`NirError::DuplicateField`]), a kind outside the subset first
-/// ([`NirError::UnsupportedNodeKind`]). On any error nothing is
-/// promised about buffer contents.
+/// ([`NirError::UnsupportedNodeKind`]). An Input's or an Output's
+/// `shape` holds 1 to 4 dims: empty or past 4 it is
+/// [`NirError::BadShape("shape")`](NirError::BadShape), as the builder
+/// refuses one, and absent
+/// [`NirError::MissingField("shape")`](NirError::MissingField). On any
+/// error nothing is promised about buffer contents.
 // two documented walks (nodes, then edges) + their trailing checks;
 // the 100-line cap is crossed by the EOF checks alone (network.rs
 // precedent for the allow)
@@ -1501,7 +1719,7 @@ pub fn nir_import<'a>(
     json: &'a [u8],
     opts: NirImportOptions,
     bufs: &mut NirBuffers<'_, 'a>,
-) -> Result<NirReport, NirError<'a>> {
+) -> Result<NirReport, NirError> {
     let mut report = NirReport::default();
 
     // walk 1: nodes (+ weights + LIF populations), and each key of the
@@ -1586,7 +1804,9 @@ pub fn nir_import<'a>(
                                 let name = r.read_string()?;
                                 let idx = (0..node_count)
                                     .find(|&i| bufs.nodes[i].name == name)
-                                    .ok_or(NirError::UnknownEdgeEndpoint(name))?;
+                                    .ok_or_else(|| {
+                                        NirError::UnknownEdgeEndpoint(NirName::new(name))
+                                    })?;
                                 pair[pi] = idx as u32;
                                 pi += 1;
                             }
@@ -1640,7 +1860,7 @@ fn read_param_array(
     scratch: &mut [f64],
     fill: &mut usize,
     field: &'static str,
-) -> Result<(usize, usize), NirError<'static>> {
+) -> Result<(usize, usize), NirError> {
     let start = *fill;
     let mut first = true;
     while r.array_step(&mut first)? {
@@ -1672,7 +1892,7 @@ fn finish_lif_population(
     opts: NirImportOptions,
     report: &mut NirReport,
     lif_fill: &mut usize,
-) -> Result<NirLifPopulation, NirError<'static>> {
+) -> Result<NirLifPopulation, NirError> {
     let rng = |o: Option<(usize, usize)>, f: &'static str| o.ok_or(NirError::MissingField(f));
     let tau_r = rng(tau, "tau")?;
     let res_r = rng(res, "r")?;
@@ -1735,7 +1955,7 @@ fn finish_lif_population(
 /// [`NirUnits::Simulation`], and nothing in native units. `None` when
 /// the node carries no mark; any other value is refused. The rest of
 /// `metadata` is skipped, whatever its shape.
-fn read_units_mark(r: &mut Reader<'_>) -> Result<Option<NirUnits>, NirError<'static>> {
+fn read_units_mark(r: &mut Reader<'_>) -> Result<Option<NirUnits>, NirError> {
     let mut mark = None;
     if r.peek() != Some(b'{') {
         r.skip_value(0)?;
@@ -1769,6 +1989,19 @@ fn read_units_mark(r: &mut Reader<'_>) -> Result<Option<NirUnits>, NirError<'sta
     Ok(mark)
 }
 
+/// An Input's or an Output's shape, once the walk has refused one past 4
+/// dims: absent, a missing field; given and empty, a bad shape, as
+/// `NirBuilder` refuses one.
+fn carrier_shape(given: bool, len: usize) -> Result<(), NirError> {
+    if !given {
+        return Err(NirError::MissingField("shape"));
+    }
+    if len == 0 {
+        return Err(NirError::BadShape("shape"));
+    }
+    Ok(())
+}
+
 // 106 lines once rustfmt reflows the call sites (2026-09-02); the body
 // did not grow, the line count did
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
@@ -1781,7 +2014,7 @@ fn import_node<'a>(
     weight_fill: &mut usize,
     lif_fill: &mut usize,
     report: &mut NirReport,
-) -> Result<(), NirError<'a>> {
+) -> Result<(), NirError> {
     let idx = *node_count;
     bufs.nodes[idx] = NirNode {
         name,
@@ -1795,6 +2028,8 @@ fn import_node<'a>(
     let mut kind: Option<&str> = None;
     let mut shape = [0u32; 4];
     let mut shape_len = 0usize;
+    // given and empty is a bad shape, absent a missing field
+    let mut shape_given = false;
     // LIF params stage contiguously into scratch (per-node `fill`,
     // freed after quantization); ranges are (start, len) pairs.
     let mut staged = 0usize;
@@ -1812,6 +2047,7 @@ fn import_node<'a>(
         match key {
             "type" => kind = Some(r.read_string()?),
             "shape" => {
+                shape_given = true;
                 let mut sfirst = true;
                 while r.array_step(&mut sfirst)? {
                     if shape_len >= 4 {
@@ -1869,22 +2105,19 @@ fn import_node<'a>(
     // the kind before the keys, so a kind outside the subset is refused
     // by name whatever keys it carries; the keys before any staged value
     // is used, since a stray `weight` stages over a LIF's fields
-    let (node_kind, own) = kind_fields(kind).ok_or(NirError::UnsupportedNodeKind(kind))?;
+    let (node_kind, own) =
+        kind_fields(kind).ok_or_else(|| NirError::UnsupportedNodeKind(NirName::new(kind)))?;
     keys.check(name, own)?;
     bufs.nodes[idx].shape = shape;
     bufs.nodes[idx].shape_len = shape_len;
     bufs.nodes[idx].kind = match node_kind {
         NirNodeKind::Input => {
-            if shape_len == 0 {
-                return Err(NirError::MissingField("shape"));
-            }
+            carrier_shape(shape_given, shape_len)?;
             report.inputs += 1;
             NirNodeKind::Input
         }
         NirNodeKind::Output => {
-            if shape_len == 0 {
-                return Err(NirError::MissingField("shape"));
-            }
+            carrier_shape(shape_given, shape_len)?;
             report.outputs += 1;
             NirNodeKind::Output
         }
@@ -1924,7 +2157,7 @@ fn import_weight(
     r: &mut Reader<'_>,
     bufs: &mut NirBuffers<'_, '_>,
     offset: usize,
-) -> Result<NirLinear, NirError<'static>> {
+) -> Result<NirLinear, NirError> {
     let mut rows = 0usize;
     let mut cols: Option<usize> = None;
     let mut staged = 0usize; // f64 slots written to scratch
@@ -1974,7 +2207,7 @@ struct ByteWriter<'a> {
 }
 
 impl ByteWriter<'_> {
-    fn push(&mut self, b: u8) -> Result<(), NirError<'static>> {
+    fn push(&mut self, b: u8) -> Result<(), NirError> {
         if self.len >= self.out.len() {
             return Err(NirError::ExportTooSmall);
         }
@@ -1982,7 +2215,7 @@ impl ByteWriter<'_> {
         self.len += 1;
         Ok(())
     }
-    fn push_str(&mut self, s: &str) -> Result<(), NirError<'static>> {
+    fn push_str(&mut self, s: &str) -> Result<(), NirError> {
         for &b in s.as_bytes() {
             self.push(b)?;
         }
@@ -1999,14 +2232,14 @@ impl core::fmt::Write for ByteWriter<'_> {
 /// Render one f64 canonically: Rust's `Display` (shortest round-trip
 /// — deterministic across platforms and releases) — parses back
 /// bit-exactly with the same correctly-rounded reader.
-fn write_f64(w: &mut ByteWriter<'_>, v: f64) -> Result<(), NirError<'static>> {
+fn write_f64(w: &mut ByteWriter<'_>, v: f64) -> Result<(), NirError> {
     if !v.is_finite() {
         return Err(NirError::BadNumber("export value"));
     }
     write!(w, "{v}").map_err(|_| NirError::ExportTooSmall)
 }
 
-fn write_u32(w: &mut ByteWriter<'_>, v: u32) -> Result<(), NirError<'static>> {
+fn write_u32(w: &mut ByteWriter<'_>, v: u32) -> Result<(), NirError> {
     write!(w, "{v}").map_err(|_| NirError::ExportTooSmall)
 }
 
@@ -2033,17 +2266,17 @@ fn name_is_writable(s: &str) -> bool {
 /// [`NirError::NonAsciiNodeName`] when a node name cannot be written
 /// escape-free (the builder accepts any `&str`; the container
 /// cannot).
-pub fn nir_export<'a>(
-    nodes: &[NirNode<'a>],
+pub fn nir_export(
+    nodes: &[NirNode<'_>],
     edges: &[(u32, u32)],
     weights: &[i16],
     lifs: &[NirLif],
     opts: NirImportOptions,
     out: &mut [u8],
-) -> Result<usize, NirError<'a>> {
+) -> Result<usize, NirError> {
     for node in nodes {
         if !name_is_writable(node.name) {
-            return Err(NirError::NonAsciiNodeName(node.name));
+            return Err(NirError::NonAsciiNodeName(NirName::new(node.name)));
         }
     }
     let mut w = ByteWriter { out, len: 0 };
@@ -2094,7 +2327,7 @@ fn export_node(
     weights: &[i16],
     lifs: &[NirLif],
     opts: NirImportOptions,
-) -> Result<(), NirError<'static>> {
+) -> Result<(), NirError> {
     let scale = opts.resolution.scale();
     let to_v = |q: i16| f64::from(q) / (1000.0 * f64::from(scale));
     match node.kind {
@@ -2328,8 +2561,8 @@ mod std_assembly {
     use std::collections::{BTreeMap, BTreeSet};
 
     use super::{
-        NirError, NirImportOptions, NirLif, NirLifParams, NirLifPopulation, NirLinear, NirNode,
-        NirNodeKind, NirUnits, NIR_REF_SHA, SIM_CURRENT_QUANTA,
+        NirError, NirImportOptions, NirLif, NirLifParams, NirLifPopulation, NirLinear, NirName,
+        NirNode, NirNodeKind, NirUnits, NIR_REF_SHA, SIM_CURRENT_QUANTA,
     };
     use crate::lif_neuron::{LIFNeuron, NeuronType, VoltageResolution};
     use crate::network::SpikingNeuralNetwork;
@@ -2530,11 +2763,11 @@ mod std_assembly {
         /// `build_network` must produce the same neurons, the same
         /// encoder output, and the same 100-step spike raster — the
         /// general path subsumes the chain, proven bit-exact. On both
-        /// grids, so each builder's is read: the default options' mV and
-        /// the centi-mV one.
+        /// grids, so each builder's is read: the mV one and the centi-mV
+        /// one.
         #[test]
         fn chain_equivalence_both_builders_bit_exact() {
-            chain_equivalence(NirImportOptions::default());
+            chain_equivalence(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
             chain_equivalence(centi());
         }
 
@@ -2588,7 +2821,11 @@ mod std_assembly {
         /// l1·l2, two stages, D6 note) + every population fires.
         #[test]
         fn branch_assembles_fuses_and_fires() {
-            let g = NirImport::from_json(BRANCH, NirImportOptions::default()).expect("imports");
+            let g = NirImport::from_json(
+                BRANCH,
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+            )
+            .expect("imports");
             let (mut net, enc, rep) = g.build_network().expect("assembles");
             assert_eq!(rep.neurons, 4);
             assert_eq!(rep.synapses, 0);
@@ -2646,7 +2883,11 @@ mod std_assembly {
         /// step 14; n2: g/10 decay, −48≥−50, step 1).
         #[test]
         fn branch_first_spike_pins_match_the_gate() {
-            let g = NirImport::from_json(BRANCH, NirImportOptions::default()).unwrap();
+            let g = NirImport::from_json(
+                BRANCH,
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+            )
+            .unwrap();
             let (mut net, enc, _) = g.build_network().unwrap();
             let mut firsts = vec![usize::MAX; 4];
             for t in 0..100 {
@@ -2926,7 +3167,7 @@ mod std_assembly {
         // 107 lines once rustfmt reflows the table rows (2026-09-02)
         #[allow(clippy::type_complexity, clippy::too_many_lines)]
         fn named_rejections_reference_fixtures() {
-            let cases: Vec<(&str, &[u8], fn(&NirError<'_>) -> bool)> = vec![
+            let cases: Vec<(&str, &[u8], fn(&NirError) -> bool)> = vec![
                 (
                     "pass-through",
                     include_bytes!("../tests/nir_fixtures/neg_asm_passthrough.json"),
@@ -2996,10 +3237,8 @@ mod std_assembly {
                     |e| {
                         matches!(
                             e,
-                            NirError::EdgeShapeMismatch {
-                                src: "input",
-                                dst: "l1"
-                            }
+                            NirError::EdgeShapeMismatch { src, dst }
+                                if src == "input" && dst == "l1"
                         )
                     },
                 ),
@@ -3021,7 +3260,8 @@ mod std_assembly {
             ];
             for (label, doc, check) in cases {
                 let opts = if label.starts_with("recurrent") {
-                    NirImportOptions::default() // mV — the rejected request
+                    // mV, the rejected request
+                    NirImportOptions::new(1_000, VoltageResolution::Millivolt)
                 } else {
                     centi()
                 };
@@ -3042,7 +3282,7 @@ mod std_assembly {
         #[allow(clippy::too_many_lines)] // four independent scenarios, one table
         fn named_rejections_builder_only() {
             // Output as edge source
-            let mut b = NirBuilder::new(NirImportOptions::default());
+            let mut b = NirBuilder::new(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
             let inp = b.add_input("input", &[1]).unwrap();
             let lin = b.add_linear("l", &[0.5], 1, 1).unwrap();
             let lif = b
@@ -3071,7 +3311,7 @@ mod std_assembly {
             ));
 
             // Linear-only cycle: no feedforward evaluation order
-            let mut b = NirBuilder::new(NirImportOptions::default());
+            let mut b = NirBuilder::new(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
             let inp = b.add_input("input", &[1]).unwrap();
             let lin1 = b.add_linear("l1", &[1.0], 1, 1).unwrap();
             let lin2 = b.add_linear("l2", &[1.0], 1, 1).unwrap();
@@ -3103,7 +3343,7 @@ mod std_assembly {
             ));
 
             // dead Input: no edge leaves it
-            let mut b = NirBuilder::new(NirImportOptions::default());
+            let mut b = NirBuilder::new(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
             b.add_input("input", &[1]).unwrap();
             let lif = b
                 .add_lif_population(
@@ -3130,7 +3370,7 @@ mod std_assembly {
 
             // D7: total neurons past u16::MAX is a loud BufferOverflow
             let pop_len = 33_000usize;
-            let mut b = NirBuilder::new(NirImportOptions::default());
+            let mut b = NirBuilder::new(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
             let inp = b.add_input("input", &[1]).unwrap();
             let la = b.add_linear("la", &vec![0.5; pop_len], pop_len, 1).unwrap();
             let lb = b.add_linear("lb", &vec![0.5; pop_len], pop_len, 1).unwrap();
@@ -3169,7 +3409,7 @@ mod std_assembly {
         /// the drive window (silence documented, never silent).
         #[test]
         fn undriven_population_notes_and_stays_silent() {
-            let mut b = NirBuilder::new(NirImportOptions::default());
+            let mut b = NirBuilder::new(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
             let inp = b.add_input("input", &[1]).unwrap();
             let lin = b.add_linear("l", &[0.5], 1, 1).unwrap();
             let lif_a = b
@@ -3387,7 +3627,10 @@ mod std_assembly {
         #[test]
         fn native_options_refuse_both_witnesses_by_their_units() {
             for (label, doc) in [("snntorch", SNNTORCH), ("two_lif", TWO_LIF)] {
-                for opts in [NirImportOptions::default(), centi()] {
+                for opts in [
+                    NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+                    centi(),
+                ] {
                     let err = NirImport::from_json(doc, opts)
                         .map(|_| ())
                         .expect_err("a file in simulation units");
@@ -3431,10 +3674,10 @@ mod std_assembly {
             assert_eq!(
                 err.to_string(),
                 "the file is in native units and the options read simulation units — import it \
-                 with NirImportOptions::default(), or a graph with a spike edge with \
-                 NirImportOptions { resolution: VoltageResolution::CentiMillivolt, \
-                 ..NirImportOptions::default() }; a neuralos-nir2json --sim-units file written \
-                 before the units mark has none: convert its .nir again"
+                 with NirImportOptions::new(dt_us, VoltageResolution::Millivolt), or a graph \
+                 with a spike edge with NirImportOptions::new(dt_us, \
+                 VoltageResolution::CentiMillivolt); a neuralos-nir2json --sim-units file \
+                 written before the units mark has none: convert its .nir again"
             );
         }
 
@@ -3447,7 +3690,7 @@ mod std_assembly {
                 .replace("\"units\":\"simulation\"", "\"units\":\"native\"");
             for opts in [
                 NirImportOptions::sim_units(100),
-                NirImportOptions::default(),
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt),
             ] {
                 assert_eq!(
                     NirImport::from_json(doc.as_bytes(), opts).map(|_| ()),
@@ -3473,7 +3716,8 @@ mod std_assembly {
         /// carries no units mark, so the grid rule is what it meets.
         #[test]
         fn the_mv_grid_rejects_a_spiking_linear_edge_by_name() {
-            let mut bld = NirBuilder::new(NirImportOptions::default());
+            let mut bld =
+                NirBuilder::new(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
             let inp = bld.add_input("input", &[1]).expect("input");
             let l0 = bld.add_linear("l0", &[1.0], 1, 1).expect("linear");
             let pre = lif(&mut bld, "a", 1);
@@ -3495,16 +3739,24 @@ mod std_assembly {
             );
         }
 
-        /// A graph with a spiking Linear edge or a LIF→LIF edge on the
-        /// default mV options is refused with one of these remedies, and
+        /// A graph with a spiking Linear edge or a LIF→LIF edge on mV
+        /// options is refused with one of these remedies, and
         /// each names the options a graph in simulation units needs: a
         /// builder's graph carries no units mark, and neither does a file
-        /// the converter wrote before the mark.
+        /// the converter wrote before the mark. Each names the native
+        /// options on the centi-mV grid by `new`, a call: a struct literal
+        /// of the options does not compile outside this crate.
         #[test]
-        fn the_mv_remedies_name_the_simulation_units_options() {
+        fn the_mv_remedies_name_the_options_each_graph_needs() {
             for remedy in [SPIKING_LINEAR_MV_REMEDY, RECURRENT_MV_REMEDY] {
                 assert!(
                     remedy.contains("NirImportOptions::sim_units(dt_us)"),
+                    "{remedy}"
+                );
+                assert!(
+                    remedy.contains(
+                        "NirImportOptions::new(dt_us, VoltageResolution::CentiMillivolt)"
+                    ),
                     "{remedy}"
                 );
             }
@@ -3703,8 +3955,11 @@ mod std_assembly {
     }
 
     /// An imported graph in owned buffers (std convenience over the
-    /// two-pass buffer API).
+    /// two-pass buffer API). Not exhaustive: a field may come in a minor
+    /// release, so outside this crate a graph comes from
+    /// [`from_json`](Self::from_json) or [`NirBuilder::build`].
     #[derive(Debug)]
+    #[non_exhaustive]
     pub struct NirImport<'a> {
         /// Nodes in document order.
         pub nodes: Vec<NirNode<'a>>,
@@ -3727,10 +3982,7 @@ mod std_assembly {
         /// # Errors
         ///
         /// Every [`NirError`] the buffer import can raise.
-        pub fn from_json(
-            json: &[u8],
-            opts: NirImportOptions,
-        ) -> Result<NirImport<'_>, NirError<'_>> {
+        pub fn from_json(json: &[u8], opts: NirImportOptions) -> Result<NirImport<'_>, NirError> {
             let scan = super::nir_scan(json)?;
             let mut nodes: Vec<NirNode<'_>> = vec![
                 NirNode {
@@ -3783,7 +4035,7 @@ mod std_assembly {
         #[allow(clippy::missing_panics_doc)] // no panics — flagged for the unwrap on .first()
         pub fn build_chain_network(
             &self,
-        ) -> Result<(SpikingNeuralNetwork, ChainEncoder<'_>), NirError<'_>> {
+        ) -> Result<(SpikingNeuralNetwork, ChainEncoder<'_>), NirError> {
             match self.opts.units {
                 NirUnits::Native => {}
                 NirUnits::Simulation => return Err(NirError::UnsupportedUnits),
@@ -3886,8 +4138,8 @@ mod std_assembly {
         /// assembles only on centi-mV options — mV options reject by
         /// name with the re-import remedy (D1: a 20 pA pulse is dead
         /// 10× over on the mV grid; D8 extends the rule). Feed-forward
-        /// imports without a spike edge keep the historical mV default
-        /// — the frozen chain pins.
+        /// imports without a spike edge assemble on mV options too, as
+        /// the frozen chain pins do.
         ///
         /// # Errors
         ///
@@ -3909,7 +4161,7 @@ mod std_assembly {
         /// panics on the node bounds.
         pub fn build_network(
             &self,
-        ) -> Result<(SpikingNeuralNetwork, NirGraphEncoder, NirAssemblyReport<'_>), NirError<'_>>
+        ) -> Result<(SpikingNeuralNetwork, NirGraphEncoder, NirAssemblyReport<'_>), NirError>
         {
             self.validate_graph()?;
 
@@ -4040,7 +4292,7 @@ mod std_assembly {
         // the 100-line cap is crossed by the edge tables alone
         // (nir_import's precedent allow)
         #[allow(clippy::too_many_lines)]
-        fn validate_graph(&self) -> Result<(), NirError<'_>> {
+        fn validate_graph(&self) -> Result<(), NirError> {
             let nodes = &self.nodes;
             if nodes.is_empty() {
                 return Err(NirError::UnsupportedTopology("empty graph"));
@@ -4118,8 +4370,8 @@ mod std_assembly {
                 };
                 if !ok {
                     return Err(NirError::EdgeShapeMismatch {
-                        src: na.name,
-                        dst: nb.name,
+                        src: NirName::new(na.name),
+                        dst: NirName::new(nb.name),
                     });
                 }
             }
@@ -4175,7 +4427,7 @@ mod std_assembly {
         /// edges (iterative DFS — a hostile 10k-deep chain must not
         /// overflow the stack). A cycle is a named rejection: no
         /// feedforward evaluation order exists.
-        fn linear_order(&self) -> Result<Vec<usize>, NirError<'_>> {
+        fn linear_order(&self) -> Result<Vec<usize>, NirError> {
             let n = self.nodes.len();
             // Linear-child adjacency (index -> Linear children)
             let mut children: Vec<Vec<usize>> = vec![Vec::new(); n];
@@ -4250,7 +4502,7 @@ mod std_assembly {
             inputs: &[usize],
             order: &[usize],
             pop_base: &BTreeMap<usize, usize>,
-        ) -> Result<EncoderPlan<'_>, NirError<'_>> {
+        ) -> Result<EncoderPlan<'_>, NirError> {
             let n_nodes = self.nodes.len();
             let mut incoming: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
             let mut lif_children: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
@@ -4550,6 +4802,9 @@ mod std_assembly {
     /// input can pass 32.767 units (raw pixels, 0 to 255, say); the
     /// current a neuron takes from a stage in one step still saturates
     /// at ±32,767 quanta.
+    ///
+    /// Exhaustive on purpose: `Thousandths(n)` is how a caller writes one,
+    /// and a second field would be a breaking release.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
     pub struct Thousandths(pub i32);
 
@@ -4649,8 +4904,11 @@ mod std_assembly {
 
     /// A fused encoder stage (D2): the composed Linear chain
     /// (root-first, target last) with each component tensor's
-    /// quantization scale.
+    /// quantization scale. The assembly builds it and a caller reads it.
+    /// Not exhaustive: a field may come in a minor release, so a pattern
+    /// needs `..`.
     #[derive(Debug, Clone, PartialEq)]
+    #[non_exhaustive]
     pub struct LinearFusedRecord<'a> {
         /// The composed nodes' names, root first, target last.
         pub chain: Vec<&'a str>,
@@ -4658,8 +4916,10 @@ mod std_assembly {
         pub scales: Vec<f64>,
     }
 
-    /// The loud assembly report.
+    /// The loud assembly report. The assembly builds it and a caller
+    /// reads it. Not exhaustive: a field may come in a minor release.
     #[derive(Debug, Clone, PartialEq)]
+    #[non_exhaustive]
     pub struct NirAssemblyReport<'a> {
         /// Total neurons (all populations).
         pub neurons: usize,
@@ -4697,16 +4957,14 @@ mod std_assembly {
     const RECURRENT_MV_REMEDY: &str = "recurrent graph on mV: pulses fall in the ~200 pA dead \
      zone — re-import a neuralos-nir2json --sim-units file with \
      NirImportOptions::sim_units(dt_us), a graph in native units with \
-     NirImportOptions { resolution: VoltageResolution::CentiMillivolt, \
-     ..NirImportOptions::default() }";
+     NirImportOptions::new(dt_us, VoltageResolution::CentiMillivolt)";
 
     /// The named mV-on-spiking-Linear rejection (D8 extends D1's grid
     /// rule), remedy verbatim and copy-pasteable.
     const SPIKING_LINEAR_MV_REMEDY: &str = "spiking Linear edge (LIF->Linear->LIF) on mV: D8 \
      assembles on the centi-mV grid only, as LIF->LIF does — re-import a \
      neuralos-nir2json --sim-units file with NirImportOptions::sim_units(dt_us), a graph in \
-     native units with NirImportOptions { resolution: VoltageResolution::CentiMillivolt, \
-     ..NirImportOptions::default() }";
+     native units with NirImportOptions::new(dt_us, VoltageResolution::CentiMillivolt)";
 
     #[cfg(test)]
     mod sim_units_tests {
@@ -5045,7 +5303,7 @@ mod std_assembly {
     /// `round(w · SIM_CURRENT_QUANTA · per)`, where `per` is 1 into a
     /// drive stage and 10 for a spiking Linear edge's std weight (the
     /// assembly's divisor 10). Refused past ±32,767.
-    fn sim_quanta(w: f64, per: i16) -> Result<i16, NirError<'static>> {
+    fn sim_quanta(w: f64, per: i16) -> Result<i16, NirError> {
         let q = super::round_half_away(w * f64::from(SIM_CURRENT_QUANTA) * f64::from(per));
         if (-f64::from(i16::MAX)..=f64::from(i16::MAX)).contains(&q) {
             Ok(q as i16)
@@ -5160,9 +5418,8 @@ mod std_assembly {
         /// # Errors
         ///
         /// [`NirError::BadShape("shape")`](NirError::BadShape) outside 1–4
-        /// dims; the reader refuses an empty shape too, as
-        /// [`NirError::MissingField("shape")`](NirError::MissingField).
-        pub fn add_input(&mut self, name: &'a str, shape: &[u32]) -> Result<usize, NirError<'a>> {
+        /// dims, as the reader refuses a shape given empty or past 4.
+        pub fn add_input(&mut self, name: &'a str, shape: &[u32]) -> Result<usize, NirError> {
             self.push_carrier(name, NirNodeKind::Input, shape)
         }
 
@@ -5171,9 +5428,8 @@ mod std_assembly {
         /// # Errors
         ///
         /// [`NirError::BadShape("shape")`](NirError::BadShape) outside 1–4
-        /// dims; the reader refuses an empty shape too, as
-        /// [`NirError::MissingField("shape")`](NirError::MissingField).
-        pub fn add_output(&mut self, name: &'a str, shape: &[u32]) -> Result<usize, NirError<'a>> {
+        /// dims, as the reader refuses a shape given empty or past 4.
+        pub fn add_output(&mut self, name: &'a str, shape: &[u32]) -> Result<usize, NirError> {
             self.push_carrier(name, NirNodeKind::Output, shape)
         }
 
@@ -5195,7 +5451,7 @@ mod std_assembly {
             &mut self,
             name: &'a str,
             params: &NirLifParams<'_>,
-        ) -> Result<usize, NirError<'a>> {
+        ) -> Result<usize, NirError> {
             let n = params.tau_s.len();
             if n == 0
                 || params.r_ohm.len() != n
@@ -5249,7 +5505,7 @@ mod std_assembly {
             values: &[f64],
             rows: usize,
             cols: usize,
-        ) -> Result<usize, NirError<'a>> {
+        ) -> Result<usize, NirError> {
             // Quantize into scratch FIRST: any failure must leave
             // the builder untouched (no zombie node, no zero tail
             // on the weights arena).
@@ -5271,7 +5527,7 @@ mod std_assembly {
         ///
         /// [`NirError::BadShape("edges")`](NirError::BadShape) when an index names no
         /// node (the builder twin of import's endpoint resolution).
-        pub fn add_edge(&mut self, from: usize, to: usize) -> Result<(), NirError<'a>> {
+        pub fn add_edge(&mut self, from: usize, to: usize) -> Result<(), NirError> {
             let end = self.nodes.len();
             if from >= end || to >= end {
                 return Err(NirError::BadShape("edges"));
@@ -5287,7 +5543,7 @@ mod std_assembly {
         /// # Errors
         ///
         /// [`NirError::DuplicateNodeName`], [`NirError::DuplicateEdge`].
-        pub fn build(self) -> Result<NirImport<'a>, NirError<'a>> {
+        pub fn build(self) -> Result<NirImport<'a>, NirError> {
             for i in 0..self.nodes.len() {
                 for j in (i + 1)..self.nodes.len() {
                     if self.nodes[i].name == self.nodes[j].name {
@@ -5320,7 +5576,7 @@ mod std_assembly {
             name: &'a str,
             kind: NirNodeKind,
             shape: &[u32],
-        ) -> Result<usize, NirError<'a>> {
+        ) -> Result<usize, NirError> {
             if shape.is_empty() {
                 return Err(NirError::BadShape("shape"));
             }
@@ -5332,7 +5588,7 @@ mod std_assembly {
             name: &'a str,
             kind: NirNodeKind,
             shape: &[u32],
-        ) -> Result<usize, NirError<'a>> {
+        ) -> Result<usize, NirError> {
             if shape.len() > 4 {
                 return Err(NirError::BadShape("shape"));
             }
@@ -5393,6 +5649,43 @@ mod tests {
         ));
     }
 
+    /// Each blank equals the literal its sites wrote: a node arena's slot
+    /// (the import's, `nir_format_gate`'s, the fixtures' three), leg A's
+    /// Linear sentinel but its NaN, and a lifs buffer's
+    /// `NirLif::default()`; a population view, which no site wrote, is
+    /// zeros.
+    #[test]
+    fn each_blank_is_what_its_sites_wrote() {
+        assert_eq!(
+            NirNode::BLANK,
+            NirNode {
+                name: "",
+                kind: NirNodeKind::Input,
+                shape: [0; 4],
+                shape_len: 0,
+                lif: None,
+                linear: None,
+            }
+        );
+        assert_eq!(
+            NirLinear::BLANK,
+            NirLinear {
+                rows: 0,
+                cols: 0,
+                weight_offset: 0,
+                scale: 0.0,
+                absmax: 0.0,
+                max_abs_err: 0.0,
+                zero_tensor: false,
+            }
+        );
+        assert_eq!(NirLif::BLANK, NirLif::default());
+        assert_eq!(
+            NirLifPopulation::BLANK,
+            NirLifPopulation { offset: 0, len: 0 }
+        );
+    }
+
     #[allow(clippy::type_complexity)]
     fn import_chain(
         opts: NirImportOptions,
@@ -5429,7 +5722,7 @@ mod tests {
             Vec<NirLif>,
             NirReport,
         ),
-        NirError<'_>,
+        NirError,
     > {
         let scan = nir_scan(CHAIN.as_bytes()).unwrap();
         let mut nodes = vec![
@@ -5460,7 +5753,8 @@ mod tests {
 
     #[test]
     fn import_quantizes_the_chain() {
-        let (nodes, edges, weights, lifs, report) = import_chain(NirImportOptions::default());
+        let (nodes, edges, weights, lifs, report) =
+            import_chain(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
         assert_eq!(
             edges,
             vec![(0, 1), (1, 2), (2, 3)],
@@ -5543,10 +5837,7 @@ mod tests {
     #[allow(clippy::too_many_lines)]
     fn lif_hard_failures() {
         // tau < dt: the whole import must fail loudly
-        let opts = NirImportOptions {
-            dt_us: 30_000,
-            ..NirImportOptions::default()
-        };
+        let opts = NirImportOptions::new(30_000, VoltageResolution::Millivolt);
         let scan = nir_scan(CHAIN.as_bytes()).unwrap();
         let mut nodes = vec![
             NirNode {
@@ -5583,7 +5874,7 @@ mod tests {
                 -0.055,
                 -0.08,
                 false,
-                NirImportOptions::default()
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt)
             ),
             Err(NirError::BadNumber("tau"))
         ));
@@ -5595,7 +5886,7 @@ mod tests {
                 -0.055,
                 -0.08,
                 false,
-                NirImportOptions::default()
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt)
             ),
             Err(NirError::BadNumber("tau"))
         ));
@@ -5607,7 +5898,7 @@ mod tests {
                 -0.055,
                 -0.08,
                 false,
-                NirImportOptions::default()
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt)
             ),
             Err(NirError::BadNumber("r"))
         ));
@@ -5619,7 +5910,7 @@ mod tests {
                 -0.0004,
                 -0.08,
                 false,
-                NirImportOptions::default()
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt)
             ),
             Err(NirError::ThresholdZero)
         ));
@@ -5643,7 +5934,7 @@ mod tests {
                 0.06,
                 -0.08,
                 false,
-                NirImportOptions::default()
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt)
             ),
             Err(NirError::PotentialOutOfRange("v_threshold"))
         ));
@@ -5685,8 +5976,12 @@ mod tests {
             scratch: &mut scratch,
         };
         assert_eq!(
-            nir_import(doc.as_bytes(), NirImportOptions::default(), &mut bufs),
-            Err(NirError::UnsupportedNodeKind("Affine"))
+            nir_import(
+                doc.as_bytes(),
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+                &mut bufs
+            ),
+            Err(NirError::UnsupportedNodeKind(NirName::new("Affine")))
         );
     }
 
@@ -5715,7 +6010,12 @@ mod tests {
             lifs: &mut lifs,
             scratch: &mut scratch,
         };
-        nir_import(doc.as_bytes(), NirImportOptions::default(), &mut bufs).expect("resolves");
+        nir_import(
+            doc.as_bytes(),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+            &mut bufs,
+        )
+        .expect("resolves");
         assert_eq!(edges[0], (0, 1));
     }
 
@@ -5731,7 +6031,7 @@ mod tests {
             (
                 "unknown endpoint",
                 mk("{\"a\":{\"type\":\"Input\",\"shape\":[1]}}", "[[\"a\",\"zz\"]]"),
-                |e| matches!(e, NirError::UnknownEdgeEndpoint("zz")),
+                |e| matches!(e, NirError::UnknownEdgeEndpoint(n) if n == "zz"),
             ),
             (
                 "duplicate edge",
@@ -5791,8 +6091,12 @@ mod tests {
                 lifs: &mut lifs,
                 scratch: &mut scratch,
             };
-            let err = nir_import(doc.as_bytes(), NirImportOptions::default(), &mut bufs)
-                .expect_err(label);
+            let err = nir_import(
+                doc.as_bytes(),
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+                &mut bufs,
+            )
+            .expect_err(label);
             assert!(check(&err), "{label}: got {err:?}");
         }
     }
@@ -5820,7 +6124,11 @@ mod tests {
             scratch: &mut scratch,
         };
         assert_eq!(
-            nir_import(CHAIN.as_bytes(), NirImportOptions::default(), &mut bufs),
+            nir_import(
+                CHAIN.as_bytes(),
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+                &mut bufs
+            ),
             Err(NirError::BufferOverflow)
         );
         // arena too small: staging completes (scratch fits the 6
@@ -5845,7 +6153,11 @@ mod tests {
             scratch: &mut scratch,
         };
         assert_eq!(
-            nir_import(CHAIN.as_bytes(), NirImportOptions::default(), &mut bufs),
+            nir_import(
+                CHAIN.as_bytes(),
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+                &mut bufs
+            ),
             Err(NirError::BufferOverflow)
         );
         // scratch too small: the staging loop refuses mid-tensor
@@ -5869,14 +6181,18 @@ mod tests {
             scratch: &mut scratch,
         };
         assert_eq!(
-            nir_import(CHAIN.as_bytes(), NirImportOptions::default(), &mut bufs),
+            nir_import(
+                CHAIN.as_bytes(),
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+                &mut bufs
+            ),
             Err(NirError::BufferOverflow)
         );
     }
 
     #[test]
     fn export_then_import_is_idempotent() {
-        let opts = NirImportOptions::default();
+        let opts = NirImportOptions::new(1_000, VoltageResolution::Millivolt);
         let (nodes, edges, weights, lifs, _report) = import_chain(opts);
 
         let mut out = [0u8; 2048];
@@ -5946,7 +6262,7 @@ mod tests {
     /// is 1 MΩ on the substrate: 10,000 pF, not the source's 20,000).
     #[test]
     fn capacitance_is_the_substrates_own_tau_over_r() {
-        let opts = NirImportOptions::default();
+        let opts = NirImportOptions::new(1_000, VoltageResolution::Millivolt);
         let doc = CHAIN.replacen(
             "\"tau\":[0.02,0.02],\"r\":[100000000.0,100000000.0]",
             "\"tau\":[0.0100006,0.01],\"r\":[2000000.0,500000.0]",
@@ -5966,7 +6282,7 @@ mod tests {
     /// `doc` through `nir_import` alone, into buffers wide enough for
     /// every variant of CHAIN below, so the refusal shown is the
     /// import's own.
-    fn import_alone(doc: &str) -> Result<(), NirError<'_>> {
+    fn import_alone(doc: &str) -> Result<(), NirError> {
         let mut nodes = [NirNode {
             name: "",
             kind: NirNodeKind::Input,
@@ -5986,7 +6302,12 @@ mod tests {
             lifs: &mut lifs,
             scratch: &mut scratch,
         };
-        nir_import(doc.as_bytes(), NirImportOptions::default(), &mut bufs).map(|_| ())
+        nir_import(
+            doc.as_bytes(),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+            &mut bufs,
+        )
+        .map(|_| ())
     }
 
     /// A key its object does not carry, or one given twice, is refused
@@ -6012,16 +6333,16 @@ mod tests {
             assert_ne!(doc, CHAIN, "CHAIN holds {old}");
             doc
         };
-        let out = |node: Option<&'static str>, field: &'static str| NirError::UnexpectedField {
-            node,
-            field,
+        let out = |node: Option<&str>, field: &str| NirError::UnexpectedField {
+            node: node.map(NirName::new),
+            field: NirName::new(field),
         };
-        let twice = |node: Option<&'static str>, field: &'static str| NirError::DuplicateField {
-            node,
-            field,
+        let twice = |node: Option<&str>, field: &str| NirError::DuplicateField {
+            node: node.map(NirName::new),
+            field: NirName::new(field),
         };
         let lif_end = "\"v_reset\":[-0.08,-0.08]}";
-        let cases: Vec<(&str, String, NirError<'static>, Option<NirError<'static>>)> = vec![
+        let cases: Vec<(&str, String, NirError, Option<NirError>)> = vec![
             (
                 "a LIF's tau on an Input",
                 on("input", "\"tau\":[0.02]"),
@@ -6183,8 +6504,20 @@ mod tests {
     /// or, when no node holds it, the graph object and the document.
     #[test]
     fn the_key_errors_name_the_node_and_the_key() {
-        let out = |node, field| NirError::UnexpectedField { node, field }.to_string();
-        let twice = |node, field| NirError::DuplicateField { node, field }.to_string();
+        let out = |node: Option<&str>, field: &str| {
+            NirError::UnexpectedField {
+                node: node.map(NirName::new),
+                field: NirName::new(field),
+            }
+            .to_string()
+        };
+        let twice = |node: Option<&str>, field: &str| {
+            NirError::DuplicateField {
+                node: node.map(NirName::new),
+                field: NirName::new(field),
+            }
+            .to_string()
+        };
         assert_eq!(
             out(Some("lif"), "v_rest"),
             "node 'lif' carries 'v_rest', a key its kind does not have"
@@ -6200,9 +6533,150 @@ mod tests {
         );
     }
 
+    /// 32 bytes are kept whole and a 33rd cuts the name: the cut is
+    /// marked, `Display` and `Debug` end it with "…", and the cut name
+    /// equals no `&str`, neither the name nor the bytes it kept.
+    #[test]
+    fn a_name_keeps_32_bytes_and_cuts_the_33rd() {
+        let n32 = "abcdefghijklmnopqrstuvwxyz012345";
+        let n33 = "abcdefghijklmnopqrstuvwxyz0123456";
+        assert_eq!((n32.len(), n33.len()), (32, 33));
+        let whole = NirName::new(n32);
+        assert!(!whole.is_cut());
+        assert_eq!(whole.as_str(), n32);
+        assert_eq!(whole, n32);
+        assert_eq!(whole, *n32);
+        assert_eq!(whole.to_string(), n32);
+        assert_eq!(format!("{whole:?}"), format!("{n32:?}"));
+        let cut = NirName::new(n33);
+        assert!(cut.is_cut());
+        assert_eq!(cut.as_str(), n32);
+        assert_ne!(cut, n33);
+        assert_ne!(cut, n32);
+        assert_ne!(cut, *n32);
+        assert_eq!(cut.to_string(), format!("{n32}…"));
+        assert_eq!(format!("{cut:?}"), format!("{n32:?}…"));
+        assert_ne!(cut, whole, "the same bytes, one of them cut");
+        assert_eq!(NirName::new(""), "");
+    }
+
+    /// A name is cut at the last char boundary that fits: thirty bytes
+    /// of ASCII and a three-byte '€' pass 32, so the '€' goes whole and
+    /// thirty bytes stay; a two-byte 'é' in its place fits, and one byte
+    /// later it goes, thirty-one staying.
+    #[test]
+    fn a_name_is_cut_at_a_char_boundary() {
+        let a30 = "a".repeat(30);
+        let cut = NirName::new(&format!("{a30}€"));
+        assert!(cut.is_cut());
+        assert_eq!(cut.as_str(), a30);
+        assert_eq!(cut.to_string(), format!("{a30}…"));
+        let fits = format!("{a30}é");
+        assert_eq!(fits.len(), 32);
+        assert!(!NirName::new(&fits).is_cut());
+        assert_eq!(NirName::new(&fits), fits.as_str());
+        let a31 = "a".repeat(31);
+        let over = NirName::new(&format!("{a31}é"));
+        assert!(over.is_cut());
+        assert_eq!(over.as_str(), a31);
+    }
+
+    /// Each of the six names an error reports comes through its door as
+    /// the document or the builder wrote it, and `Display` prints it: a
+    /// node kind, a node and the key it carries or gives twice, the graph
+    /// object's key, an edge's endpoint, an edge's two ends at the
+    /// assembly, and a name the JSON container cannot write. Past 32
+    /// bytes a name comes through cut, at a char boundary. The error
+    /// outlives the document it reports on.
+    #[test]
+    fn each_name_an_error_reports_comes_through_its_door() {
+        let opts = NirImportOptions::new(1_000, VoltageResolution::Millivolt);
+        let refused = |doc: String| {
+            import_chain_variant(&doc, opts)
+                .map(|_| ())
+                .expect_err("refused")
+        };
+        let e = refused(CHAIN.replacen("\"type\":\"LIF\"", "\"type\":\"CubaLIF\"", 1));
+        assert!(
+            matches!(e, NirError::UnsupportedNodeKind(k) if k == "CubaLIF"),
+            "{e:?}"
+        );
+        assert!(e.to_string().contains("'CubaLIF'"), "{e}");
+        let e = refused(chain_with("\"v_rest\":[0.0,0.0]"));
+        assert!(
+            matches!(e, NirError::UnexpectedField { node: Some(n), field }
+                if n == "lif" && field == "v_rest"),
+            "{e:?}"
+        );
+        assert!(e.to_string().contains("node 'lif' carries 'v_rest'"), "{e}");
+        let e = refused(chain_with("\"tau\":[0.02,0.02]"));
+        assert!(
+            matches!(e, NirError::DuplicateField { node: Some(n), field }
+                if n == "lif" && field == "tau"),
+            "{e:?}"
+        );
+        assert!(
+            e.to_string().contains("node 'lif' gives 'tau' twice"),
+            "{e}"
+        );
+        let e = refused(CHAIN.replacen(
+            "\"type\":\"NIRGraph\",",
+            "\"type\":\"NIRGraph\",\"junk\":1,",
+            1,
+        ));
+        assert!(
+            matches!(e, NirError::UnexpectedField { node: None, field } if field == "junk"),
+            "{e:?}"
+        );
+        assert!(e.to_string().contains("'junk'"), "{e}");
+        let long = "model.encoder.block_3.spiking_layer.lif";
+        let e =
+            refused(CHAIN.replacen("[\"lif\",\"output\"]", &format!("[\"lif\",\"{long}\"]"), 1));
+        let NirError::UnknownEdgeEndpoint(n) = e else {
+            panic!("{e:?}")
+        };
+        assert!(n.is_cut());
+        assert_eq!(n.as_str(), &long[..32]);
+        assert!(
+            e.to_string().contains(&format!("'{}…'", &long[..32])),
+            "{e}"
+        );
+        let centi = NirImportOptions::new(1_000, VoltageResolution::CentiMillivolt);
+        let g = NirImport::from_json(
+            include_bytes!("../tests/nir_fixtures/neg_asm_shape_mismatch.json"),
+            centi,
+        )
+        .expect("imports");
+        let e = g.build_network().map(|_| ()).expect_err("refused");
+        assert!(
+            matches!(e, NirError::EdgeShapeMismatch { src, dst } if src == "input" && dst == "l1"),
+            "{e:?}"
+        );
+        assert!(e.to_string().contains("'input' -> 'l1'"), "{e}");
+        let name = "é".repeat(20);
+        let mut b = NirBuilder::new(opts);
+        // a writable node first: the error names the node it cannot write
+        b.add_input("in", &[1]).expect("input");
+        b.add_input(&name, &[1])
+            .expect("the builder takes any name");
+        let g = b.build().expect("builds");
+        let mut out = [0u8; 1024];
+        let e = nir_export(&g.nodes, &g.edges, &g.weights, &g.lifs, g.opts, &mut out)
+            .expect_err("the container cannot write it");
+        let NirError::NonAsciiNodeName(n) = e else {
+            panic!("{e:?}")
+        };
+        assert!(n.is_cut());
+        assert_eq!(n.as_str(), "é".repeat(16));
+        assert!(
+            e.to_string().contains(&format!("'{}…'", "é".repeat(16))),
+            "{e}"
+        );
+    }
+
     #[test]
     fn exported_json_is_valid_shape() {
-        let opts = NirImportOptions::default();
+        let opts = NirImportOptions::new(1_000, VoltageResolution::Millivolt);
         let (nodes, edges, weights, lifs, _) = import_chain(opts);
         let mut out = [0u8; 2048];
         let n = nir_export(&nodes, &edges, &weights, &lifs, opts, &mut out).unwrap();
@@ -6247,7 +6721,12 @@ mod tests {
             lifs: &mut lifs,
             scratch: &mut scratch,
         };
-        let rep = nir_import(doc.as_bytes(), NirImportOptions::default(), &mut bufs).unwrap();
+        let rep = nir_import(
+            doc.as_bytes(),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+            &mut bufs,
+        )
+        .unwrap();
         assert!(rep.notes(NirNote::ZeroWeightTensor) >= 1);
         assert_eq!(nodes[0].linear.unwrap().scale, 1.0);
 
@@ -6260,7 +6739,12 @@ mod tests {
             lifs: &mut lifs,
             scratch: &mut scratch,
         };
-        let rep2 = nir_import(doc2.as_bytes(), NirImportOptions::default(), &mut bufs2).unwrap();
+        let rep2 = nir_import(
+            doc2.as_bytes(),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+            &mut bufs2,
+        )
+        .unwrap();
         assert!(rep2.notes(NirNote::QuantizationLoss) >= 1);
     }
 
@@ -6289,7 +6773,12 @@ mod tests {
             lifs: &mut lifs,
             scratch: &mut scratch,
         };
-        let rep = nir_import(doc.as_bytes(), NirImportOptions::default(), &mut bufs).unwrap();
+        let rep = nir_import(
+            doc.as_bytes(),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+            &mut bufs,
+        )
+        .unwrap();
         assert!(rep.notes(NirNote::VResetDefaulted) >= 1);
         let pop = nodes[0].lif.unwrap();
         assert_eq!(pop.len, 1);
@@ -6343,7 +6832,7 @@ mod tests {
             nir_scan(junk.as_bytes()).map(|_| ()),
             Err(NirError::UnexpectedField {
                 node: None,
-                field: "junk"
+                field: NirName::new("junk")
             })
         );
     }
@@ -6360,8 +6849,8 @@ mod tests {
         // each field opens `levels` objects, then nests arrays around a
         // number: `n` containers in all
         let deep = NirError::UnexpectedField {
-            node: Some("lif"),
-            field: "deep",
+            node: Some(NirName::new("lif")),
+            field: NirName::new("deep"),
         };
         for (label, open, levels, at_64) in [
             ("a key no kind carries", "\"deep\":", 0, Err(deep)),
@@ -6401,7 +6890,11 @@ mod tests {
                 "{label}: the scan, 64"
             );
             assert_eq!(
-                import_chain_variant(&doc, NirImportOptions::default()).map(|_| ()),
+                import_chain_variant(
+                    &doc,
+                    NirImportOptions::new(1_000, VoltageResolution::Millivolt)
+                )
+                .map(|_| ()),
                 at_64,
                 "{label}: the import, 64"
             );
@@ -6412,7 +6905,10 @@ mod tests {
             );
             assert!(
                 matches!(
-                    import_chain_variant(&doc, NirImportOptions::default()),
+                    import_chain_variant(
+                        &doc,
+                        NirImportOptions::new(1_000, VoltageResolution::Millivolt)
+                    ),
                     Err(NirError::Json(_))
                 ),
                 "{label}: the import, 65"
@@ -6435,7 +6931,11 @@ mod tests {
         ] {
             let doc = chain_with(&format!("\"metadata\":{metadata}"));
             assert_eq!(
-                import_chain_variant(&doc, NirImportOptions::default()).map(|_| ()),
+                import_chain_variant(
+                    &doc,
+                    NirImportOptions::new(1_000, VoltageResolution::Millivolt)
+                )
+                .map(|_| ()),
                 Ok(()),
                 "{metadata}"
             );
@@ -6460,7 +6960,11 @@ mod tests {
         let doc = CHAIN.replacen("\"linear\":{", &format!("\"linear\":{{{mark},"), 1);
         assert_ne!(doc, CHAIN, "the Linear node takes the mark");
         assert_eq!(
-            import_chain_variant(&doc, NirImportOptions::default()).map(|_| ()),
+            import_chain_variant(
+                &doc,
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt)
+            )
+            .map(|_| ()),
             Err(NirError::UnitsMismatch {
                 file: NirUnits::Simulation,
                 options: NirUnits::Native,
@@ -6511,7 +7015,11 @@ mod tests {
             scratch: &mut scratch,
         };
         assert!(matches!(
-            nir_import(doc, NirImportOptions::default(), &mut bufs),
+            nir_import(
+                doc,
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+                &mut bufs
+            ),
             Err(NirError::Json(_))
         ));
     }
@@ -6546,7 +7054,11 @@ mod tests {
                 scratch: &mut scratch,
             };
             assert_eq!(
-                nir_import(doc.as_bytes(), NirImportOptions::default(), &mut bufs),
+                nir_import(
+                    doc.as_bytes(),
+                    NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+                    &mut bufs
+                ),
                 Err(NirError::BadNumber("weight")),
                 "{tok}"
             );
@@ -6578,7 +7090,7 @@ mod tests {
                 -0.055,
                 -0.08,
                 false,
-                NirImportOptions::default()
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt)
             ),
             Err(NirError::BadNumber("r"))
         ));
@@ -6606,7 +7118,7 @@ mod tests {
 
         // assembly parity (reference type-check): population size
         // must equal the feeding Linear's rows
-        let mut bld = NirBuilder::new(NirImportOptions::default());
+        let mut bld = NirBuilder::new(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
         let inp = bld.add_input("i", &[3]).expect("input");
         let lin = bld.add_linear("l", &[1.0, 1.0, 1.0], 1, 3).expect("linear");
         let lif = bld
@@ -6660,7 +7172,8 @@ mod tests {
 
     #[test]
     fn export_rejects_dangling_edge_indices() {
-        let (nodes, _edges, weights, lifs, _report) = import_chain(NirImportOptions::default());
+        let (nodes, _edges, weights, lifs, _report) =
+            import_chain(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
         let mut out = [0u8; 512];
         assert_eq!(
             nir_export(
@@ -6668,7 +7181,7 @@ mod tests {
                 &[(0, 99)],
                 &weights,
                 &lifs,
-                NirImportOptions::default(),
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt),
                 &mut out
             ),
             Err(NirError::BadShape("edges")),
@@ -6686,7 +7199,11 @@ mod tests {
 \"l\":{\"type\":\"Linear\",\"weight\":[[1.0,1.0,1.0]]},\
 \"n\":{\"type\":\"LIF\",\"tau\":[0.02],\"r\":[100000000.0],\"v_leak\":[-0.07],\
 \"v_threshold\":[-0.055],\"v_reset\":[-0.08]},\"o\":{\"type\":\"Output\",\"shape\":[1]}}}}";
-        let g = NirImport::from_json(doc.as_bytes(), NirImportOptions::default()).expect("imports");
+        let g = NirImport::from_json(
+            doc.as_bytes(),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+        )
+        .expect("imports");
         let (_net, enc) = g.build_chain_network().expect("canonical chain");
         assert_eq!(enc.encode(&[32767, 32767, 32767]), vec![32767]);
         // negative saturation lands on i16::MIN (-32768)
@@ -6854,7 +7371,7 @@ mod tests {
     }
 
     fn builder_chain() -> NirImport<'static> {
-        let mut bld = NirBuilder::new(NirImportOptions::default());
+        let mut bld = NirBuilder::new(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
         let inp = bld.add_input("input", &[3]).expect("input");
         let lin = bld
             .add_linear("linear", &[0.5, -1.0, 0.25, 0.0, 0.75, -0.5], 2, 3)
@@ -6881,7 +7398,8 @@ mod tests {
     #[test]
     fn builder_matches_the_json_path_exactly() {
         let built = builder_chain();
-        let (jn, je, jw, jl, _rep) = import_chain(NirImportOptions::default());
+        let (jn, je, jw, jl, _rep) =
+            import_chain(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
         // same quantized state, node for node
         assert_eq!(built.edges, je);
         assert_eq!(built.weights, jw);
@@ -6918,7 +7436,7 @@ mod tests {
     #[test]
     fn ascii_gate_fires_at_export_only() {
         // a non-ASCII name is FINE on the typed surface…
-        let mut bld = NirBuilder::new(NirImportOptions::default());
+        let mut bld = NirBuilder::new(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
         let inp = bld.add_input("entrée", &[1]).expect("input");
         let lif = bld
             .add_lif_population("lif", &lif_params_single())
@@ -6932,11 +7450,11 @@ mod tests {
         let mut out = vec![0u8; 2048];
         assert_eq!(
             nir_export(&g.nodes, &g.edges, &g.weights, &g.lifs, g.opts, &mut out),
-            Err(NirError::NonAsciiNodeName("entrée"))
+            Err(NirError::NonAsciiNodeName(NirName::new("entrée")))
         );
         // quotes and escapes are unwritable too (would corrupt the
         // container); the plain-ASCII builder chain exports fine
-        let mut q = NirBuilder::new(NirImportOptions::default());
+        let mut q = NirBuilder::new(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
         let qi = q.add_input("a\"b", &[1]).expect("input");
         let qn = q
             .add_lif_population("lif", &lif_params_single())
@@ -6952,7 +7470,7 @@ mod tests {
                 gq.opts,
                 &mut out
             ),
-            Err(NirError::NonAsciiNodeName("a\"b"))
+            Err(NirError::NonAsciiNodeName(NirName::new("a\"b")))
         );
         let ok = builder_chain();
         assert!(nir_export(
@@ -6968,13 +7486,13 @@ mod tests {
 
     #[test]
     fn builder_parity_checks_and_rejections() {
-        let mut b = NirBuilder::new(NirImportOptions::default());
+        let mut b = NirBuilder::new(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
         let i = b.add_input("a", &[1]).expect("input");
         let o = b.add_output("a", &[1]).expect("output");
         b.add_edge(i, o).expect("edge");
         assert!(matches!(b.build(), Err(NirError::DuplicateNodeName)));
 
-        let mut b2 = NirBuilder::new(NirImportOptions::default());
+        let mut b2 = NirBuilder::new(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
         let i2 = b2.add_input("a", &[1]).expect("input");
         let o2 = b2.add_output("b", &[1]).expect("output");
         b2.add_edge(i2, o2).expect("edge");
@@ -7022,14 +7540,14 @@ mod tests {
 
     #[test]
     fn an_empty_shape_is_refused_by_the_builder_as_by_the_reader() {
-        let opts = NirImportOptions::default();
+        let opts = NirImportOptions::new(1_000, VoltageResolution::Millivolt);
         let whole = carriers("[1]", "[1]");
         assert!(NirImport::from_json(whole.as_bytes(), opts).is_ok());
         for (input, output) in [("[]", "[1]"), ("[1]", "[]")] {
             let d = carriers(input, output);
             assert_eq!(
                 NirImport::from_json(d.as_bytes(), opts).err(),
-                Some(NirError::MissingField("shape")),
+                Some(NirError::BadShape("shape")),
                 "input {input}, output {output}"
             );
         }
@@ -7043,10 +7561,31 @@ mod tests {
         assert_eq!((i, o), (0, 1));
     }
 
+    /// A shape the document does not give is missing, the reader's alone
+    /// to see: the builder takes a shape with every carrier.
+    #[test]
+    fn an_absent_shape_is_a_missing_field() {
+        let opts = NirImportOptions::new(1_000, VoltageResolution::Millivolt);
+        let whole = carriers("[1]", "[1]");
+        for (node, kind) in [("i", "Input"), ("o", "Output")] {
+            let d = whole.replacen(
+                &format!("\"{node}\":{{\"type\":\"{kind}\",\"shape\":[1]}}"),
+                &format!("\"{node}\":{{\"type\":\"{kind}\"}}"),
+                1,
+            );
+            assert_ne!(d, whole, "{kind} carries its shape");
+            assert_eq!(
+                NirImport::from_json(d.as_bytes(), opts).err(),
+                Some(NirError::MissingField("shape")),
+                "{kind} without its shape"
+            );
+        }
+    }
+
     #[test]
     fn four_dims_are_taken_and_a_fifth_refused_by_the_builder_as_by_the_reader() {
         // the other end of 1–4: the reader's own shape array holds four
-        let opts = NirImportOptions::default();
+        let opts = NirImportOptions::new(1_000, VoltageResolution::Millivolt);
         let four = carriers("[1,1,1,1]", "[1,1,1,1]");
         assert!(NirImport::from_json(four.as_bytes(), opts).is_ok());
         for (input, output) in [("[1,1,1,1,1]", "[1]"), ("[1]", "[1,1,1,1,1]")] {
@@ -7074,7 +7613,8 @@ mod tests {
         // negative), 10 then 1e308 past it; 10 then
         // 1.7976931348623155e307 compose under it and build
         let chain = |w1: f64, w2: f64| {
-            let mut bld = NirBuilder::new(NirImportOptions::default());
+            let mut bld =
+                NirBuilder::new(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
             let inp = bld.add_input("input", &[1]).expect("input");
             let l1 = bld.add_linear("l1", &[w1], 1, 1).expect("l1 imports");
             let l2 = bld.add_linear("l2", &[w2], 1, 1).expect("l2 imports");
@@ -7105,7 +7645,7 @@ mod tests {
 
     #[test]
     fn failed_adds_leave_no_zombie_state() {
-        let mut b = NirBuilder::new(NirImportOptions::default());
+        let mut b = NirBuilder::new(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
         let inp = b.add_input("input", &[3]).expect("input");
         // (a) failed add_linear: NaN weight — quantize_linear
         //     hard-fails AFTER the old push-first shape would have

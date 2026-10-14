@@ -31,8 +31,9 @@
 
 use neuralos_snn::nir::{
     nir_export, nir_scan, NirBuffers, NirError, NirImport, NirImportOptions, NirLif, NirNode,
-    NirNodeKind, NirNote, EXPORT_VERSION, NIR_REF_SHA,
+    NirNote, EXPORT_VERSION, NIR_REF_SHA,
 };
+use neuralos_snn::VoltageResolution;
 
 const CHAIN: &str = include_str!("../tests/nir_fixtures/chain.json");
 const CHAIN_VRESET: &str = include_str!("../tests/nir_fixtures/chain_vreset_absent.json");
@@ -43,12 +44,12 @@ const NEGATIVES: &[NegCase] = &[
     (
         "affine",
         include_str!("../tests/nir_fixtures/neg_affine.json"),
-        |e| matches!(e, NirError::UnsupportedNodeKind("Affine")),
+        |e| matches!(e, NirError::UnsupportedNodeKind(k) if k == "Affine"),
     ),
     (
         "unknown kind",
         include_str!("../tests/nir_fixtures/neg_unknown_kind.json"),
-        |e| matches!(e, NirError::UnsupportedNodeKind("CubaLIF")),
+        |e| matches!(e, NirError::UnsupportedNodeKind(k) if k == "CubaLIF"),
     ),
     (
         "tau zero",
@@ -78,7 +79,7 @@ const NEGATIVES: &[NegCase] = &[
     (
         "unknown endpoint",
         include_str!("../tests/nir_fixtures/neg_unknown_endpoint.json"),
-        |e| matches!(e, NirError::UnknownEdgeEndpoint("ghost")),
+        |e| matches!(e, NirError::UnknownEdgeEndpoint(n) if n == "ghost"),
     ),
     (
         "duplicate edge",
@@ -126,7 +127,7 @@ fn main() {
         "fixture : chain.json — {} nodes / {} edges / {} weight cells, version \"{}\"",
         scan.node_count, scan.edge_count, scan.weight_cells, scan.version
     );
-    let opts = NirImportOptions::default();
+    let opts = NirImportOptions::new(1_000, VoltageResolution::Millivolt);
     let g = NirImport::from_json(CHAIN.as_bytes(), opts)
         .unwrap_or_else(|e| fail(&format!("chain import: {e}")));
     let pop = g.nodes[2].lif.expect("lif");
@@ -162,7 +163,7 @@ fn main() {
 
     // absent-v_reset semantics (reference from_dict) + notes
     let scan2 = nir_scan(CHAIN_VRESET.as_bytes()).unwrap();
-    let mut nodes = vec![blank(); scan2.node_count];
+    let mut nodes = vec![NirNode::BLANK; scan2.node_count];
     let mut edges = vec![(0u32, 0u32); scan2.edge_count];
     let mut weights = vec![0i16; scan2.weight_cells];
     let mut lifs2 = vec![NirLif::default(); scan2.lif_neurons];
@@ -250,16 +251,5 @@ fn main() {
     if let Ok(path) = std::env::var("NEURALOS_NIR_DUMP") {
         std::fs::write(&path, &out).unwrap_or_else(|e| fail(&format!("dump: {e}")));
         println!("dumped  : {path} ({n} B)");
-    }
-}
-
-fn blank() -> NirNode<'static> {
-    NirNode {
-        name: "",
-        kind: NirNodeKind::Input,
-        shape: [0; 4],
-        shape_len: 0,
-        lif: None,
-        linear: None,
     }
 }

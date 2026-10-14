@@ -167,8 +167,7 @@ pub enum ConvertError {
     UnexpectedKey { path: String, nir_version: String },
     /// snn's builder/exporter refused the graph (quantization bounds,
     /// edges, duplicates, non-ASCII names) — mapped with the failing
-    /// stage named and the error rendered (NirError borrows node
-    /// names; the string severs the lifetime at this boundary).
+    /// stage named and the error rendered.
     Snn { stage: &'static str, msg: String },
 }
 
@@ -1650,6 +1649,7 @@ fn assembly_json(a: &Assembly) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use neuralos_snn::VoltageResolution;
 
     const ZERO: Thousandths = Thousandths(0);
 
@@ -1736,16 +1736,19 @@ mod tests {
         // refuses, beside a weight past the bound; an lzf `shape` that
         // the filter census refuses, beside the same weight (each past
         // the bound never written, so the files stay small)
-        let sim = NirImportOptions {
-            dt_us: SIM_DT_US,
-            ..NirImportOptions::default()
-        };
+        let sim = NirImportOptions::sim_units(SIM_DT_US);
         for (name, dataset) in [
             ("order_version_int64.nir", "version"),
             ("order_root_key.nir", "node/nodes/linear/weight"),
             ("order_lzf_shape.nir", "node/nodes/linear/weight"),
         ] {
-            for (opts, units) in [(NirImportOptions::default(), false), (sim, true)] {
+            for (opts, units) in [
+                (
+                    NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+                    false,
+                ),
+                (sim, true),
+            ] {
                 match convert_file_opts(&fixture(name), opts, units) {
                     Err(ConvertError::TooLarge {
                         dataset: d,
@@ -1763,11 +1766,14 @@ mod tests {
         // a 2×2 weight stored in one chunk of 2049×2048 values, which a
         // read allocates whole
         let path = fixture("chunk_past_bound.nir");
-        let sim = NirImportOptions {
-            dt_us: SIM_DT_US,
-            ..NirImportOptions::default()
-        };
-        for (opts, units) in [(NirImportOptions::default(), false), (sim, true)] {
+        let sim = NirImportOptions::sim_units(SIM_DT_US);
+        for (opts, units) in [
+            (
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+                false,
+            ),
+            (sim, true),
+        ] {
             let e = convert_file_opts(&path, opts, units)
                 .err()
                 .unwrap_or_else(|| panic!("sim {units}: converted"));
@@ -1825,12 +1831,15 @@ mod tests {
     fn chain_population_converts_and_imports() {
         let c = convert_file(
             &rt_fixture("chain_population.nir"),
-            NirImportOptions::default(),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
         )
         .expect("converts");
         // the money assertion: the published crate imports what we wrote
-        let g = neuralos_snn::nir::NirImport::from_json(&c.json, NirImportOptions::default())
-            .expect("snn imports the tool's output");
+        let g = neuralos_snn::nir::NirImport::from_json(
+            &c.json,
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+        )
+        .expect("snn imports the tool's output");
         assert_eq!(g.nodes.len(), 4);
         assert_eq!(g.edges.len(), 3);
         assert!(c.stamp.f32_datasets.is_empty());
@@ -1839,8 +1848,11 @@ mod tests {
 
     #[test]
     fn lzf_is_refused_by_name() {
-        let err = convert_file(&fixture("neg_filter_lzf.nir"), NirImportOptions::default())
-            .expect_err("lzf must be refused");
+        let err = convert_file(
+            &fixture("neg_filter_lzf.nir"),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+        )
+        .expect_err("lzf must be refused");
         match &err {
             ConvertError::Filter { name, .. } => assert_eq!(name, "lzf"),
             other => panic!("expected Filter, got {other:?}"),
@@ -1855,7 +1867,7 @@ mod tests {
     fn out_of_subset_kind_is_named() {
         let err = convert_file(
             &fixture("community/lif_norse.nir"),
-            NirImportOptions::default(),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
         )
         .expect_err("Affine is refused in native units");
         match &err {
@@ -1957,10 +1969,7 @@ mod tests {
 
     #[test]
     fn an_affine_s_bias_of_the_wrong_length_is_bad_data() {
-        let opts = NirImportOptions {
-            dt_us: SIM_DT_US,
-            ..NirImportOptions::default()
-        };
+        let opts = NirImportOptions::sim_units(SIM_DT_US);
         match convert_file_opts(&fixture("affine_bias_length.nir"), opts, true) {
             Err(ConvertError::BadData { dataset, what }) => {
                 assert_eq!(dataset, "node/nodes/c/bias");
@@ -1974,7 +1983,10 @@ mod tests {
     /// rows by its columns (`tools/gen_nir2json_fixtures.py`).
     #[test]
     fn a_weight_that_is_not_2_d_is_bad_data() {
-        match convert_file(&fixture("weight_1d.nir"), NirImportOptions::default()) {
+        match convert_file(
+            &fixture("weight_1d.nir"),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+        ) {
             Err(ConvertError::BadData { dataset, what }) => {
                 assert_eq!(dataset, "node/nodes/linear/weight");
                 assert_eq!(what, "1-D weight — expected 2-D");
@@ -2000,7 +2012,10 @@ mod tests {
             ("stray_graph_key.nir", "node/foo"),
             ("stray_file_key.nir", "foo"),
         ] {
-            match convert_file(&fixture(name), NirImportOptions::default()) {
+            match convert_file(
+                &fixture(name),
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+            ) {
                 Err(ConvertError::UnexpectedKey { path, nir_version }) => {
                     assert_eq!(path, want, "{name}");
                     assert_eq!(nir_version, "1.0.9.dev1+g7883c3c85", "{name}");
@@ -2011,24 +2026,26 @@ mod tests {
         // an Affine natively is outside the subset, refused by its kind
         // whatever keys it carries; under `--sim-units`, by its stray key
         let affine = fixture("stray_affine_key.nir");
-        match convert_file(&affine, NirImportOptions::default()) {
+        match convert_file(
+            &affine,
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+        ) {
             Err(ConvertError::UnsupportedNode { node, kind }) => {
                 assert_eq!((node.as_str(), kind.as_str()), ("affine", "Affine"));
             }
             other => panic!("native: expected UnsupportedNode, got {other:?}"),
         }
-        let sim = NirImportOptions {
-            dt_us: SIM_DT_US,
-            ..NirImportOptions::default()
-        };
+        let sim = NirImportOptions::sim_units(SIM_DT_US);
         match convert_file_opts(&affine, sim, true) {
             Err(ConvertError::UnexpectedKey { path, .. }) => {
                 assert_eq!(path, "node/nodes/affine/foo");
             }
             other => panic!("--sim-units: expected UnexpectedKey, got {other:?}"),
         }
-        let Err(e) = convert_file(&fixture("stray_node_key.nir"), NirImportOptions::default())
-        else {
+        let Err(e) = convert_file(
+            &fixture("stray_node_key.nir"),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+        ) else {
             panic!("stray_node_key.nir: expected a refusal");
         };
         let msg = e.to_string();
@@ -2224,7 +2241,7 @@ mod tests {
         for bad in ["Graph", "3chain", "loop", "_", "", "two-layer"] {
             match freeze(
                 b"not json",
-                NirImportOptions::default(),
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt),
                 bad,
                 &[(1, None)],
                 &[],
@@ -2242,7 +2259,7 @@ mod tests {
         assert!(matches!(
             freeze(
                 b"not json",
-                NirImportOptions::default(),
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt),
                 "graph",
                 &[(1, None)],
                 &[]
@@ -2278,7 +2295,7 @@ mod tests {
     fn stamp_renders_valid_json() {
         let c = convert_file(
             &rt_fixture("chain_population.nir"),
-            NirImportOptions::default(),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
         )
         .expect("converts");
         let s = stamp_json(&c.stamp, std::path::Path::new("x.nir"), None);
@@ -2289,10 +2306,7 @@ mod tests {
     /// A graph converted under `--sim-units` at the CLI's default step,
     /// and the options `--freeze` builds it under.
     fn sim_conversion(name: &str) -> (Converted, NirImportOptions) {
-        let opts = NirImportOptions {
-            dt_us: SIM_DT_US,
-            ..NirImportOptions::default()
-        };
+        let opts = NirImportOptions::sim_units(SIM_DT_US);
         let c = convert_file_opts(&fixture(name), opts, true).expect("converts under --sim-units");
         (c, effective_options(opts, true))
     }
@@ -2308,7 +2322,7 @@ mod tests {
     fn a_native_sidecar_carries_no_simulation_keys() {
         let c = convert_file(
             &rt_fixture("chain_population.nir"),
-            NirImportOptions::default(),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
         )
         .expect("converts");
         let s = stamp_json(&c.stamp, std::path::Path::new("x.nir"), None);
@@ -2477,7 +2491,11 @@ mod tests {
     #[test]
     fn the_inputs_split_a_drive_in_input_order() {
         let merge = include_bytes!("../../neuralos-snn/tests/nir_fixtures/merge.json");
-        let g = NirImport::from_json(merge, NirImportOptions::default()).expect("imports");
+        let g = NirImport::from_json(
+            merge,
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+        )
+        .expect("imports");
         let (_, enc, _) = g.build_network().expect("assembles");
         let inputs = Inputs::new(&g, &enc, &[]).expect("no bias input");
         assert_eq!((inputs.features(), inputs.starts()), (4, vec![]));
@@ -2637,7 +2655,7 @@ mod tests {
         let branch = include_bytes!("../../neuralos-snn/tests/nir_fixtures/branch.json");
         let f = freeze(
             branch,
-            NirImportOptions::default(),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
             "branch",
             &[(1, None)],
             &[],

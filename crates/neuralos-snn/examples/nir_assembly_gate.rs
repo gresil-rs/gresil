@@ -87,7 +87,7 @@ fn print_report(rep: &NirAssemblyReport<'_>) {
         "report  : {} neurons · {} synapses · {} inputs · {} drive Linears · {} stages",
         rep.neurons, rep.synapses, rep.inputs, rep.drive_linears, rep.stages
     );
-    for LinearFusedRecord { chain, scales } in &rep.fused {
+    for LinearFusedRecord { chain, scales, .. } in &rep.fused {
         println!("fused   : {} (scales {:e})", chain.join("·"), scales[0]);
     }
     for n in &rep.undriven {
@@ -113,8 +113,11 @@ fn main() {
     println!();
 
     // ---- gate 1: branch — every population fires, pins exact -------
-    let g = NirImport::from_json(BRANCH, NirImportOptions::default())
-        .unwrap_or_else(|e| fail(&e.to_string()));
+    let g = NirImport::from_json(
+        BRANCH,
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+    )
+    .unwrap_or_else(|e| fail(&e.to_string()));
     let (mut net, enc, rep) = g.build_network().unwrap_or_else(|e| fail(&e.to_string()));
     print_report(&rep);
     let pins = raster(&mut net, &enc, &[&[6_000, 0, 0].map(Thousandths)], 100);
@@ -208,7 +211,11 @@ fn main() {
     );
 
     // ---- gate 4: fusion exactness through the seam -----------------
-    let g = NirImport::from_json(BRANCH, NirImportOptions::default()).unwrap();
+    let g = NirImport::from_json(
+        BRANCH,
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+    )
+    .unwrap();
     let (_, enc, rep) = g.build_network().unwrap();
     if rep.fused.len() != 1 || rep.fused[0].chain != vec!["l1", "l2"] {
         fail("the l1·l2 chain must fuse exactly once, recorded");
@@ -237,7 +244,7 @@ fn main() {
     // (label, fixture, import opts, error check) — one row per named
     // rejection; the tuple shape IS the table
     #[allow(clippy::type_complexity)]
-    let table: Vec<(&str, &[u8], NirImportOptions, fn(&NirError<'_>) -> bool)> = vec![
+    let table: Vec<(&str, &[u8], NirImportOptions, fn(&NirError) -> bool)> = vec![
         (
             "pass-through",
             include_bytes!("../tests/nir_fixtures/neg_asm_passthrough.json"),
@@ -310,10 +317,8 @@ fn main() {
             |e| {
                 matches!(
                     e,
-                    NirError::EdgeShapeMismatch {
-                        src: "input",
-                        dst: "l1"
-                    }
+                    NirError::EdgeShapeMismatch { src, dst, .. }
+                        if src == "input" && dst == "l1"
                 )
             },
         ),
@@ -332,7 +337,7 @@ fn main() {
         (
             "recurrent on mV",
             RECURRENT,
-            NirImportOptions::default(),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
             |e| {
                 matches!(e, NirError::UnsupportedTopology(m)
                 if m.contains("CentiMillivolt") && m.contains("~200 pA dead zone"))
@@ -356,7 +361,7 @@ fn main() {
     );
 
     // ---- gate 6: frozen chain re-runs UNCHANGED through both -------
-    let opts = NirImportOptions::default();
+    let opts = NirImportOptions::new(1_000, VoltageResolution::Millivolt);
     let g = NirImport::from_json(CHAIN, opts).unwrap_or_else(|e| fail(&e.to_string()));
     let (mut net1, enc1) = g
         .build_chain_network()
