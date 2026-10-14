@@ -44,12 +44,12 @@ const NEGATIVES: &[NegCase] = &[
     (
         "affine",
         include_str!("../tests/nir_fixtures/neg_affine.json"),
-        |e| matches!(e, NirError::UnsupportedNodeKind("Affine")),
+        |e| matches!(e, NirError::UnsupportedNodeKind(k) if k == "Affine"),
     ),
     (
         "unknown kind",
         include_str!("../tests/nir_fixtures/neg_unknown_kind.json"),
-        |e| matches!(e, NirError::UnsupportedNodeKind("CubaLIF")),
+        |e| matches!(e, NirError::UnsupportedNodeKind(k) if k == "CubaLIF"),
     ),
     (
         "tau zero",
@@ -79,7 +79,7 @@ const NEGATIVES: &[NegCase] = &[
     (
         "unknown endpoint",
         include_str!("../tests/nir_fixtures/neg_unknown_endpoint.json"),
-        |e| matches!(e, NirError::UnknownEdgeEndpoint("ghost")),
+        |e| matches!(e, NirError::UnknownEdgeEndpoint(n) if n == "ghost"),
     ),
     (
         "duplicate edge",

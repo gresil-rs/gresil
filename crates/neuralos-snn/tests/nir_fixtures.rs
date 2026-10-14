@@ -15,7 +15,7 @@
 
 use neuralos_snn::nir::{
     nir_export, nir_import, nir_scan, NirBuffers, NirError, NirGraphEncoder, NirImport,
-    NirImportOptions, NirLif, NirNode, NirNote, Thousandths, EXPORT_VERSION,
+    NirImportOptions, NirLif, NirName, NirNode, NirNote, Thousandths, EXPORT_VERSION,
 };
 use neuralos_snn::{SpikingNeuralNetwork, VoltageResolution};
 use std::panic::{self, AssertUnwindSafe};
@@ -40,7 +40,7 @@ const PARAM_LEN: &str = include_str!("nir_fixtures/neg_param_length.json");
 const MISSING_V: &str = include_str!("nir_fixtures/neg_missing_version.json");
 const ESCAPED: &str = include_str!("nir_fixtures/neg_escaped_name.json");
 
-fn import_owned(doc: &str) -> Result<NirImport<'_>, NirError<'_>> {
+fn import_owned(doc: &str) -> Result<NirImport<'_>, NirError> {
     NirImport::from_json(
         doc.as_bytes(),
         NirImportOptions::new(1_000, VoltageResolution::Millivolt),
@@ -230,12 +230,16 @@ fn reference_chain_export_round_trips() {
 #[allow(clippy::type_complexity)]
 fn negative_fixtures_reject_with_the_named_error() {
     let cases: &[(&str, &str, fn(&NirError) -> bool)] = &[
-        ("affine", AFFINE, |e| {
-            matches!(e, NirError::UnsupportedNodeKind("Affine"))
-        }),
-        ("unknown kind", UNKNOWN, |e| {
-            matches!(e, NirError::UnsupportedNodeKind("CubaLIF"))
-        }),
+        (
+            "affine",
+            AFFINE,
+            |e| matches!(e, NirError::UnsupportedNodeKind(k) if k == "Affine"),
+        ),
+        (
+            "unknown kind",
+            UNKNOWN,
+            |e| matches!(e, NirError::UnsupportedNodeKind(k) if k == "CubaLIF"),
+        ),
         ("tau zero", TAU_ZERO, |e| {
             matches!(e, NirError::BadNumber("tau"))
         }),
@@ -251,9 +255,11 @@ fn negative_fixtures_reject_with_the_named_error() {
         ("missing field", MISSING_F, |e| {
             matches!(e, NirError::MissingField("v_threshold"))
         }),
-        ("unknown endpoint", ENDPOINT, |e| {
-            matches!(e, NirError::UnknownEdgeEndpoint("ghost"))
-        }),
+        (
+            "unknown endpoint",
+            ENDPOINT,
+            |e| matches!(e, NirError::UnknownEdgeEndpoint(n) if n == "ghost"),
+        ),
         ("duplicate edge", DUP_EDGE, |e| {
             matches!(e, NirError::DuplicateEdge)
         }),
@@ -308,7 +314,7 @@ fn the_scan_counts_the_arrays_of_a_node_the_import_refuses() {
     assert_eq!(nir_scan(AFFINE.as_bytes()).map(|s| s.weight_cells), Ok(4));
     assert_eq!(
         import_owned(AFFINE).err(),
-        Some(NirError::UnsupportedNodeKind("Affine"))
+        Some(NirError::UnsupportedNodeKind(NirName::new("Affine")))
     );
     // the LIF's one neuron and the two of a node with no type
     let untyped = CHAIN.replacen(

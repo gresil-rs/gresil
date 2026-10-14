@@ -167,8 +167,7 @@ pub enum ConvertError {
     UnexpectedKey { path: String, nir_version: String },
     /// snn's builder/exporter refused the graph (quantization bounds,
     /// edges, duplicates, non-ASCII names) — mapped with the failing
-    /// stage named and the error rendered (NirError borrows node
-    /// names; the string severs the lifetime at this boundary).
+    /// stage named and the error rendered.
     Snn { stage: &'static str, msg: String },
 }
 

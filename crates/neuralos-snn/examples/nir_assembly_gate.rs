@@ -244,7 +244,7 @@ fn main() {
     // (label, fixture, import opts, error check) — one row per named
     // rejection; the tuple shape IS the table
     #[allow(clippy::type_complexity)]
-    let table: Vec<(&str, &[u8], NirImportOptions, fn(&NirError<'_>) -> bool)> = vec![
+    let table: Vec<(&str, &[u8], NirImportOptions, fn(&NirError) -> bool)> = vec![
         (
             "pass-through",
             include_bytes!("../tests/nir_fixtures/neg_asm_passthrough.json"),
@@ -317,11 +317,8 @@ fn main() {
             |e| {
                 matches!(
                     e,
-                    NirError::EdgeShapeMismatch {
-                        src: "input",
-                        dst: "l1",
-                        ..
-                    }
+                    NirError::EdgeShapeMismatch { src, dst, .. }
+                        if src == "input" && dst == "l1"
                 )
             },
         ),

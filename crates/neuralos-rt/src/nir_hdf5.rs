@@ -61,8 +61,8 @@ use hdf5_sys::h5d::H5Dget_create_plist;
 use hdf5_sys::h5p::{H5Pclose, H5Pget_filter2, H5Pget_nfilters};
 use ndarray::{Array1, Array2};
 use neuralos_snn::nir::{
-    NirBuilder, NirError, NirImport, NirImportOptions, NirLif, NirLifParams, NirNode, NirNodeKind,
-    EXPORT_VERSION,
+    NirBuilder, NirError, NirImport, NirImportOptions, NirLif, NirLifParams, NirName, NirNode,
+    NirNodeKind, EXPORT_VERSION,
 };
 
 /// HDF5's built-in deflate filter id (`H5Z_FILTER_DEFLATE`).
@@ -114,8 +114,8 @@ impl fmt::Display for NirHdfError {
 
 impl std::error::Error for NirHdfError {}
 
-impl From<neuralos_snn::nir::NirError<'_>> for NirHdfError {
-    fn from(e: neuralos_snn::nir::NirError<'_>) -> Self {
+impl From<neuralos_snn::nir::NirError> for NirHdfError {
+    fn from(e: neuralos_snn::nir::NirError) -> Self {
         Self::Seam(e.to_string())
     }
 }
@@ -558,7 +558,7 @@ fn read_node(nodes_group: &Group, name: &str) -> Result<NirHdfNode, NirHdfError>
             })
         }
         other => Err(NirHdfError::Seam(
-            NirError::UnsupportedNodeKind(other).to_string(),
+            NirError::UnsupportedNodeKind(NirName::new(other)).to_string(),
         )),
     }
 }
@@ -627,10 +627,9 @@ impl NirHdfDoc {
         }
         for (from, to) in &self.edges {
             let resolve = |name: &str| {
-                index
-                    .get(name)
-                    .copied()
-                    .ok_or_else(|| NirHdfError::from(NirError::UnknownEdgeEndpoint(name)))
+                index.get(name).copied().ok_or_else(|| {
+                    NirHdfError::from(NirError::UnknownEdgeEndpoint(NirName::new(name)))
+                })
             };
             let (f, t) = (resolve(from)?, resolve(to)?);
             bld.add_edge(f, t).map_err(NirHdfError::from)?;
