@@ -617,6 +617,37 @@ pub struct NirLif {
     pub max_v_err_v: f64,
 }
 
+impl NirLif {
+    /// A blank record, every number 0 and every flag `false`, as
+    /// `NirLif::default()` gives: what a lifs buffer holds before the
+    /// import writes it. A `const`, so it fills a `static` buffer, which
+    /// `default()`, a function call, cannot.
+    ///
+    /// ```
+    /// use neuralos_snn::nir::NirLif;
+    ///
+    /// static LIFS: [NirLif; 4] = [NirLif::BLANK; 4];
+    /// assert_eq!(LIFS[3], NirLif::default());
+    /// ```
+    pub const BLANK: Self = Self {
+        tau_s: 0.0,
+        r_ohm: 0.0,
+        v_leak_v: 0.0,
+        v_threshold_v: 0.0,
+        v_reset_v: 0.0,
+        v_reset_defaulted: false,
+        tau_us: 0,
+        resistance_mohm: 0,
+        capacitance_pf: 0,
+        capacitance_clamped: false,
+        leak_q: 0,
+        threshold_q: 0,
+        reset_q: 0,
+        tau_err_s: 0.0,
+        max_v_err_v: 0.0,
+    };
+}
+
 /// A quantized LIF population view: `len` neurons with per-neuron
 /// records in the caller's lifs buffer ([`NirBuffers::lifs`] or
 /// `NirImport::lifs`), starting at `offset`. A length-1
@@ -627,6 +658,35 @@ pub struct NirLifPopulation {
     pub offset: usize,
     /// Population size (the per-neuron param array length).
     pub len: usize,
+}
+
+impl NirLifPopulation {
+    /// A blank view, offset 0 and length 0: its length is written after
+    /// it, and its offset when the records do not start at 0. A LIF node
+    /// written by hand, as the structured-entry seam builds one where
+    /// `NirBuilder` (std) is not there, takes one.
+    ///
+    /// ```
+    /// use neuralos_snn::nir::{nir_export, quantize_lif, NirLifPopulation, NirNode, NirNodeKind};
+    /// use neuralos_snn::{NirImportOptions, VoltageResolution};
+    ///
+    /// let opts = NirImportOptions::new(1_000, VoltageResolution::Millivolt);
+    /// let lif = quantize_lif(0.02, 1e8, -0.07, -0.055, -0.08, false, opts).unwrap();
+    /// let mut pop = NirLifPopulation::BLANK;
+    /// pop.len = 1; // one record, at offset 0 of the lifs buffer
+    /// let mut input = NirNode::BLANK;
+    /// input.name = "input";
+    /// input.shape[0] = 1;
+    /// input.shape_len = 1;
+    /// let mut neuron = NirNode::BLANK;
+    /// neuron.name = "lif";
+    /// neuron.kind = NirNodeKind::Lif;
+    /// neuron.lif = Some(pop);
+    /// let mut out = [0u8; 1024];
+    /// let n = nir_export(&[input, neuron], &[(0, 1)], &[], &[lif], opts, &mut out).unwrap();
+    /// assert!(out[..n].starts_with(b"{\"version\""));
+    /// ```
+    pub const BLANK: Self = Self { offset: 0, len: 0 };
 }
 
 /// Per-neuron source-unit LIF parameters (population form) for the
@@ -668,6 +728,29 @@ pub struct NirLinear {
     pub zero_tensor: bool,
 }
 
+impl NirLinear {
+    /// A blank view: no rows, no cols, offset 0, every number 0, not a
+    /// zero tensor. A slot to be overwritten, or a value with a field
+    /// written after it.
+    ///
+    /// ```
+    /// use neuralos_snn::nir::NirLinear;
+    ///
+    /// let mut mark = NirLinear::BLANK;
+    /// mark.max_abs_err = f64::NAN;
+    /// assert_eq!((mark.rows, mark.cols, mark.scale), (0, 0, 0.0));
+    /// ```
+    pub const BLANK: Self = Self {
+        rows: 0,
+        cols: 0,
+        weight_offset: 0,
+        scale: 0.0,
+        absmax: 0.0,
+        max_abs_err: 0.0,
+        zero_tensor: false,
+    };
+}
+
 /// One node, imported or built. Shapes are `[u32; 4]` + length (≤ 4 dims,
 /// reference shapes are 1–4-D). A LIF node carries a population
 /// view into the lifs buffer.
@@ -688,6 +771,29 @@ pub struct NirNode<'a> {
     pub lif: Option<NirLifPopulation>,
     /// The quantized tensor of a `Linear` node, `None` on any other kind.
     pub linear: Option<NirLinear>,
+}
+
+impl NirNode<'_> {
+    /// A blank node: an `Input` with an empty name, no shape and no view,
+    /// what a node buffer holds before the import writes it. A `const`,
+    /// so it fills a `static` arena.
+    ///
+    /// ```
+    /// use neuralos_snn::nir::{NirNode, NirNodeKind};
+    ///
+    /// static NODES: [NirNode<'static>; 4] = [NirNode::BLANK; 4];
+    /// assert_eq!(NODES[3].kind, NirNodeKind::Input);
+    /// assert_eq!((NODES[3].name, NODES[3].shape_len), ("", 0));
+    /// assert!(NODES[3].lif.is_none() && NODES[3].linear.is_none());
+    /// ```
+    pub const BLANK: Self = Self {
+        name: "",
+        kind: NirNodeKind::Input,
+        shape: [0; 4],
+        shape_len: 0,
+        lif: None,
+        linear: None,
+    };
 }
 
 /// Import notes (loud lossiness — each counted, none silent).
@@ -5391,6 +5497,43 @@ mod tests {
             nir_scan(b"{\"version\":\"x\"}"),
             Err(NirError::MissingField("node"))
         ));
+    }
+
+    /// Each blank equals the literal its sites wrote: a node arena's slot
+    /// (the import's, `nir_format_gate`'s, the fixtures' three), leg A's
+    /// Linear sentinel but its NaN, and a lifs buffer's
+    /// `NirLif::default()`; a population view, which no site wrote, is
+    /// zeros.
+    #[test]
+    fn each_blank_is_what_its_sites_wrote() {
+        assert_eq!(
+            NirNode::BLANK,
+            NirNode {
+                name: "",
+                kind: NirNodeKind::Input,
+                shape: [0; 4],
+                shape_len: 0,
+                lif: None,
+                linear: None,
+            }
+        );
+        assert_eq!(
+            NirLinear::BLANK,
+            NirLinear {
+                rows: 0,
+                cols: 0,
+                weight_offset: 0,
+                scale: 0.0,
+                absmax: 0.0,
+                max_abs_err: 0.0,
+                zero_tensor: false,
+            }
+        );
+        assert_eq!(NirLif::BLANK, NirLif::default());
+        assert_eq!(
+            NirLifPopulation::BLANK,
+            NirLifPopulation { offset: 0, len: 0 }
+        );
     }
 
     #[allow(clippy::type_complexity)]

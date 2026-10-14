@@ -15,7 +15,7 @@
 
 use neuralos_snn::nir::{
     nir_export, nir_import, nir_scan, NirBuffers, NirError, NirGraphEncoder, NirImport,
-    NirImportOptions, NirLif, NirNode, NirNodeKind, NirNote, Thousandths, EXPORT_VERSION,
+    NirImportOptions, NirLif, NirNode, NirNote, Thousandths, EXPORT_VERSION,
 };
 use neuralos_snn::{SpikingNeuralNetwork, VoltageResolution};
 use std::panic::{self, AssertUnwindSafe};
@@ -90,17 +90,7 @@ fn reference_chain_imports_with_exact_quantization() {
 #[test]
 fn absent_v_reset_is_reference_semantics_with_note() {
     let scan = nir_scan(CHAIN_VRESET.as_bytes()).unwrap();
-    let mut nodes = vec![
-        NirNode {
-            name: "",
-            kind: NirNodeKind::Input,
-            shape: [0; 4],
-            shape_len: 0,
-            lif: None,
-            linear: None,
-        };
-        scan.node_count
-    ];
+    let mut nodes = vec![NirNode::BLANK; scan.node_count];
     let mut edges = vec![(0u32, 0u32); scan.edge_count];
     let mut weights = vec![0i16; scan.weight_cells];
     let mut lifs = vec![NirLif::default(); scan.lif_neurons];
@@ -392,17 +382,7 @@ fn a_weight_of_f64_s_largest_is_refused_at_import() {
 #[test]
 fn buffer_api_consumes_reference_emission() {
     let scan = nir_scan(CHAIN.as_bytes()).unwrap();
-    let mut nodes = vec![
-        NirNode {
-            name: "",
-            kind: NirNodeKind::Input,
-            shape: [0; 4],
-            shape_len: 0,
-            lif: None,
-            linear: None,
-        };
-        scan.node_count
-    ];
+    let mut nodes = vec![NirNode::BLANK; scan.node_count];
     let mut edges = vec![(0u32, 0u32); scan.edge_count];
     let mut weights = vec![0i16; scan.weight_cells];
     let mut lifs = vec![NirLif::default(); scan.lif_neurons];
@@ -1140,15 +1120,7 @@ fn short_buffers(
             continue;
         }
         let len = |i: usize| sizes[i] - usize::from(short == Some(i));
-        let blank = NirNode {
-            name: "",
-            kind: NirNodeKind::Input,
-            shape: [0; 4],
-            shape_len: 0,
-            lif: None,
-            linear: None,
-        };
-        let mut nodes = vec![blank; len(0)];
+        let mut nodes = vec![NirNode::BLANK; len(0)];
         let mut edges = vec![(0u32, 0u32); len(1)];
         let mut weights = vec![0i16; len(2)];
         let mut lifs = vec![NirLif::default(); len(3)];

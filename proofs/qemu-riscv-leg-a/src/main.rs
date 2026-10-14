@@ -141,15 +141,9 @@ fn quiet_neuron(id: u16, r: VoltageResolution) -> LIFNeuron {
 }
 
 fn lin_sentinel() -> NirLinear {
-    NirLinear {
-        rows: 0,
-        cols: 0,
-        weight_offset: 0,
-        scale: 0.0,
-        absmax: 0.0,
-        max_abs_err: f64::NAN,
-        zero_tensor: false,
-    }
+    let mut lin = NirLinear::BLANK;
+    lin.max_abs_err = f64::NAN;
+    lin
 }
 
 #[unsafe(no_mangle)]
