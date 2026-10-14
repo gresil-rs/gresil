@@ -335,10 +335,7 @@ fn stranger_fallback_snntorch_two_layer_completes_full_path_sim_units() {
         convert_file(&path, NirImportOptions::default()).expect_err("r = 50 Ω refuses natively");
     assert!(matches!(err, ConvertError::SimUnits { .. }), "{err:?}");
     // the CLI's --sim-units defaults: snnTorch's 0.1 ms step
-    let sim_step = NirImportOptions {
-        dt_us: SIM_DT_US,
-        ..NirImportOptions::default()
-    };
+    let sim_step = NirImportOptions::sim_units(SIM_DT_US);
     let c = convert_file_opts(&path, sim_step, true).expect("converts under --sim-units");
     assert_eq!(c.stamp.nir_version, "1.0.9.dev1+g7883c3c85");
     assert!(
@@ -386,10 +383,7 @@ fn the_snn_witness_fixtures_are_this_converter_s_bytes() {
         ("community/two_lif_neurons.nir", "two_lif_neurons_sim.json"),
     ] {
         // the CLI's --sim-units default step, 0.1 ms
-        let sim_step = NirImportOptions {
-            dt_us: SIM_DT_US,
-            ..NirImportOptions::default()
-        };
+        let sim_step = NirImportOptions::sim_units(SIM_DT_US);
         let c =
             convert_file_opts(&fixture(nir), sim_step, true).expect("converts under --sim-units");
         let committed = std::fs::read(
@@ -431,10 +425,7 @@ fn stranger_emitter_skew_norse_converts_under_sim_units() {
     // under --sim-units the all-zero bias adds nothing, and the Affine
     // is a plain Linear under its own name.
     use neuralos_snn::nir::NirNodeKind::{Input, Lif, Linear, Output};
-    let sim_step = NirImportOptions {
-        dt_us: SIM_DT_US,
-        ..NirImportOptions::default()
-    };
+    let sim_step = NirImportOptions::sim_units(SIM_DT_US);
     let c = convert_file_opts(&fixture("community/lif_norse.nir"), sim_step, true)
         .expect("converts under --sim-units");
     assert!(c.stamp.bias.is_empty(), "{:?}", c.stamp.bias);
@@ -508,6 +499,10 @@ fn binary_end_to_end_smoke_happy_and_sad() {
     assert!(
         head_sidecar.contains("\"dt_us\":1000,"),
         "without --sim-units the step stays 1 ms: {head_sidecar}"
+    );
+    assert!(
+        head_sidecar.contains("\"resolution\":\"mv\""),
+        "without --sim-units the grid stays mV: {head_sidecar}"
     );
 
     // the transform through the binary: two_lif + --sim-units exits 0

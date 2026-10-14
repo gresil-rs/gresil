@@ -496,10 +496,7 @@ fn fixture_paths() -> Vec<std::path::PathBuf> {
 /// The fixtures as seeds, each fixture a step of the setup, so a hang
 /// there names the fixture.
 fn mutation_seeds(flight: &InFlight) -> Vec<Seed> {
-    let centi = NirImportOptions {
-        resolution: VoltageResolution::CentiMillivolt,
-        ..NirImportOptions::default()
-    };
+    let centi = NirImportOptions::new(1_000, VoltageResolution::CentiMillivolt);
     let builds = |bytes: &[u8], opts: NirImportOptions| {
         NirImport::from_json(bytes, opts).is_ok_and(|g| g.build_network().is_ok())
     };

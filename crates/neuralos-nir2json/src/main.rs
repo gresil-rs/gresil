@@ -20,6 +20,7 @@ use neuralos_nir2json::{
     Assembly, FreezeError, MAX_VALUES, SIM_DT_US, convert_file_opts, effective_options, freeze,
     grouped, module_name, stamp_json,
 };
+use neuralos_snn::VoltageResolution;
 use neuralos_snn::nir::{NirImportOptions, Thousandths};
 
 /// The run `--freeze` writes when `--steps` is not given.
@@ -236,10 +237,7 @@ fn main() -> ExitCode {
     } else {
         NATIVE_DT_US
     });
-    let opts = NirImportOptions {
-        dt_us,
-        ..NirImportOptions::default()
-    };
+    let opts = NirImportOptions::new(dt_us, VoltageResolution::Millivolt);
     let converted = match convert_file_opts(&input, opts, args.sim_units) {
         Ok(c) => c,
         Err(e) => {

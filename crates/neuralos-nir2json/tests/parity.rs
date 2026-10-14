@@ -106,10 +106,7 @@ fn input(config: &serde_json::Value, features: usize, steps: u32) -> Vec<Vec<Tho
 /// bias input the conversion adds is driven as `freeze` drives it
 /// (`Inputs`).
 fn run(nir: &Path, input: &[Vec<Thousandths>]) -> Vec<Vec<u32>> {
-    let opts = NirImportOptions {
-        dt_us: SIM_DT_US,
-        ..NirImportOptions::default()
-    };
+    let opts = NirImportOptions::sim_units(SIM_DT_US);
     let c = convert_file_opts(nir, opts, true).expect("converts under --sim-units");
     let graph = NirImport::from_json(&c.json, effective_options(opts, true)).expect("imports");
     let (mut net, enc, _) = graph.build_network().expect("the graph builds");

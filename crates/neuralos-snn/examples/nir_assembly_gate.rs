@@ -87,7 +87,7 @@ fn print_report(rep: &NirAssemblyReport<'_>) {
         "report  : {} neurons · {} synapses · {} inputs · {} drive Linears · {} stages",
         rep.neurons, rep.synapses, rep.inputs, rep.drive_linears, rep.stages
     );
-    for LinearFusedRecord { chain, scales } in &rep.fused {
+    for LinearFusedRecord { chain, scales, .. } in &rep.fused {
         println!("fused   : {} (scales {:e})", chain.join("·"), scales[0]);
     }
     for n in &rep.undriven {
@@ -312,7 +312,8 @@ fn main() {
                     e,
                     NirError::EdgeShapeMismatch {
                         src: "input",
-                        dst: "l1"
+                        dst: "l1",
+                        ..
                     }
                 )
             },

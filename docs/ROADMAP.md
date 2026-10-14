@@ -150,8 +150,10 @@ records it names in `evidence/INDEX.md`. Four lines, in order:
    for the std network's clock and step, `time_us()` and `dt_us`,
    `Synapse`'s fields behind getters, the three no computation read
    gone, `Spike`, `NetworkStats` and `FixedSynapse` not exhaustive,
-   STDP's counters and bounds behind its feature, and a neuron with no
-   capacitance are in. Then the rename, the front door, the stamp.
+   STDP's counters and bounds behind its feature, a neuron with no
+   capacitance, and ten `nir` structs and four `NirError` variants not
+   exhaustive, with a blank for the four structs a caller fills, are in.
+   Then the rename, the front door, the stamp.
 3. **0.1.0: the stamp.** The principal's call, once the fourteen checks
    of § 0.1.0 hold again at the final tree, after the rename.
 4. **After 0.1.0: the learning chapter** (`docs/VISION.md` § Realistic

@@ -40,10 +40,7 @@ type Row = (
 /// Both conversions of `path`, native, then under `--sim-units` at the
 /// CLI's step: the JSON's length, or the refusal.
 fn both(path: &Path) -> [Result<usize, ConvertError>; 2] {
-    let sim = NirImportOptions {
-        dt_us: SIM_DT_US,
-        ..NirImportOptions::default()
-    };
+    let sim = NirImportOptions::sim_units(SIM_DT_US);
     [
         convert_file_opts(path, NirImportOptions::default(), false),
         convert_file_opts(path, sim, true),

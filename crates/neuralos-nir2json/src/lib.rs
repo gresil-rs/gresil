@@ -1736,10 +1736,7 @@ mod tests {
         // refuses, beside a weight past the bound; an lzf `shape` that
         // the filter census refuses, beside the same weight (each past
         // the bound never written, so the files stay small)
-        let sim = NirImportOptions {
-            dt_us: SIM_DT_US,
-            ..NirImportOptions::default()
-        };
+        let sim = NirImportOptions::sim_units(SIM_DT_US);
         for (name, dataset) in [
             ("order_version_int64.nir", "version"),
             ("order_root_key.nir", "node/nodes/linear/weight"),
@@ -1763,10 +1760,7 @@ mod tests {
         // a 2×2 weight stored in one chunk of 2049×2048 values, which a
         // read allocates whole
         let path = fixture("chunk_past_bound.nir");
-        let sim = NirImportOptions {
-            dt_us: SIM_DT_US,
-            ..NirImportOptions::default()
-        };
+        let sim = NirImportOptions::sim_units(SIM_DT_US);
         for (opts, units) in [(NirImportOptions::default(), false), (sim, true)] {
             let e = convert_file_opts(&path, opts, units)
                 .err()
@@ -1957,10 +1951,7 @@ mod tests {
 
     #[test]
     fn an_affine_s_bias_of_the_wrong_length_is_bad_data() {
-        let opts = NirImportOptions {
-            dt_us: SIM_DT_US,
-            ..NirImportOptions::default()
-        };
+        let opts = NirImportOptions::sim_units(SIM_DT_US);
         match convert_file_opts(&fixture("affine_bias_length.nir"), opts, true) {
             Err(ConvertError::BadData { dataset, what }) => {
                 assert_eq!(dataset, "node/nodes/c/bias");
@@ -2017,10 +2008,7 @@ mod tests {
             }
             other => panic!("native: expected UnsupportedNode, got {other:?}"),
         }
-        let sim = NirImportOptions {
-            dt_us: SIM_DT_US,
-            ..NirImportOptions::default()
-        };
+        let sim = NirImportOptions::sim_units(SIM_DT_US);
         match convert_file_opts(&affine, sim, true) {
             Err(ConvertError::UnexpectedKey { path, .. }) => {
                 assert_eq!(path, "node/nodes/affine/foo");
@@ -2289,10 +2277,7 @@ mod tests {
     /// A graph converted under `--sim-units` at the CLI's default step,
     /// and the options `--freeze` builds it under.
     fn sim_conversion(name: &str) -> (Converted, NirImportOptions) {
-        let opts = NirImportOptions {
-            dt_us: SIM_DT_US,
-            ..NirImportOptions::default()
-        };
+        let opts = NirImportOptions::sim_units(SIM_DT_US);
         let c = convert_file_opts(&fixture(name), opts, true).expect("converts under --sim-units");
         (c, effective_options(opts, true))
     }

@@ -125,7 +125,9 @@ const I16_FS: f64 = 32_767.0;
 // ---------------------------------------------------------------------------
 
 /// Everything that can go wrong importing/exporting NIR. Copy +
-/// borrowed strings only (no alloc).
+/// borrowed strings only (no alloc). Not exhaustive, nor are its four
+/// struct variants: a variant, or a field of one, may come in a minor
+/// release.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum NirError<'a> {
@@ -188,6 +190,7 @@ pub enum NirError<'a> {
     /// reference's `from_dict` is `cls(**kwargs)`, which refuses any
     /// other key, a field of another kind included; at the document, of
     /// which its reader takes only `node`, the rule is this module's.
+    #[non_exhaustive]
     UnexpectedField {
         /// The node's key in `nodes`; `None` for the graph object and
         /// the document.
@@ -198,6 +201,7 @@ pub enum NirError<'a> {
     /// A key given twice in one object. JSON leaves its meaning open
     /// and the reference reads no JSON, so the reader refuses it, as it
     /// refuses a node name or an edge given twice.
+    #[non_exhaustive]
     DuplicateField {
         /// The node's key in `nodes`; `None` for the graph object and
         /// the document.
@@ -223,6 +227,7 @@ pub enum NirError<'a> {
     /// import reads a mark on any node, and a LIF node with no mark
     /// reads as [`NirUnits::Native`]: under the other units every
     /// potential, `r` and weight would read on another scale.
+    #[non_exhaustive]
     UnitsMismatch {
         /// The units a node of the file is in: its mark, or native
         /// units for a LIF node with none.
@@ -232,6 +237,7 @@ pub enum NirError<'a> {
     },
     /// A per-edge type-shape mismatch (reference `check_types`
     /// parity): the `src → dst` edge's tensor shapes disagree.
+    #[non_exhaustive]
     EdgeShapeMismatch {
         /// The source node's key in the document.
         src: &'a str,
@@ -342,9 +348,9 @@ const fn units_name(u: NirUnits) -> &'static str {
 const fn units_remedy(file: NirUnits) -> &'static str {
     match file {
         NirUnits::Native => {
-            "import it with NirImportOptions::default(), or a graph with a spike edge with \
-             NirImportOptions { resolution: VoltageResolution::CentiMillivolt, \
-             ..NirImportOptions::default() }; a neuralos-nir2json --sim-units file written \
+            "import it with NirImportOptions::new(dt_us, VoltageResolution::Millivolt), or a \
+             graph with a spike edge with NirImportOptions::new(dt_us, \
+             VoltageResolution::CentiMillivolt); a neuralos-nir2json --sim-units file written \
              before the units mark has none: convert its .nir again"
         }
         NirUnits::Simulation => {
@@ -576,8 +582,11 @@ pub enum NirNodeKind {
 
 /// A quantized LIF node: provenance floats + derived substrate
 /// integers. Export renders the derived fields; provenance rides
-/// `metadata`.
+/// `metadata`. Not exhaustive: a field may come in a minor release, so
+/// outside this crate a record comes from [`quantize_lif`], or a caller
+/// writes one from [`BLANK`](Self::BLANK).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[non_exhaustive]
 pub struct NirLif {
     // provenance (source units: s, Ω, V)
     /// Source `tau`, seconds.
@@ -651,8 +660,11 @@ impl NirLif {
 /// A quantized LIF population view: `len` neurons with per-neuron
 /// records in the caller's lifs buffer ([`NirBuffers::lifs`] or
 /// `NirImport::lifs`), starting at `offset`. A length-1
-/// population is the slice-1 single neuron.
+/// population is the slice-1 single neuron. Not exhaustive: a field may
+/// come in a minor release, so outside this crate a caller writes one
+/// from [`BLANK`](Self::BLANK).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct NirLifPopulation {
     /// First record index in the lifs buffer.
     pub offset: usize,
@@ -693,6 +705,10 @@ impl NirLifPopulation {
 /// structured-entry builder: every slice must have equal length
 /// ≥ 1; `v_reset_v` `None` = the reference's absent-`v_reset`
 /// zeros semantics.
+///
+/// Exhaustive on purpose: a caller builds one by a literal, which puts
+/// each of the five slices beside its name, and a sixth field would be a
+/// breaking release.
 #[derive(Debug, Clone, Copy)]
 pub struct NirLifParams<'v> {
     /// Source `tau`, one per neuron, seconds.
@@ -708,8 +724,12 @@ pub struct NirLifParams<'v> {
     pub v_reset_v: Option<&'v [f64]>,
 }
 
-/// A quantized Linear node: weights live in the shared i16 arena.
+/// A quantized Linear node: weights live in the shared i16 arena. Not
+/// exhaustive: a field may come in a minor release, so outside this crate
+/// a view comes from [`quantize_linear`], or a caller writes one from
+/// [`BLANK`](Self::BLANK).
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct NirLinear {
     /// The `weight` tensor's out dimension.
     pub rows: usize,
@@ -753,8 +773,11 @@ impl NirLinear {
 
 /// One node, imported or built. Shapes are `[u32; 4]` + length (≤ 4 dims,
 /// reference shapes are 1–4-D). A LIF node carries a population
-/// view into the lifs buffer.
+/// view into the lifs buffer. Not exhaustive: a field may come in a
+/// minor release, so outside this crate a caller writes a node from
+/// [`BLANK`](Self::BLANK).
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub struct NirNode<'a> {
     /// This node's key in the document's `nodes` object, or the name a
     /// `NirBuilder` caller gave it.
@@ -816,8 +839,10 @@ pub enum NirNote {
     QuantizationLoss,
 }
 
-/// The loud import report.
+/// The loud import report. The import builds it and a caller reads it.
+/// Not exhaustive: a field may come in a minor release.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct NirReport {
     /// `Input` nodes.
     pub inputs: usize,
@@ -911,8 +936,11 @@ impl NoteCounts {
     }
 }
 
-/// First pass: buffer sizes + the version string.
+/// First pass: buffer sizes + the version string. [`nir_scan`] builds
+/// it and a caller reads it. Not exhaustive: a field may come in a minor
+/// release.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct NirScan<'a> {
     /// The document's `version` string, borrowed from the JSON.
     pub version: &'a str,
@@ -941,6 +969,9 @@ pub struct NirScan<'a> {
 /// weights and each LIF's five param arrays into `scratch`
 /// (transiently) while quantizing into the arena and the lifs
 /// buffer, which keep exactly the results.
+///
+/// Exhaustive on purpose: a caller lends its five buffers by a literal,
+/// each beside its name, and a sixth field would be a breaking release.
 #[derive(Debug)]
 pub struct NirBuffers<'buf, 'a> {
     /// `bufs` borrow lifetime (`'buf`) and json-data lifetime (`'a`).
@@ -958,8 +989,11 @@ pub struct NirBuffers<'buf, 'a> {
 }
 
 /// Import options: the three things NIR does not carry that the
-/// substrate needs.
+/// substrate needs. Not exhaustive: a field may come in a minor release,
+/// so outside this crate no struct literal builds options:
+/// [`new`](Self::new) and [`sim_units`](Self::sim_units) do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct NirImportOptions {
     /// Simulation timestep (μs). Hard requirement: `dt ≤ tau ≤ 1000·dt`
     /// (`TauBelowDt` below it, `TauTooLongForDt` above it).
@@ -3537,10 +3571,10 @@ mod std_assembly {
             assert_eq!(
                 err.to_string(),
                 "the file is in native units and the options read simulation units — import it \
-                 with NirImportOptions::default(), or a graph with a spike edge with \
-                 NirImportOptions { resolution: VoltageResolution::CentiMillivolt, \
-                 ..NirImportOptions::default() }; a neuralos-nir2json --sim-units file written \
-                 before the units mark has none: convert its .nir again"
+                 with NirImportOptions::new(dt_us, VoltageResolution::Millivolt), or a graph \
+                 with a spike edge with NirImportOptions::new(dt_us, \
+                 VoltageResolution::CentiMillivolt); a neuralos-nir2json --sim-units file \
+                 written before the units mark has none: convert its .nir again"
             );
         }
 
@@ -3605,12 +3639,20 @@ mod std_assembly {
         /// default mV options is refused with one of these remedies, and
         /// each names the options a graph in simulation units needs: a
         /// builder's graph carries no units mark, and neither does a file
-        /// the converter wrote before the mark.
+        /// the converter wrote before the mark. Each names the native
+        /// options on the centi-mV grid by `new`, a call: a struct literal
+        /// of the options does not compile outside this crate.
         #[test]
-        fn the_mv_remedies_name_the_simulation_units_options() {
+        fn the_mv_remedies_name_the_options_each_graph_needs() {
             for remedy in [SPIKING_LINEAR_MV_REMEDY, RECURRENT_MV_REMEDY] {
                 assert!(
                     remedy.contains("NirImportOptions::sim_units(dt_us)"),
+                    "{remedy}"
+                );
+                assert!(
+                    remedy.contains(
+                        "NirImportOptions::new(dt_us, VoltageResolution::CentiMillivolt)"
+                    ),
                     "{remedy}"
                 );
             }
@@ -3809,8 +3851,11 @@ mod std_assembly {
     }
 
     /// An imported graph in owned buffers (std convenience over the
-    /// two-pass buffer API).
+    /// two-pass buffer API). Not exhaustive: a field may come in a minor
+    /// release, so outside this crate a graph comes from
+    /// [`from_json`](Self::from_json) or [`NirBuilder::build`].
     #[derive(Debug)]
+    #[non_exhaustive]
     pub struct NirImport<'a> {
         /// Nodes in document order.
         pub nodes: Vec<NirNode<'a>>,
@@ -4656,6 +4701,9 @@ mod std_assembly {
     /// input can pass 32.767 units (raw pixels, 0 to 255, say); the
     /// current a neuron takes from a stage in one step still saturates
     /// at ±32,767 quanta.
+    ///
+    /// Exhaustive on purpose: `Thousandths(n)` is how a caller writes one,
+    /// and a second field would be a breaking release.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
     pub struct Thousandths(pub i32);
 
@@ -4755,8 +4803,11 @@ mod std_assembly {
 
     /// A fused encoder stage (D2): the composed Linear chain
     /// (root-first, target last) with each component tensor's
-    /// quantization scale.
+    /// quantization scale. The assembly builds it and a caller reads it.
+    /// Not exhaustive: a field may come in a minor release, so a pattern
+    /// needs `..`.
     #[derive(Debug, Clone, PartialEq)]
+    #[non_exhaustive]
     pub struct LinearFusedRecord<'a> {
         /// The composed nodes' names, root first, target last.
         pub chain: Vec<&'a str>,
@@ -4764,8 +4815,10 @@ mod std_assembly {
         pub scales: Vec<f64>,
     }
 
-    /// The loud assembly report.
+    /// The loud assembly report. The assembly builds it and a caller
+    /// reads it. Not exhaustive: a field may come in a minor release.
     #[derive(Debug, Clone, PartialEq)]
+    #[non_exhaustive]
     pub struct NirAssemblyReport<'a> {
         /// Total neurons (all populations).
         pub neurons: usize,
@@ -4803,16 +4856,14 @@ mod std_assembly {
     const RECURRENT_MV_REMEDY: &str = "recurrent graph on mV: pulses fall in the ~200 pA dead \
      zone — re-import a neuralos-nir2json --sim-units file with \
      NirImportOptions::sim_units(dt_us), a graph in native units with \
-     NirImportOptions { resolution: VoltageResolution::CentiMillivolt, \
-     ..NirImportOptions::default() }";
+     NirImportOptions::new(dt_us, VoltageResolution::CentiMillivolt)";
 
     /// The named mV-on-spiking-Linear rejection (D8 extends D1's grid
     /// rule), remedy verbatim and copy-pasteable.
     const SPIKING_LINEAR_MV_REMEDY: &str = "spiking Linear edge (LIF->Linear->LIF) on mV: D8 \
      assembles on the centi-mV grid only, as LIF->LIF does — re-import a \
      neuralos-nir2json --sim-units file with NirImportOptions::sim_units(dt_us), a graph in \
-     native units with NirImportOptions { resolution: VoltageResolution::CentiMillivolt, \
-     ..NirImportOptions::default() }";
+     native units with NirImportOptions::new(dt_us, VoltageResolution::CentiMillivolt)";
 
     #[cfg(test)]
     mod sim_units_tests {
