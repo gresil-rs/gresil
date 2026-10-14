@@ -41,7 +41,10 @@ const MISSING_V: &str = include_str!("nir_fixtures/neg_missing_version.json");
 const ESCAPED: &str = include_str!("nir_fixtures/neg_escaped_name.json");
 
 fn import_owned(doc: &str) -> Result<NirImport<'_>, NirError<'_>> {
-    NirImport::from_json(doc.as_bytes(), NirImportOptions::default())
+    NirImport::from_json(
+        doc.as_bytes(),
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+    )
 }
 
 #[test]
@@ -104,7 +107,7 @@ fn absent_v_reset_is_reference_semantics_with_note() {
     };
     let report = nir_import(
         CHAIN_VRESET.as_bytes(),
-        NirImportOptions::default(),
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
         &mut bufs,
     )
     .expect("imports");
@@ -357,7 +360,11 @@ fn a_weight_of_f64_s_largest_is_refused_at_import() {
         let (native, simulation) = (in_merge(w), in_sim(w));
         assert!(native != merge && simulation != sim, "the edits matched");
         assert_eq!(
-            NirImport::from_json(native.as_bytes(), NirImportOptions::default()).err(),
+            NirImport::from_json(
+                native.as_bytes(),
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt)
+            )
+            .err(),
             Some(NirError::BadNumber("weight")),
             "{w} in merge.json"
         );
@@ -369,7 +376,10 @@ fn a_weight_of_f64_s_largest_is_refused_at_import() {
     }
     let below = "1.7976931348623155e308";
     for (doc, opts) in [
-        (in_merge(below), NirImportOptions::default()),
+        (
+            in_merge(below),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+        ),
         (in_sim(below), sim_units),
     ] {
         let path = import_path(doc.as_bytes(), opts, &mut out);
@@ -395,8 +405,12 @@ fn buffer_api_consumes_reference_emission() {
             lifs: &mut lifs,
             scratch: &mut scratch,
         };
-        let report =
-            nir_import(CHAIN.as_bytes(), NirImportOptions::default(), &mut bufs).expect("imports");
+        let report = nir_import(
+            CHAIN.as_bytes(),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+            &mut bufs,
+        )
+        .expect("imports");
         assert_eq!(report.weight_cells, 3);
         assert!(
             report.note_count() >= 1,
@@ -468,12 +482,11 @@ impl Rng {
 }
 
 /// A fixture as a seed of the loop: its bytes, the options it imports
-/// under and where a JSON edit can land in it. The options are the
-/// default, but simulation units when the default refuses the fixture's
-/// units mark, and the centi-mV grid in native units when the default
-/// imports the fixture, its `build_network` refuses and the centi-mV grid
-/// builds it; a negative made for mV, which the default refuses, stays on
-/// mV.
+/// under and where a JSON edit can land in it. The options are mV at
+/// 1 ms in native units, but simulation units when those refuse the
+/// fixture's units mark, and the centi-mV grid in native units when they
+/// import the fixture, its `build_network` refuses and the centi-mV grid
+/// builds it; a negative made for mV, which they refuse, stays on mV.
 struct Seed {
     name: String,
     bytes: Vec<u8>,
@@ -510,10 +523,13 @@ fn mutation_seeds(flight: &InFlight) -> Vec<Seed> {
                 .into_owned();
             let bytes = std::fs::read(p).expect("a fixture reads");
             flight.begin(format!("the setup, {name}"), &bytes);
-            let opts = match NirImport::from_json(&bytes, NirImportOptions::default()) {
+            let opts = match NirImport::from_json(
+                &bytes,
+                NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+            ) {
                 Err(NirError::UnitsMismatch { .. }) => NirImportOptions::sim_units(100),
                 Ok(g) if g.build_network().is_err() && builds(&bytes, centi) => centi,
-                _ => NirImportOptions::default(),
+                _ => NirImportOptions::new(1_000, VoltageResolution::Millivolt),
             };
             Seed {
                 name,

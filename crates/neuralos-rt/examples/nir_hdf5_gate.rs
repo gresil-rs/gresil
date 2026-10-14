@@ -27,6 +27,7 @@ use std::path::PathBuf;
 
 use neuralos_rt::nir_hdf5::{nir_hdf5_read, nir_hdf5_write, NirHdfError};
 use neuralos_snn::nir::{NirImport, NirImportOptions};
+use neuralos_snn::VoltageResolution;
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -63,7 +64,7 @@ fn main() {
         doc.edges.len(),
         doc.version
     );
-    let opts = NirImportOptions::default();
+    let opts = NirImportOptions::new(1_000, VoltageResolution::Millivolt);
     let g = doc.import(opts).unwrap_or_else(|e| fail(&e.to_string()));
     let lif_node = g.nodes.iter().find(|n| n.name == "lif").unwrap();
     let pop = lif_node.lif.unwrap();

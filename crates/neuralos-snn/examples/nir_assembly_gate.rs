@@ -113,8 +113,11 @@ fn main() {
     println!();
 
     // ---- gate 1: branch — every population fires, pins exact -------
-    let g = NirImport::from_json(BRANCH, NirImportOptions::default())
-        .unwrap_or_else(|e| fail(&e.to_string()));
+    let g = NirImport::from_json(
+        BRANCH,
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+    )
+    .unwrap_or_else(|e| fail(&e.to_string()));
     let (mut net, enc, rep) = g.build_network().unwrap_or_else(|e| fail(&e.to_string()));
     print_report(&rep);
     let pins = raster(&mut net, &enc, &[&[6_000, 0, 0].map(Thousandths)], 100);
@@ -208,7 +211,11 @@ fn main() {
     );
 
     // ---- gate 4: fusion exactness through the seam -----------------
-    let g = NirImport::from_json(BRANCH, NirImportOptions::default()).unwrap();
+    let g = NirImport::from_json(
+        BRANCH,
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+    )
+    .unwrap();
     let (_, enc, rep) = g.build_network().unwrap();
     if rep.fused.len() != 1 || rep.fused[0].chain != vec!["l1", "l2"] {
         fail("the l1·l2 chain must fuse exactly once, recorded");
@@ -333,7 +340,7 @@ fn main() {
         (
             "recurrent on mV",
             RECURRENT,
-            NirImportOptions::default(),
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
             |e| {
                 matches!(e, NirError::UnsupportedTopology(m)
                 if m.contains("CentiMillivolt") && m.contains("~200 pA dead zone"))
@@ -357,7 +364,7 @@ fn main() {
     );
 
     // ---- gate 6: frozen chain re-runs UNCHANGED through both -------
-    let opts = NirImportOptions::default();
+    let opts = NirImportOptions::new(1_000, VoltageResolution::Millivolt);
     let g = NirImport::from_json(CHAIN, opts).unwrap_or_else(|e| fail(&e.to_string()));
     let (mut net1, enc1) = g
         .build_chain_network()

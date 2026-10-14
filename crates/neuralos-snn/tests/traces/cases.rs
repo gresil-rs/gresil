@@ -511,13 +511,16 @@ fn saturation_floor_ceiling() -> Run {
 }
 
 /// The reference chain (Input 3 → Linear 1×3 → LIF → Output) imported
-/// with the default options and built by `build_network`, driven through
+/// with the mV options at 1 ms and built by `build_network`, driven through
 /// its encoder with `[4, 0, 0]` as the assembly gate's frozen pin is:
 /// 9 spikes in 100 steps, the first at step 6
 /// (`examples/nir_assembly_gate.rs`, gate 6).
 fn nir_chain_fixture() -> Run {
-    let g = NirImport::from_json(NIR_CHAIN, NirImportOptions::default())
-        .expect("the reference emission imports");
+    let g = NirImport::from_json(
+        NIR_CHAIN,
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+    )
+    .expect("the reference emission imports");
     let (net, enc, _report) = g.build_network().expect("the chain assembles");
     Run {
         net,

@@ -33,6 +33,7 @@ use neuralos_snn::nir::{
     nir_export, nir_scan, NirBuffers, NirError, NirImport, NirImportOptions, NirLif, NirNode,
     NirNote, EXPORT_VERSION, NIR_REF_SHA,
 };
+use neuralos_snn::VoltageResolution;
 
 const CHAIN: &str = include_str!("../tests/nir_fixtures/chain.json");
 const CHAIN_VRESET: &str = include_str!("../tests/nir_fixtures/chain_vreset_absent.json");
@@ -126,7 +127,7 @@ fn main() {
         "fixture : chain.json — {} nodes / {} edges / {} weight cells, version \"{}\"",
         scan.node_count, scan.edge_count, scan.weight_cells, scan.version
     );
-    let opts = NirImportOptions::default();
+    let opts = NirImportOptions::new(1_000, VoltageResolution::Millivolt);
     let g = NirImport::from_json(CHAIN.as_bytes(), opts)
         .unwrap_or_else(|e| fail(&format!("chain import: {e}")));
     let pop = g.nodes[2].lif.expect("lif");

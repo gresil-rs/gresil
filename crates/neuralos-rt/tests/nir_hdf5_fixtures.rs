@@ -14,6 +14,7 @@ use neuralos_rt::nir_hdf5::{nir_hdf5_read, nir_hdf5_write, NirHdfError, NirHdfNo
 use neuralos_snn::nir::{
     NirBuilder, NirImport, NirImportOptions, NirLif, NirLifParams, Thousandths,
 };
+use neuralos_snn::VoltageResolution;
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -65,7 +66,9 @@ fn reference_population_chain_imports_per_neuron() {
         ]
     );
 
-    let g = doc.import(NirImportOptions::default()).expect("imports");
+    let g = doc
+        .import(NirImportOptions::new(1_000, VoltageResolution::Millivolt))
+        .expect("imports");
     let lin = find(&g, "linear").linear.expect("linear");
     assert_eq!(
         &g.weights[lin.weight_offset..lin.weight_offset + 6],
@@ -91,14 +94,19 @@ fn hdf5_matches_the_json_path_record_for_record() {
     // JSON shape (to_dict, hand-emitted as chain_population.json) and
     // its HDF5 write() must yield identical quantized state
     let h5_doc = nir_hdf5_read(&fixture("chain_population.nir")).expect("read");
-    let h5 = h5_doc.import(NirImportOptions::default()).expect("import");
+    let h5 = h5_doc
+        .import(NirImportOptions::new(1_000, VoltageResolution::Millivolt))
+        .expect("import");
     let json_doc = std::fs::read_to_string(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../neuralos-snn/tests/nir_fixtures/chain_population.json"),
     )
     .expect("json fixture");
-    let js = NirImport::from_json(json_doc.as_bytes(), NirImportOptions::default())
-        .expect("json import");
+    let js = NirImport::from_json(
+        json_doc.as_bytes(),
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+    )
+    .expect("json import");
 
     for name in ["input", "linear", "lif", "output"] {
         let (h, j) = (find(&h5, name), find(&js, name));
@@ -313,7 +321,9 @@ fn ghost_edge_endpoint_is_a_seam_error() {
         .unwrap();
     f.close().unwrap();
     let doc = nir_hdf5_read(&p).expect("reads");
-    let err = doc.import(NirImportOptions::default()).expect_err("ghost");
+    let err = doc
+        .import(NirImportOptions::new(1_000, VoltageResolution::Millivolt))
+        .expect_err("ghost");
     match err {
         NirHdfError::Seam(m) => assert!(m.contains("ghost"), "{m}"),
         other => panic!("wrong error: {other:?}"),
@@ -327,7 +337,7 @@ fn lif_param_length_mismatch_is_a_seam_badshape() {
     hand::add_lif_arrays(&p, "l", &[0.02, 0.03], &[1e8]);
     let doc = nir_hdf5_read(&p).expect("reads at container level");
     let err = doc
-        .import(NirImportOptions::default())
+        .import(NirImportOptions::new(1_000, VoltageResolution::Millivolt))
         .expect_err("param len");
     match err {
         NirHdfError::Seam(m) => assert!(m.contains("LIF param"), "{m}"),
@@ -403,7 +413,9 @@ fn assert_semantically_equal(a: &NirImport<'_>, b: &NirImport<'_>) {
 #[test]
 fn export_read_back_is_semantically_idempotent() {
     let doc = nir_hdf5_read(&fixture("chain_population.nir")).expect("read");
-    let g = doc.import(NirImportOptions::default()).expect("import");
+    let g = doc
+        .import(NirImportOptions::new(1_000, VoltageResolution::Millivolt))
+        .expect("import");
     let out = hand::scratch("export_roundtrip.nir");
     nir_hdf5_write(&out, &g).expect("export");
     let doc2 = nir_hdf5_read(&out).expect("re-read");
@@ -411,14 +423,16 @@ fn export_read_back_is_semantically_idempotent() {
         doc2.version, "nir@7883c3c",
         "our export carries the provenance version block"
     );
-    let g2 = doc2.import(NirImportOptions::default()).expect("re-import");
+    let g2 = doc2
+        .import(NirImportOptions::new(1_000, VoltageResolution::Millivolt))
+        .expect("re-import");
     assert_semantically_equal(&g, &g2);
     // and the second round is stable too
     let out2 = hand::scratch("export_roundtrip2.nir");
     nir_hdf5_write(&out2, &g2).expect("export 2");
     let doc3 = nir_hdf5_read(&out2).expect("re-read 2");
     let g3 = doc3
-        .import(NirImportOptions::default())
+        .import(NirImportOptions::new(1_000, VoltageResolution::Millivolt))
         .expect("re-import 2");
     assert_semantically_equal(&g2, &g3);
 }
@@ -427,7 +441,7 @@ fn export_read_back_is_semantically_idempotent() {
 fn defaulted_v_reset_survives_the_round_trip() {
     // absent v_reset on read → defaulted record → export OMITS the
     // dataset → re-read defaults again: the flag round-trips
-    let mut bld = NirBuilder::new(NirImportOptions::default());
+    let mut bld = NirBuilder::new(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
     let params = NirLifParams {
         tau_s: &[0.02],
         r_ohm: &[1e8],
@@ -458,7 +472,9 @@ fn defaulted_v_reset_survives_the_round_trip() {
             .is_none(),
         "v_reset dataset must be OMITTED when defaulted"
     );
-    let g2 = doc.import(NirImportOptions::default()).unwrap();
+    let g2 = doc
+        .import(NirImportOptions::new(1_000, VoltageResolution::Millivolt))
+        .unwrap();
     assert!(g2.lifs[0].v_reset_defaulted, "flag survives the round trip");
     assert_semantically_equal(&g, &g2);
 }
@@ -467,7 +483,7 @@ fn defaulted_v_reset_survives_the_round_trip() {
 fn zero_edge_graph_exports_and_reads() {
     // the reference cannot emit this shape (auto-wiring); our writer
     // emits 0×2 edges and the reader takes it back
-    let mut bld = NirBuilder::new(NirImportOptions::default());
+    let mut bld = NirBuilder::new(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
     bld.add_input("i", &[2]).unwrap();
     bld.add_output("o", &[2]).unwrap();
     let g = bld.build().unwrap();
@@ -475,7 +491,9 @@ fn zero_edge_graph_exports_and_reads() {
     nir_hdf5_write(&path, &g).expect("export");
     let doc = nir_hdf5_read(&path).expect("read");
     assert!(doc.edges.is_empty());
-    let g2 = doc.import(NirImportOptions::default()).unwrap();
+    let g2 = doc
+        .import(NirImportOptions::new(1_000, VoltageResolution::Millivolt))
+        .unwrap();
     assert_semantically_equal(&g, &g2);
 }
 
@@ -485,7 +503,9 @@ fn json_export_stays_byte_stable_from_the_hdf5_import() {
     // HDF5 path: the same import exports byte-identically twice and
     // re-imports state-identically
     let doc = nir_hdf5_read(&fixture("chain_population.nir")).unwrap();
-    let g = doc.import(NirImportOptions::default()).unwrap();
+    let g = doc
+        .import(NirImportOptions::new(1_000, VoltageResolution::Millivolt))
+        .unwrap();
     let mut a = vec![0u8; 8192];
     let mut b = vec![0u8; 8192];
     let na = neuralos_snn::nir::nir_export(&g.nodes, &g.edges, &g.weights, &g.lifs, g.opts, &mut a)
@@ -493,7 +513,11 @@ fn json_export_stays_byte_stable_from_the_hdf5_import() {
     let nb = neuralos_snn::nir::nir_export(&g.nodes, &g.edges, &g.weights, &g.lifs, g.opts, &mut b)
         .unwrap();
     assert_eq!(&a[..na], &b[..nb], "JSON export is byte-stable");
-    let g2 = NirImport::from_json(&a[..na], NirImportOptions::default()).unwrap();
+    let g2 = NirImport::from_json(
+        &a[..na],
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+    )
+    .unwrap();
     assert_semantically_equal(&g, &g2);
 }
 
@@ -503,7 +527,6 @@ fn json_export_stays_byte_stable_from_the_hdf5_import() {
 /// step 52. Mirrors the `nir_hdf5_assembly_gate` example's leg 3.
 #[test]
 fn merge_graph_assembles_and_fires_from_the_hdf5_path() {
-    use neuralos_snn::lif_neuron::VoltageResolution;
     let centi = NirImportOptions::new(1_000, VoltageResolution::CentiMillivolt);
     let gz_doc = nir_hdf5_read(&fixture("merge.nir")).expect("reference file reads");
     let gz = gz_doc.import(centi).expect("imports");

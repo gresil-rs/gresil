@@ -7,6 +7,7 @@
 use std::path::{Path, PathBuf};
 
 use neuralos_nir2json::{ConvertError, SIM_DT_US, convert_file_opts};
+use neuralos_snn::VoltageResolution;
 use neuralos_snn::nir::NirImportOptions;
 
 /// The seed `seed`, its bytes at `at` turned from `old` into `new`,
@@ -42,7 +43,11 @@ type Row = (
 fn both(path: &Path) -> [Result<usize, ConvertError>; 2] {
     let sim = NirImportOptions::sim_units(SIM_DT_US);
     [
-        convert_file_opts(path, NirImportOptions::default(), false),
+        convert_file_opts(
+            path,
+            NirImportOptions::new(1_000, VoltageResolution::Millivolt),
+            false,
+        ),
         convert_file_opts(path, sim, true),
     ]
     .map(|r| r.map(|c| c.json.len()))

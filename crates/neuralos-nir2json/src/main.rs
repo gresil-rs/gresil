@@ -26,7 +26,7 @@ use neuralos_snn::nir::{NirImportOptions, Thousandths};
 /// The run `--freeze` writes when `--steps` is not given.
 const DEFAULT_STEPS: u32 = 150;
 
-/// The time step otherwise, the library's default.
+/// The time step when neither `--dt` nor `--sim-units` is given: 1 ms.
 const NATIVE_DT_US: u32 = 1_000;
 
 /// The command line, parsed.
