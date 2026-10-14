@@ -1705,8 +1705,12 @@ fn count_array(r: &mut Reader<'_>, depth: &mut usize, leaves: &mut usize) -> Res
 /// ([`NirError::UnitsMismatch`]). A key its object does not carry, or
 /// one given twice, is refused by name ([`NirError::UnexpectedField`],
 /// [`NirError::DuplicateField`]), a kind outside the subset first
-/// ([`NirError::UnsupportedNodeKind`]). On any error nothing is
-/// promised about buffer contents.
+/// ([`NirError::UnsupportedNodeKind`]). An Input's or an Output's
+/// `shape` holds 1 to 4 dims: empty or past 4 it is
+/// [`NirError::BadShape("shape")`](NirError::BadShape), as the builder
+/// refuses one, and absent
+/// [`NirError::MissingField("shape")`](NirError::MissingField). On any
+/// error nothing is promised about buffer contents.
 // two documented walks (nodes, then edges) + their trailing checks;
 // the 100-line cap is crossed by the EOF checks alone (network.rs
 // precedent for the allow)
@@ -1985,6 +1989,19 @@ fn read_units_mark(r: &mut Reader<'_>) -> Result<Option<NirUnits>, NirError> {
     Ok(mark)
 }
 
+/// An Input's or an Output's shape, once the walk has refused one past 4
+/// dims: absent, a missing field; given and empty, a bad shape, as
+/// `NirBuilder` refuses one.
+fn carrier_shape(given: bool, len: usize) -> Result<(), NirError> {
+    if !given {
+        return Err(NirError::MissingField("shape"));
+    }
+    if len == 0 {
+        return Err(NirError::BadShape("shape"));
+    }
+    Ok(())
+}
+
 // 106 lines once rustfmt reflows the call sites (2026-09-02); the body
 // did not grow, the line count did
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
@@ -2011,6 +2028,8 @@ fn import_node<'a>(
     let mut kind: Option<&str> = None;
     let mut shape = [0u32; 4];
     let mut shape_len = 0usize;
+    // given and empty is a bad shape, absent a missing field
+    let mut shape_given = false;
     // LIF params stage contiguously into scratch (per-node `fill`,
     // freed after quantization); ranges are (start, len) pairs.
     let mut staged = 0usize;
@@ -2028,6 +2047,7 @@ fn import_node<'a>(
         match key {
             "type" => kind = Some(r.read_string()?),
             "shape" => {
+                shape_given = true;
                 let mut sfirst = true;
                 while r.array_step(&mut sfirst)? {
                     if shape_len >= 4 {
@@ -2092,16 +2112,12 @@ fn import_node<'a>(
     bufs.nodes[idx].shape_len = shape_len;
     bufs.nodes[idx].kind = match node_kind {
         NirNodeKind::Input => {
-            if shape_len == 0 {
-                return Err(NirError::MissingField("shape"));
-            }
+            carrier_shape(shape_given, shape_len)?;
             report.inputs += 1;
             NirNodeKind::Input
         }
         NirNodeKind::Output => {
-            if shape_len == 0 {
-                return Err(NirError::MissingField("shape"));
-            }
+            carrier_shape(shape_given, shape_len)?;
             report.outputs += 1;
             NirNodeKind::Output
         }
@@ -5402,8 +5418,7 @@ mod std_assembly {
         /// # Errors
         ///
         /// [`NirError::BadShape("shape")`](NirError::BadShape) outside 1–4
-        /// dims; the reader refuses an empty shape too, as
-        /// [`NirError::MissingField("shape")`](NirError::MissingField).
+        /// dims, as the reader refuses a shape given empty or past 4.
         pub fn add_input(&mut self, name: &'a str, shape: &[u32]) -> Result<usize, NirError> {
             self.push_carrier(name, NirNodeKind::Input, shape)
         }
@@ -5413,8 +5428,7 @@ mod std_assembly {
         /// # Errors
         ///
         /// [`NirError::BadShape("shape")`](NirError::BadShape) outside 1–4
-        /// dims; the reader refuses an empty shape too, as
-        /// [`NirError::MissingField("shape")`](NirError::MissingField).
+        /// dims, as the reader refuses a shape given empty or past 4.
         pub fn add_output(&mut self, name: &'a str, shape: &[u32]) -> Result<usize, NirError> {
             self.push_carrier(name, NirNodeKind::Output, shape)
         }
@@ -7533,7 +7547,7 @@ mod tests {
             let d = carriers(input, output);
             assert_eq!(
                 NirImport::from_json(d.as_bytes(), opts).err(),
-                Some(NirError::MissingField("shape")),
+                Some(NirError::BadShape("shape")),
                 "input {input}, output {output}"
             );
         }
@@ -7545,6 +7559,27 @@ mod tests {
         let i = b.add_input("i", &[1]).expect("input");
         let o = b.add_output("o", &[1]).expect("output");
         assert_eq!((i, o), (0, 1));
+    }
+
+    /// A shape the document does not give is missing, the reader's alone
+    /// to see: the builder takes a shape with every carrier.
+    #[test]
+    fn an_absent_shape_is_a_missing_field() {
+        let opts = NirImportOptions::new(1_000, VoltageResolution::Millivolt);
+        let whole = carriers("[1]", "[1]");
+        for (node, kind) in [("i", "Input"), ("o", "Output")] {
+            let d = whole.replacen(
+                &format!("\"{node}\":{{\"type\":\"{kind}\",\"shape\":[1]}}"),
+                &format!("\"{node}\":{{\"type\":\"{kind}\"}}"),
+                1,
+            );
+            assert_ne!(d, whole, "{kind} carries its shape");
+            assert_eq!(
+                NirImport::from_json(d.as_bytes(), opts).err(),
+                Some(NirError::MissingField("shape")),
+                "{kind} without its shape"
+            );
+        }
     }
 
     #[test]
