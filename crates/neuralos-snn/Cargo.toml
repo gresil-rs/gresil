@@ -108,6 +108,10 @@ required-features = ["unstable-stdp", "unstable-freeze"]
 # skips `freeze` and `learner` in silence, as it does `bench_simd`; the
 # workspace build turns their features on and covers them.
 [[example]]
+name = "stranger"
+test = true
+
+[[example]]
 name = "freeze"
 test = true
 required-features = ["unstable-freeze"]
