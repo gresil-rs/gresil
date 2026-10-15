@@ -104,6 +104,9 @@ for c in $commits; do
   # per-commit job.
   run rustup target add riscv32imc-unknown-none-elf
   run cargo check -p neuralos-snn --lib --no-default-features --features unstable-freeze --target riscv32imc-unknown-none-elf
+  # the starter set's two no_std examples on the same target (round 69):
+  # the same line as the per-commit job.
+  run cargo check -p neuralos-snn --example board --example learner --no-default-features --features unstable-stdp --target riscv32imc-unknown-none-elf
   run env RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib
   run env RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --no-default-features
   run env RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --features simd

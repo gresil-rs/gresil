@@ -55,7 +55,11 @@ features = ["simd", "unstable-stdp", "unstable-bridge", "unstable-freeze"]
 # from 2026-09-10, alpha.6); heapless, the one runtime dependency
 # before that, is now the differential oracle below. Audit surface: core.
 
-[dev-dependencies]
+# Cargo builds the dev-dependencies for an example, and proptest needs
+# an OS (heapless does not): under this table a target with none, the
+# C3's `riscv32imc-unknown-none-elf`, builds the examples without them,
+# so CI checks `board` and `learner` there (AGENTS.md § Commands).
+[target.'cfg(not(target_os = "none"))'.dev-dependencies]
 # Property-based tests — Cardano-grade rigor (leçon v0.1: tout test doit être réel)
 proptest = "1.5"
 # The pre-ring spike history, kept as the oracle of the differential
@@ -66,7 +70,7 @@ heapless = "0.8"
 name = "bench_simd"
 required-features = ["simd"]
 
-# The five examples that learn, or that write the plasticity-on trace
+# The examples that learn, or that write the plasticity-on trace
 # (`trace` writes the frozen file too, so it needs the freezer):
 # `-p neuralos-snn` skips them in silence, as it does `bench_simd`; the
 # workspace build turns the features on (rt and the app ask for STDP,
@@ -96,3 +100,29 @@ required-features = ["unstable-bridge"]
 [[example]]
 name = "trace"
 required-features = ["unstable-stdp", "unstable-freeze"]
+
+# The starter set, code a stranger copies (each header says what it
+# shows). Each runs its test under `cargo test` (`test = true`). `board`
+# and `learner` are `no_std` libraries, since a board's firmware owns the
+# entry point; CI checks them for the C3's target too. `-p neuralos-snn`
+# skips `freeze` and `learner` in silence, as it does `bench_simd`; the
+# workspace build turns their features on and covers them.
+[[example]]
+name = "stranger"
+test = true
+
+[[example]]
+name = "freeze"
+test = true
+required-features = ["unstable-freeze"]
+
+[[example]]
+name = "board"
+crate-type = ["lib"]
+test = true
+
+[[example]]
+name = "learner"
+crate-type = ["lib"]
+test = true
+required-features = ["unstable-stdp"]

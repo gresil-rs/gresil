@@ -154,8 +154,9 @@ records it names in `evidence/INDEX.md`. Four lines, in order:
    capacitance, ten `nir` structs and four `NirError` variants not
    exhaustive, with a blank for the four structs a caller fills, NIR
    import options that name their step and grid, and a `NirError` that
-   owns the names it reports are in. Then the rename, the front door,
-   the stamp.
+   owns the names it reports are in. The starter set closes the walk:
+   four examples a stranger copies, which CI builds and tests. Then the
+   rename, the front door, the stamp.
 3. **0.1.0: the stamp.** The principal's call, once the fourteen checks
    of § 0.1.0 hold again at the final tree, after the rename.
 4. **After 0.1.0: the learning chapter** (`docs/VISION.md` § Realistic
