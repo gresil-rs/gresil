@@ -99,6 +99,15 @@ jobs:
           rustup target add riscv32imc-unknown-none-elf
           cargo check -p neuralos-snn --lib --no-default-features --features unstable-freeze --target riscv32imc-unknown-none-elf
 
+      # The starter set's two no_std examples on the C3's target (round
+      # 69): `board` steps a frozen graph and `learner` applies STDP by
+      # hand, both libraries, since a board's firmware owns the entry
+      # point. Cargo builds the dev-dependencies for an example, and
+      # proptest needs an OS, so the crate's manifest leaves them out on a
+      # target with none. The target is the one the step above adds.
+      - name: no_std examples on riscv32imc (board, learner)
+        run: cargo check -p neuralos-snn --example board --example learner --no-default-features --features unstable-stdp --target riscv32imc-unknown-none-elf
+
       # The MSRV gate: `rust-version = "1.92"` is the crate's promise to its
       # users; the pin is ours and follows stable (PR C). The library alone,
       # in the six configurations a user can pick, on the declared floor.
@@ -327,6 +336,9 @@ jobs:
             # there.
             rustup target add riscv32imc-unknown-none-elf
             cargo check -p neuralos-snn --lib --no-default-features --features unstable-freeze --target riscv32imc-unknown-none-elf
+            # the starter set's two no_std examples on the same target
+            # (round 69)
+            cargo check -p neuralos-snn --example board --example learner --no-default-features --features unstable-stdp --target riscv32imc-unknown-none-elf
             RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib
             RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --no-default-features
             RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --features simd

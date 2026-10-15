@@ -91,6 +91,7 @@ cargo build --no-default-features -p neuralos-snn # the no_std gate (RISC-V/embe
 cargo build --no-default-features --features unstable-stdp -p neuralos-snn  # same gate with STDP: `STDPRule` and `update_weight` are `no_std`
 cargo build --no-default-features --features unstable-bridge -p neuralos-snn  # same gate with the bridge: the codecs and the kernel are `no_std`
 cargo check -p neuralos-snn --lib --no-default-features --features unstable-freeze --target riscv32imc-unknown-none-elf  # same gate with the freezer (round 51): it builds nothing without `std`, and a target with no `std` sees what a host line cannot, a feature that turns `std` on; needs `rustup target add riscv32imc-unknown-none-elf` on the pin
+cargo check -p neuralos-snn --example board --example learner --no-default-features --features unstable-stdp --target riscv32imc-unknown-none-elf  # the starter set's two no_std examples on the same target (round 69): cargo builds the dev-dependencies for an example, and proptest needs an OS, so the manifest leaves them out on a target with none
 RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib                         # the MSRV gate (PR C): rust-version is the crate's promise, the pin is ours; needs `rustup toolchain install 1.92.0 --profile minimal`
 RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --no-default-features   # same gate, the no_std configuration
 RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --features simd         # same gate, the simd configuration
