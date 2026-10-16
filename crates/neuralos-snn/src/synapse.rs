@@ -18,7 +18,8 @@
 //!   for a weight of 0 or more, `[-2000, 0]` below 0. The fields are the
 //!   crate's, so no caller writes the bounds.
 //! - Weight stays within `[min_weight, max_weight]` after every `update_weight` call.
-//! - `STDPRule::calculate_weight_change(dt)` returns 0 for `|dt| ≥ 10·tau` (decay floor).
+//! - `STDPRule::calculate_weight_change(dt)` returns 0 for `|dt| ≥ tau`, where the
+//!   linear factor reaches 0.
 //! - LTP (pre before post, dt < 0) returns a non-negative delta.
 //! - LTD (post before pre, dt > 0) returns a non-positive delta.
 //!
@@ -239,7 +240,8 @@ fn bounds_by_sign(weight: i16) -> (i16, i16) {
 /// Spike-Timing-Dependent Plasticity rule.
 ///
 /// The audit flagged this as **the better STDP implementation** (vs `stdp_plasticity.rs`):
-/// real exp-decay via fixed-point linear approximation, sign-correct (positive dt → LTD,
+/// a linear stand-in for the exponential decay, in fixed point (the factor is
+/// `1000 − |dt|·1000/tau`, clamped at 0), sign-correct (positive dt → LTD,
 /// negative dt → LTP).
 #[cfg(feature = "unstable-stdp")]
 #[derive(Debug, Clone)]
@@ -284,7 +286,7 @@ impl STDPRule {
     ///
     /// - `dt > 0` → returns ≤ 0 (LTD)
     /// - `dt < 0` → returns ≥ 0 (LTP)
-    /// - `|dt| ≥ 10·tau` → returns 0 (decay floor)
+    /// - `|dt| ≥ tau` → returns 0 (the linear factor reaches 0)
     ///
     /// # Bug fix vs v0.1
     ///

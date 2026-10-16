@@ -23,7 +23,9 @@
 //! (`nir/serialization.py`, h5py); the dict schema is
 //! container-independent and the JSON encoding of it is what this
 //! module reads and writes (the historical NIR container). HDF5 `.nir`
-//! file IO is slice-2 work and lands std-side (needs the hdf5 crate).
+//! files are read outside this crate: by `neuralos-rt`'s `hdf5` feature (the
+//! C library) and by `neuralos-nir2json` (`hdf5-pure`, no C), the converter
+//! that turns a stranger's `.nir` into this JSON.
 //!
 //! LIF (`nir/ir/neuron.py`): `tau` \[s\], `r` \[Ω\], `v_leak` \[V\],
 //! `v_threshold` \[V\], `v_reset` \[V\] — per-neuron arrays; `v_reset`
@@ -78,11 +80,12 @@
 //! the caller owns all memory. Two-pass protocol — [`nir_scan`] counts,
 //! [`NirBuffers`] + [`nir_import`] fills (the import itself walks the
 //! document twice: nodes, then edges — edge endpoints may appear
-//! before their nodes in key order). During import each Linear's
-//! source f64 weights stage into [`NirBuffers::scratch`] (one slot
-//! per cell) and quantize into the weight arena, so both must hold
-//! the total weight count; the arena keeps exactly the quantized
-//! result. Export writes into a caller byte slice. Strings are
+//! before their nodes in key order). During import each node stages
+//! its source f64s into [`NirBuffers::scratch`], one node at a time (a
+//! Linear its weights, a LIF its parameter arrays), and quantizes them
+//! into the weight arena or the lifs buffer, which keep exactly the
+//! results; the sizes [`NirBuffers`] names are enough for any graph.
+//! Export writes into a caller byte slice. Strings are
 //! borrowed from the input (schema strings must be escape-free
 //! printable ASCII — loud error otherwise); an error copies the names
 //! it reports, so it borrows nothing. `f64` appears in the setup path
@@ -1062,7 +1065,8 @@ pub struct NirScan<'a> {
 /// each beside its name, and a sixth field would be a breaking release.
 #[derive(Debug)]
 pub struct NirBuffers<'buf, 'a> {
-    /// `bufs` borrow lifetime (`'buf`) and json-data lifetime (`'a`).
+    /// Nodes in document order: the slice is the caller's (`'buf`), and
+    /// the names borrow the JSON (`'a`).
     pub nodes: &'buf mut [NirNode<'a>],
     /// Edges as `(from, to)` indices into `nodes`.
     pub edges: &'buf mut [(u32, u32)],
@@ -2540,8 +2544,8 @@ mod std_assembly {
     //!   Input→Linear is the encoder entry; LIF→Output is
     //!   shape-checked decoration.
     //! - **Plasticity is FROZEN at assembly** (`NIR has no plasticity
-    //!   term` — STDP would clamp ±32767 and corrupt the edge quanta);
-    //!   recorded in the report.
+    //!   term` — STDP would move an edge's pulse weight on its first
+    //!   update, inside its `[0, 2000]` bounds); recorded in the report.
     //! - **Grid:** any graph with a LIF→LIF edge assembles only on
     //!   [`VoltageResolution::CentiMillivolt`] options — a 20 pA edge
     //!   pulse is dead 10× over on mV — and D8 extends the rule to any
@@ -2586,10 +2590,12 @@ mod std_assembly {
     /// | sustained `V_ss` lift/spiking neighbor | +2.0 mV (coupling, not ignition) | +200 quanta |
     /// | ≥ 1 quantum/pulse headroom | — | holds to τ = 200 ms |
     ///
-    /// Saturation: 1638 coincident pulses saturate the i16 accumulator;
+    /// Saturation: at the default divisor the 1,639th coincident pulse
+    /// saturates the i16 accumulator (1,638 × 20 pA is 32,760);
     /// plasticity is FROZEN at NIR assembly (NIR has no plasticity
-    /// term — STDP's ±32767 clamp would corrupt the quanta on first
-    /// touch), so the constant never rides a learning weight.
+    /// term — STDP would move the pulse's weight on its first update,
+    /// inside its `[0, 2000]` bounds), so the constant never rides a
+    /// learning weight.
     ///
     /// Consequence (named, never silent): any graph with a LIF→LIF
     /// edge assembles only under `CentiMillivolt` import options — a
@@ -3996,8 +4002,9 @@ mod std_assembly {
                 scan.node_count
             ];
             let mut edges = vec![(0u32, 0u32); scan.edge_count];
-            // scratch contract: arena + f64 scratch each hold the
-            // exact weight-cell count (the arena keeps the result)
+            // the sizes `NirBuffers` names: the arena the weight cells,
+            // which it keeps, and the f64 scratch enough for any node's
+            // staging
             let n = scan.weight_cells;
             let mut weights = vec![0i16; n];
             let mut lifs = vec![NirLif::default(); scan.lif_neurons];
@@ -4161,10 +4168,13 @@ mod std_assembly {
         ///
         /// # Panics
         ///
-        /// Never on a graph produced by [`NirImport::from_json`] or
-        /// [`NirBuilder`] (edge indices are resolved/bounds-checked
-        /// there); a hand-built `NirImport` with dangling edge indices
-        /// panics on the node bounds.
+        /// Never on a graph [`NirImport::from_json`] or [`NirBuilder`]
+        /// produced and the caller left as it was (edge indices are
+        /// resolved and bounds-checked there). The fields are public, so
+        /// an edited graph can panic where the assembly reads what the
+        /// import checked: for instance an edge index past the nodes, a
+        /// LIF or Linear node whose view was set to `None`, or a Linear
+        /// view past the weights.
         pub fn build_network(
             &self,
         ) -> Result<(SpikingNeuralNetwork, NirGraphEncoder, NirAssemblyReport<'_>), NirError>
@@ -5450,7 +5460,7 @@ mod std_assembly {
         ///
         /// # Errors
         ///
-        /// [`NirError::BadShape("LIF param")`] on length mismatch or
+        /// [`NirError::BadShape("LIF param")`](NirError::BadShape) on length mismatch or
         /// empty arrays; every [`quantize_lif`](super::quantize_lif)
         /// hard failure otherwise.
         pub fn add_lif_population(

@@ -117,8 +117,10 @@ pub fn project_to_ternary(weight: i16, scale: i16) -> i16 {
 }
 
 /// BitNet-Round in-place ternarization: compute `γ = mean|w|`, then snap each
-/// weight to the nearest of `{-γ, 0, +γ}`. Sign-preserving. Returns `γ`
-/// (or `0` if the slice is empty).
+/// weight to the nearest of `{-γ, 0, +γ}`. Sign-preserving. Returns `γ`;
+/// when `γ` rounds to 0, for an empty slice or a mean magnitude under one
+/// half, it returns 0 and leaves the weights as they were
+/// (`ternarize_leaves_the_weights_when_gamma_rounds_to_0`).
 ///
 /// No float — `γ` is computed in `i64` and the per-weight decision uses the
 /// `±⌈γ/2⌉` boundary. This is a one-shot quantizer; keeping weights on-grid
@@ -300,6 +302,19 @@ mod tests {
     fn ternarize_empty_returns_zero() {
         let mut w: [i16; 0] = [];
         assert_eq!(ternarize(&mut w), 0);
+    }
+
+    /// `γ` that rounds to 0 leaves the weights as they were: a mean
+    /// magnitude under one half, `[1, 0, 0]`, returns 0 untouched; at
+    /// `γ = 1` the weights snap, `[2, 1, 0]` to `[1, 1, 0]`.
+    #[test]
+    fn ternarize_leaves_the_weights_when_gamma_rounds_to_0() {
+        let mut w = [1_i16, 0, 0];
+        assert_eq!(ternarize(&mut w), 0);
+        assert_eq!(w, [1, 0, 0]);
+        let mut w = [2_i16, 1, 0];
+        assert_eq!(ternarize(&mut w), 1);
+        assert_eq!(w, [1, 1, 0]);
     }
 
     #[test]

@@ -248,14 +248,15 @@ pub const fn q1_0_encoded_len(n: usize) -> usize {
 /// `j%8` of byte `j/8` (LSB-first); set → `+γ`, clear → `−γ`.
 ///
 /// The format is binary, so every decoded trit is [`Trit::One`] or
-/// [`Trit::MinusOne`] — no zeros exist in `q1_0`. Returns the fp16 scale
-/// bits of the first block (see `docs/TERNARY_FORMAT.md` for the
-/// multi-block scale caveat: Prism stores one scale *per block*; this
-/// decode returns per-block scales through `scale_bits_out` when provided,
-/// and the first block's scale for the one-block case).
+/// [`Trit::MinusOne`] — no zeros exist in `q1_0`. Prism stores one scale
+/// per block (`docs/TERNARY_FORMAT.md`): each block's fp16 scale bits are
+/// written to `scale_bits_out`, which needs `n/128` entries
+/// (`q1_0_decodes_every_block_at_its_own_offset`,
+/// `q1_0_rejects_bad_input`).
 ///
-/// Requires `trits.len() % 128 == 0` and
-/// `bytes.len() >= `[`q1_0_encoded_len`]`(n)`.
+/// Requires `trits.len() % 128 == 0`,
+/// `bytes.len() >= `[`q1_0_encoded_len`]`(n)` and
+/// `scale_bits_out.len() >= n/128`.
 ///
 /// # Errors
 ///

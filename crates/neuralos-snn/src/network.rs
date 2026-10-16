@@ -16,7 +16,10 @@
 //!   (saturating at `u64::MAX`, about 585,000 years of model time).
 //! - Topology builders never create self-connections.
 //! - LFSR RNG is deterministic: same seed → same network connectivity.
-//! - Synapse weights respect the presynaptic neuron's type (E → positive, I → negative).
+//! - The topology builders' weights respect the presynaptic neuron's type (E →
+//!   positive, I → negative; `prop_topology_weights_respect_presynaptic_type`).
+//!   `add_synapse` keeps the weight it is given, of either sign, as an NIR import
+//!   wires them.
 //! - `step()` delivers each synapse under its own `pre`, in the order it
 //!   was added, however adds and steps interleave.
 //!
@@ -98,11 +101,16 @@ pub enum NetworkTopology {
         /// Fraction of the possible (pre ≠ post) pairs to wire.
         connectivity: f64,
     },
-    /// Watts-Strogatz small-world. Ring lattice with `local_connections` per neuron,
-    /// each rewired with probability `rewiring_prob ∈ [0.0, 1.0]`;
-    /// `build_topology` refuses any other value, NaN included.
+    /// Watts-Strogatz small-world. Ring lattice: each neuron wires to the
+    /// `local_connections` neurons after it on the ring, each edge rewired
+    /// with probability `rewiring_prob ∈ [0.0, 1.0]`; `build_topology`
+    /// refuses any other value, NaN included. Past `neuron_count − 1` the
+    /// offsets go round the ring again: an offset that lands on the neuron
+    /// itself is skipped, and the others wire the same neighbours again, so
+    /// a pair can carry more than one synapse
+    /// (`smallworld_keeps_its_wiring_inside_0_to_1`, 5 neurons at 10).
     SmallWorld {
-        /// Ring-lattice neighbours per neuron, before rewiring.
+        /// Ring offsets per neuron, 1 to this, before rewiring.
         local_connections: u8,
         /// Probability a local connection is rewired.
         rewiring_prob: f64,
@@ -144,8 +152,8 @@ pub struct Spike {
     /// ID of the neuron that fired.
     pub neuron_id: u16,
     /// Simulation time (μs) at which the spike occurred. A `u64`: past 2^32 μs
-    /// (71.6 min) it no longer fits a `u32`, and the neuron's own
-    /// `last_spike_time_us` holds its low 32 bits.
+    /// (71.6 min) it no longer fits a `u32`, and the stamp the neuron keeps
+    /// of its last spike, which has no getter, holds its low 32 bits.
     pub time_us: u64,
 }
 
@@ -388,7 +396,9 @@ impl SpikingNeuralNetwork {
         })
     }
 
-    /// Build the configured topology. Must be called before [`step`](Self::step).
+    /// Build the configured topology. [`new`](Self::new) wires nothing, so
+    /// a network stepped before this call steps with no synapse but those
+    /// [`add_synapse`](Self::add_synapse) gave it.
     ///
     /// A second call clears any existing synapses, CSR state and pending
     /// plasticity entries before it builds, so synapses never accumulate;
@@ -431,7 +441,8 @@ impl SpikingNeuralNetwork {
     }
 
     /// Advance the simulation by one `dt_us`. Returns the spikes emitted
-    /// this step in chronological (neuron-id) order.
+    /// this step in neuron-id order (`every_wiring_steps_as_its_synapses_were_added`
+    /// reads it); every spike of a step carries the step's time.
     ///
     /// A step first sorts the CSR if a synapse came in since the last sort
     /// ([`add_synapse`](Self::add_synapse); a step and `build_topology`
@@ -811,7 +822,10 @@ impl SpikingNeuralNetwork {
 
     /// One-shot BitNet-Round ternarization of all synapse weights: `γ = mean|w|`,
     /// each weight snapped to the nearest of `{-γ, 0, +γ}`. Syncs the CSR
-    /// transmission weights. Returns `γ` (or `0` if there are no synapses).
+    /// transmission weights (`ternary_writes_reach_their_csr_slot`). Returns
+    /// `γ`; when `γ` rounds to 0, with no synapse or a mean magnitude under
+    /// one half, it returns 0 and leaves every weight as it was
+    /// (`ternarize_weights_leaves_the_weights_when_gamma_rounds_to_0`).
     ///
     /// This is a *one-shot* quantizer for the ternary-bridge Stage 1 gate — it
     /// does **not** install an ongoing ternary mode. Keeping weights on-grid
@@ -2893,6 +2907,26 @@ mod tests {
             rv_mismatches, 0,
             "every reverse-CSR edge must match its synapse's (pre, post)"
         );
+    }
+
+    /// `ternarize_weights` at the `γ` edge: weights whose mean magnitude
+    /// rounds to 0, `[1, 0, 0]`, return 0 and stay as they were; at `γ = 1`
+    /// they snap, `[2, 1, 0]` to `[1, 1, 0]`.
+    #[test]
+    fn ternarize_weights_leaves_the_weights_when_gamma_rounds_to_0() {
+        for (given, gamma, kept) in [([1_i16, 0, 0], 0, [1_i16, 0, 0]), ([2, 1, 0], 1, [1, 1, 0])] {
+            let neurons = (0..3)
+                .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+                .collect();
+            let mut net =
+                SpikingNeuralNetwork::from_neurons(neurons, 1_000).expect("three neurons");
+            for (pre, weight) in (0_u16..).zip(given) {
+                net.add_synapse(pre, (pre + 1) % 3, weight).expect("adds");
+            }
+            assert_eq!(net.ternarize_weights(), gamma, "{given:?}");
+            let weights: Vec<i16> = net.synapses().iter().map(Synapse::weight).collect();
+            assert_eq!(weights, kept, "{given:?}");
+        }
     }
 
     /// A ternary write reaches its own CSR slot. The five edges of

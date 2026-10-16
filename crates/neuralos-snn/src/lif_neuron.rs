@@ -6,9 +6,18 @@
 //!   no refractory.
 //! - After a spike, the neuron is refractory for `ceil(refractory_period_us / dt_us)`
 //!   steps: exactly `refractory_period_us` when `dt_us` divides it.
-//! - Membrane potential is always in `[``MEMBRANE_MV_MIN``, ``MEMBRANE_MV_MAX``]` mV.
+//! - The step clamps the membrane to `[``MEMBRANE_MV_MIN``, ``MEMBRANE_MV_MAX``]` mV
+//!   ([`LIFNeuron::integrate_and_fire`] § Semantics, item 7). The potentials the
+//!   chain sets are kept as given, and a spike writes `reset_potential` after the
+//!   clamp, so the membrane stays in the bounds when the resting and reset
+//!   potentials are in them, as `new`'s are (`prop_membrane_potential_stays_bounded`).
 //! - Firing rate cannot exceed `1_000_000 / refractory_period_us` Hz (refractory bound).
-//! - With zero input and large dt, membrane → resting (leak convergence).
+//! - With zero input each step closes `dt/τ` of the gap to rest (§ Semantics, item 5),
+//!   so the membrane converges to rest only while `dt` is under `2τ`: at `dt = τ` it
+//!   lands on rest in one step (`leak_convergence_large_dt_lands_on_rest_exactly`); at
+//!   `2τ` each step mirrors it across rest (`the_neuron_is_exact_where_the_batch_clamps`),
+//!   and at `2.5τ` a neuron left at its reset fires again with no input. At a small
+//!   `dt` the truncation stops the leak short of rest (§ Semantics, item 6).
 //!
 //! # Fixed-point convention
 //!
@@ -56,8 +65,9 @@
 //!
 //! - **Time ownership**: v0.1's `current_time()` returned `last_spike_time_us`,
 //!   so `firing_rate_hz` windows never advanced between spikes. Now the caller
-//!   passes `current_time_us` to `integrate_and_fire`. The neuron stores it as
-//!   `last_update_time_us`, used as the firing-rate reference.
+//!   passes `current_time_us` to `integrate_and_fire` (§ Semantics, item 1), and
+//!   the neuron computes no rate: the network's stats carry one, and the caller
+//!   of a lone neuron records its spikes (§ `no_std` above).
 //! - **Noise seed**: v0.1 seeded the LFSR only by `id`, so every neuron with the
 //!   same id produced identical "noise" forever. Now seeded by `id XOR time`.
 
@@ -218,10 +228,12 @@ fn div_1000_wide(x: i64) -> i64 {
 /// third grid would be a breaking release.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VoltageResolution {
-    /// 1 mV grid, the historical one. Dead zone ≈ 200 pA at rest.
+    /// 1 mV grid, the historical one. Dead zone at rest ≈ 200 pA for an
+    /// excitatory neuron at its defaults, 100 pA for an inhibitory one.
     Millivolt,
-    /// 0.01 mV (10 μV) grid — 100× finer. Dead zone ≈ 2 pA; the ternary
-    /// substrate's ±12 pA recurrent pulses become visible membrane motion.
+    /// 0.01 mV (10 μV) grid — 100× finer. Dead zone ≈ 2 pA (excitatory) and
+    /// 1 pA (inhibitory); the ternary substrate's ±12 pA recurrent pulses
+    /// become visible membrane motion.
     CentiMillivolt,
 }
 
