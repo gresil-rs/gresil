@@ -2798,4 +2798,20 @@ mod tests {
             }
         }
     }
+
+    // ----- The doc-vs-code dive (2026-10-15): the record line of simd's
+    // survivors made a test; run green at 645afa8 and red under the
+    // survivor `runs_avx2 -> false`, both with NEURALOS_REQUIRE_AVX2=1. -----
+
+    /// `runs_avx2` keeps the variable's promise itself: with
+    /// `NEURALOS_REQUIRE_AVX2` set, as CI sets it on each simd step, it
+    /// answers `true`, so no AVX2 test returns early there.
+    /// `ci_runner_actually_has_avx2` asks the detection, not this helper.
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn runs_avx2_answers_true_where_ci_requires_avx2() {
+        if std::env::var_os("NEURALOS_REQUIRE_AVX2").is_some() {
+            assert!(runs_avx2("the helper's own check"));
+        }
+    }
 }

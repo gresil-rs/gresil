@@ -1989,4 +1989,67 @@ mod tests {
              ISA's round-43 close-out records). This number is edited last."
         );
     }
+
+    // ----- The doc-vs-code dive (2026-10-15): a test for each neuron
+    // sentence no test held at 645afa8; each is run green there and red
+    // under its mutant. -----
+
+    /// `add_synaptic_current` saturates, at both ends: "Saturating —
+    /// never overflows".
+    #[test]
+    fn add_synaptic_current_saturates_at_both_ends() {
+        let mut n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
+        n.add_synaptic_current(i16::MAX);
+        n.add_synaptic_current(1);
+        assert_eq!(n.synaptic_current_pa, i16::MAX);
+        n.clear_synaptic_current();
+        n.add_synaptic_current(i16::MIN);
+        n.add_synaptic_current(-1);
+        assert_eq!(n.synaptic_current_pa, i16::MIN);
+    }
+
+    /// A spike's 2 pA of adaptation saturates: with no refractory period
+    /// and the threshold at the membrane's floor, every step fires, and
+    /// with no decay 16,384 spikes reach `i16::MAX` and stay there.
+    #[test]
+    fn the_adaptation_current_saturates() {
+        let mut n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt)
+            .with_threshold(MEMBRANE_MV_MIN)
+            .with_refractory_period_us(0);
+        let mut t = 0u32;
+        for _ in 0..16_400 {
+            assert!(n.integrate_and_fire(0, 1_000, t), "every step fires");
+            t = t.wrapping_add(1_000);
+        }
+        assert_eq!(n.adaptation_current_pa, i16::MAX);
+    }
+
+    /// The noise is seeded by `id XOR current_time_us`, as § Semantics item
+    /// 4 says: a neuron's noise at `t` is neuron 0's at `id ^ t`. Three of
+    /// the four pairs overlap in their low bits, where `+` and `^` part:
+    /// every trace's ids are below 8 and its 1 ms clock a multiple of 8,
+    /// where they agree.
+    #[test]
+    fn noise_is_seeded_by_id_xor_time() {
+        let noisy = |id| {
+            LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt)
+                .with_noise_amplitude_pa(100)
+        };
+        let mut parts = 0;
+        for (id, t) in [(9u16, 1_000u32), (13, 2_000), (255, 7_000), (1_000, 3_000)] {
+            let seed = u32::from(id) ^ t;
+            assert_eq!(
+                noisy(id).generate_noise(t),
+                noisy(0).generate_noise(seed),
+                "id {id} at {t}"
+            );
+            if noisy(0).generate_noise(u32::from(id) + t) != noisy(0).generate_noise(seed) {
+                parts += 1;
+            }
+        }
+        assert!(
+            parts > 0,
+            "the pairs must tell xor from add, or the test proves nothing"
+        );
+    }
 }

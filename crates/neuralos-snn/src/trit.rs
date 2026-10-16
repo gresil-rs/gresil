@@ -518,4 +518,59 @@ mod tests {
             }
         }
     }
+
+    // ----- The doc-vs-code dive (2026-10-15): tests for the trit sentences
+    // the pass's survivors showed no test held at 645afa8; run green there
+    // and red under each survivor. -----
+
+    /// The boundary is `⌈γ/2⌉` for an even γ too: every other test's γ is
+    /// odd (125, 5), where `(γ + 1) / 2` and `(γ + 2) / 2` agree.
+    #[test]
+    fn the_boundary_is_half_gamma_rounded_up_for_an_even_gamma_too() {
+        let g = 100_i16;
+        assert_eq!(Trit::from_weight(50, g), Trit::One);
+        assert_eq!(Trit::from_weight(49, g), Trit::Zero);
+        assert_eq!(Trit::from_weight(-50, g), Trit::MinusOne);
+        assert_eq!(Trit::from_weight(-49, g), Trit::Zero);
+    }
+
+    /// `|i16::MIN|` is 32,768, past `i16::MAX`: the scale is capped there,
+    /// never cast to a negative.
+    #[test]
+    fn the_scale_of_i16_min_is_capped_at_i16_max() {
+        assert_eq!(tensor_scale(&[i16::MIN]), i16::MAX);
+        assert_eq!(tensor_scale(&[i16::MIN, i16::MIN]), i16::MAX);
+    }
+
+    /// The flip's threshold is `|residual| × 3000` of 65,536 draws, the rate
+    /// the constant's doc reads its percentages from: 2,999 flips at a
+    /// residual of 1, 3,000 does not; 8,999 at 3, 9,000 does not.
+    #[cfg(feature = "unstable-stdp")]
+    #[test]
+    fn the_flip_threshold_is_3000_per_unit_of_residual() {
+        assert_eq!(STOCHASTIC_FLIP_RATE, 3000);
+        let g = 125_i16;
+        assert_eq!(stochastic_ternary_flip(0, g, 1, 2_999), g);
+        assert_eq!(stochastic_ternary_flip(0, g, 1, 3_000), 0);
+        assert_eq!(stochastic_ternary_flip(0, g, 3, 8_999), g);
+        assert_eq!(stochastic_ternary_flip(0, g, 3, 9_000), 0);
+    }
+
+    /// Past a residual of 21 the threshold saturates at 65,535: every draw
+    /// but the last flips, where an unsaturated product would wrap in `u16`.
+    #[cfg(feature = "unstable-stdp")]
+    #[test]
+    fn a_residual_past_21_flips_on_every_draw_but_the_last() {
+        let g = 125_i16;
+        assert_eq!(stochastic_ternary_flip(0, g, 30, 65_534), g);
+        assert_eq!(stochastic_ternary_flip(0, g, 30, 65_535), 0);
+    }
+
+    /// A scale of 1 flips like any other.
+    #[cfg(feature = "unstable-stdp")]
+    #[test]
+    fn a_gamma_of_one_flips_too() {
+        assert_eq!(stochastic_ternary_flip(0, 1, 1, 0), 1);
+        assert_eq!(stochastic_ternary_flip(0, 1, -1, 0), -1);
+    }
 }

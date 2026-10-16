@@ -590,4 +590,27 @@ mod tests {
             }
         }
     }
+
+    // ----- The doc-vs-code dive (2026-10-15): a test for the synapse
+    // sentence no test held at 645afa8; run green there and red under the
+    // pass's three survivors. -----
+
+    /// `STDPRule::new` is the rule its doc and the crate README name: 20 ms
+    /// and 20 ms, a₊ 50, a₋ −53, learning rate 100. `stdp_zero_at_zero_dt`
+    /// reads `a_plus` from the rule itself, so it cannot see the number.
+    #[cfg(feature = "unstable-stdp")]
+    #[test]
+    fn the_default_rule_is_the_one_its_doc_names() {
+        let r = STDPRule::new();
+        assert_eq!(
+            (
+                r.tau_plus_us,
+                r.tau_minus_us,
+                r.a_plus,
+                r.a_minus,
+                r.learning_rate
+            ),
+            (20_000, 20_000, 50, -53, 100)
+        );
+    }
 }
