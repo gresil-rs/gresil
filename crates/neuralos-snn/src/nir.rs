@@ -7706,4 +7706,896 @@ mod tests {
         assert_eq!(g.lifs, clean.lifs);
         assert_eq!(g.edges, clean.edges);
     }
+
+    // ----- The doc-vs-code dive (2026-10-15): a test for the nir sentence
+    // no test held at 645afa8; run green there and red under its mutant. -----
+
+    /// `NirGraphEncoder::encode` merges its stages saturating in `i16`
+    /// (D5): two Inputs, each through its own Linear at full scale, drive
+    /// one neuron, each stage's current at its own ceiling, 32,767; the
+    /// sum stays there, where a wrapping add would read −2.
+    #[test]
+    fn two_stages_into_one_neuron_merge_saturating() {
+        let mut bld = NirBuilder::new(NirImportOptions::new(1_000, VoltageResolution::Millivolt));
+        let a = bld.add_input("a", &[1]).expect("input");
+        let b = bld.add_input("b", &[1]).expect("input");
+        let la = bld.add_linear("la", &[1.0], 1, 1).expect("linear");
+        let lb = bld.add_linear("lb", &[1.0], 1, 1).expect("linear");
+        let lif = bld
+            .add_lif_population("lif", &lif_params_single())
+            .expect("lif");
+        let out = bld.add_output("out", &[1]).expect("output");
+        for (from, to) in [(a, la), (b, lb), (la, lif), (lb, lif), (lif, out)] {
+            bld.add_edge(from, to).expect("edge");
+        }
+        let (_, enc, _) = bld
+            .build()
+            .expect("builds")
+            .build_network()
+            .expect("assembles");
+        assert_eq!(enc.stage_count(), 2, "one stage per Input");
+        let x = [Thousandths(100_000)];
+        assert_eq!(
+            enc.encode(&[&x, &[Thousandths(0)]]),
+            [32_767],
+            "one stage at its ceiling"
+        );
+        assert_eq!(enc.encode(&[&x, &x]), [32_767], "two, merged saturating");
+    }
+
+    // ----- The doc-vs-code dive (2026-10-15), second batch: tests for the
+    // mutation pass's nir.rs survivors, each value measured at 645afa8
+    // and each test run red under the survivors it answers. -----
+
+    const READOUT_DEFERRED: &str =
+        "readout (LIF->Linear->Output) deferred — spike-count readout convention not yet named";
+    const LINEAR_CYCLE: &str =
+        "cycle through Linear nodes — no feedforward evaluation order exists";
+
+    fn mv_options() -> NirImportOptions {
+        NirImportOptions::new(1_000, VoltageResolution::Millivolt)
+    }
+
+    fn centi_options() -> NirImportOptions {
+        NirImportOptions::new(1_000, VoltageResolution::CentiMillivolt)
+    }
+
+    /// `doc` scanned, then imported into buffers its own scan sized,
+    /// the report kept (`NirImport::from_json` drops it).
+    #[allow(clippy::type_complexity)]
+    fn import_with_report(
+        doc: &str,
+        opts: NirImportOptions,
+    ) -> Result<(Vec<NirNode<'_>>, Vec<i16>, Vec<NirLif>, NirReport), NirError> {
+        let scan = nir_scan(doc.as_bytes())?;
+        let mut nodes = vec![NirNode::BLANK; scan.node_count];
+        let mut edges = vec![(0u32, 0u32); scan.edge_count];
+        let mut weights = vec![0i16; scan.weight_cells];
+        let mut lifs = vec![NirLif::BLANK; scan.lif_neurons];
+        let mut scratch = vec![0f64; scan.weight_cells + 5 * scan.lif_neurons];
+        let mut bufs = NirBuffers {
+            nodes: &mut nodes,
+            edges: &mut edges,
+            weights: &mut weights,
+            lifs: &mut lifs,
+            scratch: &mut scratch,
+        };
+        let report = nir_import(doc.as_bytes(), opts, &mut bufs)?;
+        Ok((nodes, weights, lifs, report))
+    }
+
+    /// A LIF population of `n` at the chain's biology: τ 20 ms, 100 MΩ,
+    /// −70 / −55 / −80 mV.
+    fn population(b: &mut NirBuilder<'_>, name: &'static str, n: usize) -> usize {
+        b.add_lif_population(
+            name,
+            &NirLifParams {
+                tau_s: &vec![0.02; n],
+                r_ohm: &vec![1e8; n],
+                v_leak_v: &vec![-0.07; n],
+                v_threshold_v: &vec![-0.055; n],
+                v_reset_v: Some(&vec![-0.08; n]),
+            },
+        )
+        .expect("a biological population")
+    }
+
+    /// A `rows × cols` Linear, its weights 0.5, −0.25, 1.0, 0.75 over
+    /// and over.
+    fn dense(b: &mut NirBuilder<'_>, name: &'static str, rows: usize, cols: usize) -> usize {
+        let w: Vec<f64> = (0..rows * cols)
+            .map(|i| [0.5, -0.25, 1.0, 0.75][i % 4])
+            .collect();
+        b.add_linear(name, &w, rows, cols).expect("a Linear")
+    }
+
+    /// The builder's nodes wired by these edges.
+    fn wired(b: &mut NirBuilder<'_>, edges: &[(usize, usize)]) {
+        for &(from, to) in edges {
+            b.add_edge(from, to).expect("indices from the builder");
+        }
+    }
+
+    /// Each note counts what its doc names, once per neuron or tensor.
+    /// Neuron 0's tau rounds up to 100,000 µs (the note reads the
+    /// error's size, not its sign), its threshold loses half a
+    /// millivolt and its capacitance, 100,000 pF, is clamped. Neuron 1's
+    /// reset loses half a millivolt and its capacitance, 0.3 pF, rounds
+    /// to 0. Neuron 2 loses nothing, its capacitance exactly 65,535 pF
+    /// and not clamped. A Linear at scale 1 loses nothing; the same
+    /// Linear all zeros is noted once. Every count is exact, and
+    /// `note_count` is their sum: one tau note and two potential notes,
+    /// since 2 · 2 is 2 + 2, and a `+` made `*` in the sum would not show.
+    #[test]
+    fn each_note_counts_what_its_doc_names() {
+        let doc = "{\"version\":\"t\",\"node\":{\"type\":\"NIRGraph\",\
+\"edges\":[[\"in\",\"lin\"],[\"lin\",\"lif\"],[\"lif\",\"out\"]],\
+\"nodes\":{\"in\":{\"type\":\"Input\",\"shape\":[2]},\
+\"lin\":{\"type\":\"Linear\",\"weight\":[[32767.0,-1.0],[0.0,2.0],[-3.0,4.0]]},\
+\"lif\":{\"type\":\"LIF\",\"tau\":[0.0999996,0.02,0.196605],\
+\"r\":[1000000.0,65535000000.0,3000000.0],\"v_leak\":[-0.07,-0.07,-0.07],\
+\"v_threshold\":[-0.0555,-0.05,-0.05],\"v_reset\":[-0.08,-0.0805,-0.08]},\
+\"out\":{\"type\":\"Output\",\"shape\":[3]}}}}";
+        let counts = |r: &NirReport| {
+            [
+                NirNote::VResetDefaulted,
+                NirNote::CapacitanceClamped,
+                NirNote::TauTruncated,
+                NirNote::PotentialTruncated,
+                NirNote::ZeroWeightTensor,
+                NirNote::QuantizationLoss,
+            ]
+            .map(|n| r.notes(n))
+        };
+        let (nodes, _, lifs, report) = import_with_report(doc, mv_options()).expect("imports");
+        assert_eq!(counts(&report), [0, 1, 1, 2, 0, 0]);
+        assert_eq!(report.note_count(), 4);
+        let taus: Vec<u32> = lifs.iter().map(|l| l.tau_us).collect();
+        assert_eq!(taus, [100_000, 20_000, 196_605]);
+        assert!(lifs[0].tau_err_s > 0.0, "rounded up");
+        assert_eq!((lifs[1].tau_err_s, lifs[2].tau_err_s), (0.0, 0.0));
+        let c: Vec<(u16, bool)> = lifs
+            .iter()
+            .map(|l| (l.capacitance_pf, l.capacitance_clamped))
+            .collect();
+        assert_eq!(c, [(65_535, true), (0, false), (65_535, false)]);
+        let v: Vec<(i16, i16, f64)> = lifs
+            .iter()
+            .map(|l| (l.threshold_q, l.reset_q, l.max_v_err_v))
+            .collect();
+        assert_eq!(v, [(-56, -80, 5e-4), (-50, -81, 5e-4), (-50, -80, 0.0)]);
+        let lin = nodes[1].linear.expect("a Linear");
+        assert_eq!(
+            (lin.scale, lin.max_abs_err, lin.zero_tensor),
+            (1.0, 0.0, false)
+        );
+        let zeros = doc.replace(
+            "[[32767.0,-1.0],[0.0,2.0],[-3.0,4.0]]",
+            "[[0.0,0.0],[0.0,0.0],[0.0,0.0]]",
+        );
+        let (_, _, _, report) = import_with_report(&zeros, mv_options()).expect("imports");
+        assert_eq!(counts(&report), [0, 1, 1, 2, 1, 0]);
+        assert_eq!(report.note_count(), 5);
+    }
+
+    /// A shape's dimension is a `u32`: −1 and 2³² are refused by name,
+    /// 2³² − 1 is taken whole.
+    #[test]
+    fn a_shape_dimension_outside_u32_is_refused() {
+        let with_dim = |d: &str| {
+            let doc = CHAIN.replace("\"shape\":[3]", &format!("\"shape\":[{d}]"));
+            assert_ne!(doc, CHAIN, "the Input takes {d}");
+            doc
+        };
+        for d in ["-1", "4294967296"] {
+            let refused = import_alone(&with_dim(d));
+            assert_eq!(refused, Err(NirError::BadShape("shape")), "{d}");
+        }
+        let widest = with_dim("4294967295");
+        let (nodes, ..) = import_chain_variant(&widest, mv_options()).expect("imports");
+        assert_eq!((nodes[0].shape[0], nodes[0].shape_len), (u32::MAX, 1));
+    }
+
+    /// The graph encoder's accessors read its own fields: two Inputs of
+    /// two features and one, each through its own Linear into one
+    /// neuron, give two inputs, their widths (0 past the last), two
+    /// stages and each one's quanta (none past the last). Stage 0 is
+    /// `lb`'s: the stages follow the Linears' order, not the Inputs'.
+    #[test]
+    fn the_graph_encoder_reads_its_inputs_and_stages() {
+        let mut b = NirBuilder::new(mv_options());
+        let ia = b.add_input("a", &[2]).expect("input");
+        let ib = b.add_input("b", &[1]).expect("input");
+        let la = b.add_linear("la", &[1.0, -0.5], 1, 2).expect("linear");
+        let lb = b.add_linear("lb", &[2.0], 1, 1).expect("linear");
+        let lif = b
+            .add_lif_population("lif", &lif_params_single())
+            .expect("lif");
+        let out = b.add_output("out", &[1]).expect("output");
+        wired(
+            &mut b,
+            &[(ia, la), (ib, lb), (la, lif), (lb, lif), (lif, out)],
+        );
+        let (_, enc, _) = b
+            .build()
+            .expect("builds")
+            .build_network()
+            .expect("assembles");
+        assert_eq!(enc.input_count(), 2);
+        let widths = [0, 1, 2].map(|i| enc.input_features(i));
+        assert_eq!(widths, [2, 1, 0]);
+        assert_eq!(enc.stage_count(), 2);
+        assert_eq!(enc.stage_quanta(0), Some(&[32_767][..]));
+        assert_eq!(enc.stage_quanta(1), Some(&[32_767, -16_384][..]));
+        assert_eq!(enc.stage_quanta(2), None);
+    }
+
+    /// `build_chain_network` refuses what is not the chain, by name: a
+    /// fifth node, the Output fed by the Linear, and an Input narrower
+    /// than the Linear's columns.
+    #[test]
+    fn the_chain_builder_refuses_what_is_not_the_chain() {
+        let refusal = |doc: &str| {
+            assert_ne!(doc, CHAIN, "a variant of the chain");
+            NirImport::from_json(doc.as_bytes(), mv_options())
+                .expect("imports")
+                .build_chain_network()
+                .err()
+        };
+        let fifth = CHAIN.replacen(
+            "\"output\":{",
+            "\"extra\":{\"type\":\"Output\",\"shape\":[2]},\"output\":{",
+            1,
+        );
+        assert_eq!(
+            refusal(&fifth),
+            Some(NirError::UnsupportedTopology(
+                "exactly 4 nodes (Input-Linear-LIF-Output) in slice 1"
+            ))
+        );
+        let rewired = CHAIN.replace("[\"lif\",\"output\"]", "[\"linear\",\"output\"]");
+        assert_eq!(
+            refusal(&rewired),
+            Some(NirError::UnsupportedTopology(
+                "edges must be Input->Linear->LIF->Output"
+            ))
+        );
+        let narrow = CHAIN.replace("\"shape\":[3]", "\"shape\":[2]");
+        assert_eq!(
+            refusal(&narrow),
+            Some(NirError::UnsupportedTopology("Input shape != Linear cols"))
+        );
+    }
+
+    /// `build_chain_network` gives each neuron its own record: two
+    /// neurons whose five parameters all differ keep their own. And the
+    /// chain's encoder sums each row of its own weights, a missing
+    /// feature reading 0, and divides by the gain, truncating: row 0 is
+    /// (16,384 · 25 − 32,767 · 3) / 100 = 3,112, row 1 is
+    /// 24,575 · 3 / 100 = 737.
+    #[test]
+    fn the_chain_builder_gives_each_neuron_its_record_and_each_row_its_weights() {
+        let doc = CHAIN
+            .replace("\"tau\":[0.02,0.02]", "\"tau\":[0.02,0.03]")
+            .replace(
+                "\"r\":[100000000.0,100000000.0]",
+                "\"r\":[100000000.0,200000000.0]",
+            )
+            .replace("\"v_leak\":[-0.07,-0.07]", "\"v_leak\":[-0.07,-0.065]")
+            .replace(
+                "\"v_threshold\":[-0.055,-0.055]",
+                "\"v_threshold\":[-0.055,-0.05]",
+            )
+            .replace("\"v_reset\":[-0.08,-0.08]", "\"v_reset\":[-0.08,-0.075]");
+        let g = NirImport::from_json(doc.as_bytes(), mv_options()).expect("imports");
+        let (net, enc) = g.build_chain_network().expect("the chain");
+        let records: Vec<_> = net
+            .neurons()
+            .iter()
+            .map(|n| {
+                (
+                    n.resting_potential,
+                    n.membrane_potential,
+                    n.threshold,
+                    n.reset_potential,
+                    n.tau_membrane_us,
+                    n.resistance_mohm,
+                )
+            })
+            .collect();
+        assert_eq!(
+            records,
+            [
+                (-70, -70, -55, -80, 20_000, 100),
+                (-65, -65, -50, -75, 30_000, 200)
+            ]
+        );
+        assert_eq!((enc.rows(), enc.cols()), (2, 3));
+        assert_eq!(enc.encode(&[25, 3]), [3_112, 737]);
+        assert_eq!(
+            enc.encode(&[25, 3, 0]),
+            [3_112, 737],
+            "the missing feature is 0"
+        );
+    }
+
+    /// D7, the u16 neuron-id bound, at its edge: a chain of 65,535
+    /// neurons assembles by both builders, and 65,536 is refused by
+    /// both.
+    #[test]
+    fn sixty_five_thousand_five_hundred_thirty_five_neurons_assemble_and_no_more() {
+        for n in [65_535usize, 65_536] {
+            let mut b = NirBuilder::new(mv_options());
+            let input = b.add_input("in", &[1]).expect("input");
+            let lin = b.add_linear("lin", &vec![0.5; n], n, 1).expect("linear");
+            let lif = population(&mut b, "lif", n);
+            let width = u32::try_from(n).expect("fits");
+            let out = b.add_output("out", &[width]).expect("output");
+            wired(&mut b, &[(input, lin), (lin, lif), (lif, out)]);
+            let g = b.build().expect("builds");
+            let chain = g.build_chain_network().map(|(net, _)| net.neuron_count());
+            let full = g
+                .build_network()
+                .map(|(net, _, report)| (net.neuron_count(), report.neurons));
+            if n == 65_535 {
+                assert_eq!(chain, Ok(65_535));
+                assert_eq!(full, Ok((65_535, 65_535)));
+            } else {
+                assert_eq!(chain, Err(NirError::BufferOverflow));
+                assert_eq!(full, Err(NirError::BufferOverflow));
+            }
+        }
+    }
+
+    /// Every edge kind's shapes are checked, and a mismatch is refused
+    /// with both node names: Linear→Linear (rows into columns),
+    /// LIF→LIF (sizes), LIF→Linear (size into columns), LIF→Output and
+    /// Linear→Output (the Output's one dimension against the size, or
+    /// the rows of a Linear beside its LIF).
+    #[test]
+    fn every_edge_kind_refuses_a_shape_mismatch_by_name() {
+        let mismatch = |src: &str, dst: &str| {
+            Some(NirError::EdgeShapeMismatch {
+                src: NirName::new(src),
+                dst: NirName::new(dst),
+            })
+        };
+        let mut bld = NirBuilder::new(mv_options());
+        let input = bld.add_input("in", &[2]).expect("input");
+        let l1 = dense(&mut bld, "l1", 3, 2);
+        let l2 = dense(&mut bld, "l2", 2, 4);
+        let lif_a = population(&mut bld, "a", 2);
+        let out = bld.add_output("out", &[2]).expect("output");
+        wired(
+            &mut bld,
+            &[(input, l1), (l1, l2), (l2, lif_a), (lif_a, out)],
+        );
+        let err = bld.build().expect("builds").build_network().err();
+        assert_eq!(err, mismatch("l1", "l2"), "Linear -> Linear");
+
+        let mut bld = NirBuilder::new(mv_options());
+        let input = bld.add_input("in", &[1]).expect("input");
+        let lin = dense(&mut bld, "l", 2, 1);
+        let lif_a = population(&mut bld, "a", 2);
+        let lif_c = population(&mut bld, "c", 3);
+        let out = bld.add_output("out", &[3]).expect("output");
+        wired(
+            &mut bld,
+            &[(input, lin), (lin, lif_a), (lif_a, lif_c), (lif_c, out)],
+        );
+        let err = bld.build().expect("builds").build_network().err();
+        assert_eq!(err, mismatch("a", "c"), "LIF -> LIF");
+
+        let mut bld = NirBuilder::new(mv_options());
+        let input = bld.add_input("in", &[1]).expect("input");
+        let l0 = dense(&mut bld, "l0", 2, 1);
+        let lif_a = population(&mut bld, "a", 2);
+        let l1 = dense(&mut bld, "l1", 2, 3);
+        let lif_c = population(&mut bld, "c", 2);
+        let out = bld.add_output("out", &[2]).expect("output");
+        wired(
+            &mut bld,
+            &[
+                (input, l0),
+                (l0, lif_a),
+                (lif_a, l1),
+                (l1, lif_c),
+                (lif_c, out),
+            ],
+        );
+        let err = bld.build().expect("builds").build_network().err();
+        assert_eq!(err, mismatch("a", "l1"), "LIF -> Linear");
+
+        let mut bld = NirBuilder::new(mv_options());
+        let input = bld.add_input("in", &[1]).expect("input");
+        let lin = dense(&mut bld, "l", 2, 1);
+        let lif_a = population(&mut bld, "a", 2);
+        let out = bld.add_output("out", &[3]).expect("output");
+        wired(&mut bld, &[(input, lin), (lin, lif_a), (lif_a, out)]);
+        let err = bld.build().expect("builds").build_network().err();
+        assert_eq!(err, mismatch("a", "out"), "LIF -> Output");
+
+        let mut bld = NirBuilder::new(mv_options());
+        let input = bld.add_input("in", &[1]).expect("input");
+        let lin = dense(&mut bld, "l", 2, 1);
+        let lif_a = population(&mut bld, "a", 2);
+        let out = bld.add_output("out", &[2]).expect("output");
+        let out2 = bld.add_output("out2", &[3]).expect("output");
+        wired(
+            &mut bld,
+            &[(input, lin), (lin, lif_a), (lif_a, out), (lin, out2)],
+        );
+        let err = bld.build().expect("builds").build_network().err();
+        assert_eq!(err, mismatch("l", "out2"), "Linear -> Output");
+    }
+
+    /// D8's reach crosses Linear→Linear edges: a spike two Linears deep
+    /// into an Output is the deferred readout, as one Linear deep is.
+    #[test]
+    fn a_spike_two_linears_deep_into_an_output_is_the_readout() {
+        let mut bld = NirBuilder::new(centi_options());
+        let input = bld.add_input("in", &[2]).expect("input");
+        let l0 = dense(&mut bld, "l0", 2, 2);
+        let lif_a = population(&mut bld, "a", 2);
+        let out = bld.add_output("out", &[2]).expect("output");
+        let l1 = dense(&mut bld, "l1", 2, 2);
+        let l2 = dense(&mut bld, "l2", 2, 2);
+        let out2 = bld.add_output("out2", &[2]).expect("output");
+        wired(
+            &mut bld,
+            &[
+                (input, l0),
+                (l0, lif_a),
+                (lif_a, out),
+                (lif_a, l1),
+                (l1, l2),
+                (l2, out2),
+            ],
+        );
+        let err = bld.build().expect("builds").build_network().err();
+        assert_eq!(err, Some(NirError::UnsupportedTopology(READOUT_DEFERRED)));
+    }
+
+    /// A Linear cycle a spike reaches is refused by name at the
+    /// ordering: D8's reach walks it first and visits each Linear once.
+    #[test]
+    fn a_linear_cycle_a_spike_reaches_is_refused_by_name() {
+        let mut bld = NirBuilder::new(centi_options());
+        let input = bld.add_input("in", &[2]).expect("input");
+        let l0 = dense(&mut bld, "l0", 2, 2);
+        let lif_a = population(&mut bld, "a", 2);
+        let out = bld.add_output("out", &[2]).expect("output");
+        let l1 = dense(&mut bld, "l1", 2, 2);
+        let l2 = dense(&mut bld, "l2", 2, 2);
+        wired(
+            &mut bld,
+            &[
+                (input, l0),
+                (l0, lif_a),
+                (lif_a, out),
+                (lif_a, l1),
+                (l1, l2),
+                (l2, l1),
+            ],
+        );
+        let err = bld.build().expect("builds").build_network().err();
+        assert_eq!(err, Some(NirError::UnsupportedTopology(LINEAR_CYCLE)));
+    }
+
+    /// A Linear cycle is found past the first Linear the ordering walks
+    /// from: in l0 → l1 → l2 → l1 the cycle is l1's and l2's.
+    #[test]
+    fn a_linear_cycle_past_the_first_linear_is_refused_by_name() {
+        let mut bld = NirBuilder::new(mv_options());
+        let input = bld.add_input("in", &[2]).expect("input");
+        let l0 = dense(&mut bld, "l0", 2, 2);
+        let l1 = dense(&mut bld, "l1", 2, 2);
+        let l2 = dense(&mut bld, "l2", 2, 2);
+        let lif_a = population(&mut bld, "a", 2);
+        let out = bld.add_output("out", &[2]).expect("output");
+        wired(
+            &mut bld,
+            &[
+                (input, l0),
+                (l0, l1),
+                (l1, l2),
+                (l2, l1),
+                (l2, lif_a),
+                (lif_a, out),
+            ],
+        );
+        let err = bld.build().expect("builds").build_network().err();
+        assert_eq!(err, Some(NirError::UnsupportedTopology(LINEAR_CYCLE)));
+    }
+
+    /// A Linear feeding two Linears feeds both: l0 fans out to l1 and
+    /// l2, each into its own population, and each stage is l0 composed
+    /// with its own Linear (l1 is the identity, l2 swaps the rows).
+    #[test]
+    fn a_linear_fanning_out_to_two_linears_feeds_both() {
+        let mut bld = NirBuilder::new(mv_options());
+        let input = bld.add_input("in", &[2]).expect("input");
+        let l0 = bld
+            .add_linear("l0", &[1.0, 0.5, -0.5, 1.0], 2, 2)
+            .expect("linear");
+        let l1 = bld
+            .add_linear("l1", &[1.0, 0.0, 0.0, 1.0], 2, 2)
+            .expect("linear");
+        let lif_a = population(&mut bld, "a", 2);
+        let out = bld.add_output("out", &[2]).expect("output");
+        let l2 = bld
+            .add_linear("l2", &[0.0, 1.0, 1.0, 0.0], 2, 2)
+            .expect("linear");
+        let lif_c = population(&mut bld, "c", 2);
+        let out2 = bld.add_output("out2", &[2]).expect("output");
+        wired(
+            &mut bld,
+            &[
+                (input, l0),
+                (l0, l1),
+                (l1, lif_a),
+                (lif_a, out),
+                (l0, l2),
+                (l2, lif_c),
+                (lif_c, out2),
+            ],
+        );
+        let g = bld.build().expect("builds");
+        let (_, enc, report) = g.build_network().expect("assembles");
+        assert_eq!(enc.stage_count(), 2);
+        assert_eq!(
+            enc.stage_quanta(0),
+            Some(&[-16_384, 32_767, 32_767, 16_384][..])
+        );
+        assert_eq!(
+            enc.stage_quanta(1),
+            Some(&[32_767, 16_384, -16_384, 32_767][..])
+        );
+        let chains: Vec<&[&str]> = report.fused.iter().map(|f| f.chain.as_slice()).collect();
+        assert_eq!(chains, [&["l0", "l2"][..], &["l0", "l1"][..]]);
+        let x = [Thousandths(1_000), Thousandths(2_000)];
+        assert_eq!(enc.encode(&[&x]), [655, 491, 491, 655]);
+    }
+
+    /// A diamond names each contributor once: l0 reaches l3 through l1
+    /// and through l2, and l3's fusion record lists l0 once.
+    #[test]
+    fn a_diamond_names_each_contributor_once() {
+        let mut bld = NirBuilder::new(mv_options());
+        let input = bld.add_input("in", &[2]).expect("input");
+        let l0 = dense(&mut bld, "l0", 2, 2);
+        let l1 = dense(&mut bld, "l1", 2, 2);
+        let l2 = dense(&mut bld, "l2", 2, 2);
+        let l3 = dense(&mut bld, "l3", 2, 2);
+        let lif_a = population(&mut bld, "a", 2);
+        let out = bld.add_output("out", &[2]).expect("output");
+        wired(
+            &mut bld,
+            &[
+                (input, l0),
+                (l0, l1),
+                (l0, l2),
+                (l1, l3),
+                (l2, l3),
+                (l3, lif_a),
+                (lif_a, out),
+            ],
+        );
+        let g = bld.build().expect("builds");
+        let (_, _, report) = g.build_network().expect("assembles");
+        let chains: Vec<&[&str]> = report.fused.iter().map(|f| f.chain.as_slice()).collect();
+        assert_eq!(chains, [&["l0", "l1", "l2", "l3"][..]]);
+    }
+
+    /// A path whose weight is an exact zero carries nothing, an
+    /// overflowed one too: l2 · l1 overflows to infinity in one row,
+    /// l3's weight on that row is 0, and the stage it reaches is 0, not
+    /// 0 · ∞, a NaN refused as a non-finite weight.
+    #[test]
+    fn a_zero_weight_carries_no_overflowed_path() {
+        let mut bld = NirBuilder::new(mv_options());
+        let input = bld.add_input("in", &[1]).expect("input");
+        let l1 = bld.add_linear("l1", &[1e308, 1.0], 2, 1).expect("linear");
+        let l2 = bld
+            .add_linear("l2", &[1e308, 0.0, 0.0, 1e308], 2, 2)
+            .expect("linear");
+        let l3 = bld.add_linear("l3", &[0.0, 1.0], 1, 2).expect("linear");
+        let l4 = bld.add_linear("l4", &[1.0], 1, 1).expect("linear");
+        let lif_a = population(&mut bld, "a", 1);
+        let out = bld.add_output("out", &[1]).expect("output");
+        wired(
+            &mut bld,
+            &[
+                (input, l1),
+                (l1, l2),
+                (l2, l3),
+                (l3, l4),
+                (l4, lif_a),
+                (lif_a, out),
+            ],
+        );
+        let g = bld.build().expect("builds");
+        let (_, enc, report) = g.build_network().expect("the zero stops the overflow");
+        assert_eq!(enc.stage_quanta(0), Some(&[0][..]));
+        let chains: Vec<&[&str]> = report.fused.iter().map(|f| f.chain.as_slice()).collect();
+        assert_eq!(chains, [&["l1", "l2", "l3", "l4"][..]]);
+    }
+
+    /// The undriven notes name a Linear never invoked, as their doc
+    /// says, beside a LIF no Input reaches: `ldec` has an Input's path
+    /// and none to a LIF, `lorph` has no root path, and `c`, which only
+    /// `lorph` feeds, has no Input-rooted path. In node order.
+    #[test]
+    fn undriven_linears_are_noted_by_name_beside_the_populations() {
+        let mut bld = NirBuilder::new(mv_options());
+        let input = bld.add_input("in", &[2]).expect("input");
+        let l0 = dense(&mut bld, "l0", 2, 2);
+        let lif_a = population(&mut bld, "a", 2);
+        let out = bld.add_output("out", &[2]).expect("output");
+        let ldec = dense(&mut bld, "ldec", 2, 2);
+        let out2 = bld.add_output("out2", &[2]).expect("output");
+        let lorph = dense(&mut bld, "lorph", 2, 2);
+        let lif_c = population(&mut bld, "c", 2);
+        let out3 = bld.add_output("out3", &[2]).expect("output");
+        wired(
+            &mut bld,
+            &[
+                (input, l0),
+                (l0, lif_a),
+                (lif_a, out),
+                (input, ldec),
+                (ldec, out2),
+                (lorph, lif_c),
+                (lif_c, out3),
+            ],
+        );
+        let g = bld.build().expect("builds");
+        let (_, _, report) = g.build_network().expect("assembles with the notes");
+        assert_eq!(report.undriven, ["ldec", "lorph", "c"]);
+    }
+
+    /// `add_lif_population` refuses an empty population, and each field
+    /// of another length than `tau`'s, `v_reset` included, as
+    /// `BadShape("LIF param")`.
+    #[test]
+    fn the_builder_refuses_each_lif_field_of_another_length() {
+        fn params<'v>(
+            tau: &'v [f64],
+            r: &'v [f64],
+            l: &'v [f64],
+            t: &'v [f64],
+            v: &'v [f64],
+        ) -> NirLifParams<'v> {
+            NirLifParams {
+                tau_s: tau,
+                r_ohm: r,
+                v_leak_v: l,
+                v_threshold_v: t,
+                v_reset_v: Some(v),
+            }
+        }
+        let (one, two) = ([0.02], [0.02, 0.02]);
+        let (r1, r2) = ([1e8], [1e8, 1e8]);
+        let (l1, l2) = ([-0.07], [-0.07, -0.07]);
+        let (t1, t2) = ([-0.055], [-0.055, -0.055]);
+        let (v1, v2) = ([-0.08], [-0.08, -0.08]);
+        let empty = NirLifParams {
+            tau_s: &[],
+            r_ohm: &[],
+            v_leak_v: &[],
+            v_threshold_v: &[],
+            v_reset_v: None,
+        };
+        let cases = [
+            ("empty", empty),
+            ("r", params(&two, &r1, &l2, &t2, &v2)),
+            ("v_leak", params(&two, &r2, &l1, &t2, &v2)),
+            ("v_threshold", params(&two, &r2, &l2, &t1, &v2)),
+            ("v_reset", params(&two, &r2, &l2, &t2, &v1)),
+            ("tau", params(&one, &r2, &l2, &t2, &v2)),
+        ];
+        for (field, p) in &cases {
+            let mut b = NirBuilder::new(mv_options());
+            let refused = b.add_lif_population("lif", p);
+            assert_eq!(refused, Err(NirError::BadShape("LIF param")), "{field}");
+        }
+    }
+
+    /// Whitespace between tokens is JSON's: the chain written with
+    /// Python's default separators, `", "` and `": "`, imports as the
+    /// compact one, a space before each number past an array's first,
+    /// in a shape of two dimensions too, the one array whose numbers are
+    /// read with no look ahead first.
+    #[test]
+    fn python_s_default_separators_import_as_the_compact_chain() {
+        let compact = CHAIN.replace("\"shape\":[3]", "\"shape\":[3,1]");
+        assert_ne!(compact, CHAIN, "the Input takes two dimensions");
+        let spaced = compact.replace(',', ", ").replace(':', ": ");
+        let (nodes, edges, weights, lifs, _) =
+            import_chain_variant(&compact, mv_options()).expect("imports");
+        assert_eq!(nodes[0].shape[..2], [3, 1]);
+        let again = import_chain_variant(&spaced, mv_options()).expect("imports");
+        assert_eq!(again.0, nodes);
+        assert_eq!(again.1, edges);
+        assert_eq!(again.2, weights);
+        assert_eq!(again.3, lifs);
+    }
+
+    /// The graph's metadata is skipped whole, any JSON value in it: an
+    /// empty string, escaped quotes, an escaped backslash, `null`,
+    /// `true`, `false`, a number and nested containers.
+    #[test]
+    fn metadata_takes_every_json_value() {
+        for meta in [
+            "{\"a\":\"\"}",
+            "{\"a\":\"say \\\"hi\\\"\",\"b\":1}",
+            "{\"a\":\"\\\\\",\"b\":1}",
+            "{\"a\":null,\"b\":true,\"c\":false,\"d\":-1.5e3,\"e\":[1,{\"f\":null}]}",
+        ] {
+            let doc = CHAIN.replacen(
+                "\"type\":\"NIRGraph\",",
+                &format!("\"type\":\"NIRGraph\",\"metadata\":{meta},"),
+                1,
+            );
+            assert!(nir_scan(doc.as_bytes()).is_ok(), "the scan, {meta}");
+            assert_eq!(import_alone(&doc), Ok(()), "the import alone, {meta}");
+        }
+    }
+
+    /// A value JSON refuses is refused at its first byte in metadata
+    /// too: a misspelled literal, and a number that starts with `+` or
+    /// `.`, which the skip does not take for a number.
+    #[test]
+    fn a_value_json_refuses_is_refused_at_its_byte_in_metadata() {
+        for meta in ["{\"a\":nulx}", "{\"a\":tru}", "{\"a\":+1}", "{\"a\":.5}"] {
+            let doc = CHAIN.replacen(
+                "\"type\":\"NIRGraph\",",
+                &format!("\"type\":\"NIRGraph\",\"metadata\":{meta},"),
+                1,
+            );
+            let at = doc.find("\"metadata\"").expect("metadata") + "\"metadata\":{\"a\":".len();
+            assert_eq!(
+                nir_scan(doc.as_bytes()).err(),
+                Some(NirError::Json(at)),
+                "{meta}"
+            );
+        }
+    }
+
+    /// A missing comma is refused at the byte where it was due, by the
+    /// scan and by the import alone.
+    #[test]
+    fn a_missing_comma_is_refused_where_it_was_due() {
+        let doc = CHAIN.replace("\"tau\":[0.02,0.02]", "\"tau\":[0.02 0.02]");
+        let at = doc.find("0.02 0.02").expect("the pair") + "0.02 ".len();
+        assert_eq!(nir_scan(doc.as_bytes()).err(), Some(NirError::Json(at)));
+        assert_eq!(import_alone(&doc), Err(NirError::Json(at)));
+    }
+
+    /// The graph object's `type` is `NIRGraph`; another is refused by
+    /// the scan, by name.
+    #[test]
+    fn a_graph_of_another_type_is_refused_by_the_scan() {
+        let doc = CHAIN.replace("\"type\":\"NIRGraph\"", "\"type\":\"Graph\"");
+        assert_ne!(doc, CHAIN);
+        let refused = nir_scan(doc.as_bytes()).err();
+        assert_eq!(refused, Some(NirError::BadShape("node.type")));
+    }
+
+    /// `tau < dt` is the refusal, so a tau equal to dt imports; 1 µs
+    /// less is refused.
+    #[test]
+    fn a_tau_equal_to_dt_imports() {
+        let doc = CHAIN.replace("\"tau\":[0.02,0.02]", "\"tau\":[0.001,0.001]");
+        let (.., lifs, _) = import_chain_variant(&doc, mv_options()).expect("tau = dt imports");
+        assert_eq!(lifs[0].tau_us, 1_000);
+        let below = CHAIN.replace("\"tau\":[0.02,0.02]", "\"tau\":[0.000999,0.000999]");
+        assert_eq!(import_alone(&below), Err(NirError::TauBelowDt));
+    }
+
+    /// The membrane's floor is inside its bounds: a reset at −100 mV
+    /// imports, and half a millivolt lower is refused by name.
+    #[test]
+    fn a_potential_at_the_membrane_floor_imports() {
+        let at = CHAIN.replace("\"v_reset\":[-0.08,-0.08]", "\"v_reset\":[-0.1,-0.1]");
+        let (.., lifs, _) = import_chain_variant(&at, mv_options()).expect("the floor imports");
+        assert_eq!(lifs[0].reset_q, MEMBRANE_MV_MIN);
+        let under = CHAIN.replace("\"v_reset\":[-0.08,-0.08]", "\"v_reset\":[-0.1005,-0.1005]");
+        assert_eq!(
+            import_alone(&under),
+            Err(NirError::PotentialOutOfRange("v_reset"))
+        );
+    }
+
+    /// A LIF population of no neurons is refused by name, though the
+    /// scan counts it, as 0 neurons.
+    #[test]
+    fn an_empty_lif_population_is_refused() {
+        let doc = CHAIN
+            .replace("\"tau\":[0.02,0.02]", "\"tau\":[]")
+            .replace("\"r\":[100000000.0,100000000.0]", "\"r\":[]")
+            .replace("\"v_leak\":[-0.07,-0.07]", "\"v_leak\":[]")
+            .replace("\"v_threshold\":[-0.055,-0.055]", "\"v_threshold\":[]")
+            .replace("\"v_reset\":[-0.08,-0.08]", "\"v_reset\":[]");
+        let scan = nir_scan(doc.as_bytes()).expect("the scan counts it");
+        assert_eq!(scan.lif_neurons, 0);
+        let refused = NirImport::from_json(doc.as_bytes(), mv_options()).err();
+        assert_eq!(refused, Some(NirError::BadShape("tau")));
+    }
+
+    /// Each malformed shape is refused by the scan and by the import
+    /// alone, by name: an edge of three names or of one, a flat weight,
+    /// an empty row, ragged rows (the import's alone: the scan counts
+    /// cells), a nested `tau`, and an `r` or a `v_reset` longer than
+    /// `tau`, which the scan names a LIF param and the import by field.
+    #[test]
+    fn each_malformed_shape_is_refused_by_the_scan_and_by_the_import_alone() {
+        use NirError::BadShape;
+        let weight = "[[0.5,-1.0,0.25],[0.0,0.75,-0.5]]";
+        let edge = "[\"lif\",\"output\"]";
+        let cases = [
+            (
+                edge,
+                "[\"lif\",\"output\",\"input\"]",
+                Some(BadShape("edges")),
+                BadShape("edges"),
+            ),
+            (
+                edge,
+                "[\"lif\"]",
+                Some(BadShape("edges")),
+                BadShape("edges"),
+            ),
+            (
+                weight,
+                "[0.5,-1.0,0.25]",
+                Some(BadShape("weight")),
+                BadShape("weight"),
+            ),
+            (weight, "[[]]", Some(BadShape("weight")), BadShape("weight")),
+            (
+                weight,
+                "[[0.5,-1.0,0.25],[0.0,0.75]]",
+                None,
+                BadShape("weight"),
+            ),
+            (
+                "\"tau\":[0.02,0.02]",
+                "\"tau\":[[0.02],[0.02]]",
+                Some(BadShape("LIF param")),
+                BadShape("tau"),
+            ),
+            (
+                "\"r\":[100000000.0,100000000.0]",
+                "\"r\":[100000000.0,100000000.0,100000000.0]",
+                Some(BadShape("LIF param")),
+                BadShape("r"),
+            ),
+            (
+                "\"v_reset\":[-0.08,-0.08]",
+                "\"v_reset\":[-0.08,-0.08,-0.08]",
+                Some(BadShape("LIF param")),
+                BadShape("v_reset"),
+            ),
+        ];
+        for (from, to, scan, alone) in cases {
+            let doc = CHAIN.replacen(from, to, 1);
+            assert_ne!(doc, CHAIN, "{to}");
+            assert_eq!(nir_scan(doc.as_bytes()).err(), scan, "the scan, {to}");
+            assert_eq!(import_alone(&doc), Err(alone), "the import alone, {to}");
+        }
+    }
+
+    /// The export marks an all-zero tensor in its `quant` block, as the
+    /// import recorded it.
+    #[test]
+    fn the_export_marks_a_zero_tensor() {
+        let doc = "{\"version\":\"x\",\"node\":{\"type\":\"NIRGraph\",\"edges\":[],\
+\"nodes\":{\"a\":{\"type\":\"Linear\",\"weight\":[[0.0,0.0],[0.0,0.0]]}}}}";
+        let (nodes, weights, lifs, _) = import_with_report(doc, mv_options()).expect("imports");
+        let mut out = [0u8; 1024];
+        let n = nir_export(&nodes, &[], &weights, &lifs, mv_options(), &mut out).expect("exports");
+        let text = core::str::from_utf8(&out[..n]).expect("utf8");
+        assert!(text.contains("\"zero_tensor\":true"), "{text}");
+    }
 }
