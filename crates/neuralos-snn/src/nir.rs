@@ -4029,7 +4029,8 @@ mod std_assembly {
         /// # Errors
         ///
         /// [`NirError::UnsupportedTopology`] for anything but
-        /// `Input → Linear → LIF → Output`; [`NirError::UnsupportedUnits`]
+        /// `Input → Linear → LIF → Output`, its three edges in any order;
+        /// [`NirError::UnsupportedUnits`]
         /// under [`NirUnits::Simulation`]; [`NirError::MissingField`] if
         /// the fixture starved a node.
         #[allow(clippy::missing_panics_doc)] // no panics — flagged for the unwrap on .first()
@@ -4061,12 +4062,17 @@ mod std_assembly {
                     "exactly 4 nodes (Input-Linear-LIF-Output) in slice 1",
                 ));
             }
-            let chain = [
+            // the three edges in any order: an exporter lists them in its
+            // own (snnTorch's follows Python's hash seed)
+            let mut chain = [
                 (inp as u32, lin as u32),
                 (lin as u32, lif as u32),
                 (lif as u32, out as u32),
             ];
-            if self.edges.as_slice() != chain {
+            chain.sort_unstable();
+            let mut edges = self.edges.clone();
+            edges.sort_unstable();
+            if edges != chain {
                 return Err(NirError::UnsupportedTopology(
                     "edges must be Input->Linear->LIF->Output",
                 ));
@@ -8597,5 +8603,55 @@ mod tests {
         let n = nir_export(&nodes, &[], &weights, &lifs, mv_options(), &mut out).expect("exports");
         let text = core::str::from_utf8(&out[..n]).expect("utf8");
         assert!(text.contains("\"zero_tensor\":true"), "{text}");
+    }
+
+    // ----- The doc-vs-code dive (2026-10-15): Call 7 (b)'s test, ruled
+    // 15:20 UTC: red at 645afa8, green with the change. -----
+
+    /// `build_chain_network` takes the chain's three edges in any order:
+    /// an exporter lists them in its own (snnTorch's follows Python's
+    /// hash seed), and the reordered chain builds the same network and
+    /// encoder as the ordered one.
+    #[test]
+    fn the_chain_builds_from_its_edges_in_any_order() {
+        let reordered = CHAIN.replace(
+            "[[\"input\",\"linear\"],[\"linear\",\"lif\"],[\"lif\",\"output\"]]",
+            "[[\"linear\",\"lif\"],[\"lif\",\"output\"],[\"input\",\"linear\"]]",
+        );
+        assert_ne!(reordered, CHAIN, "the edges reordered");
+        let ordered = NirImport::from_json(CHAIN.as_bytes(), mv_options()).expect("imports");
+        let other = NirImport::from_json(reordered.as_bytes(), mv_options()).expect("imports");
+        let (net, enc) = ordered.build_chain_network().expect("the chain");
+        let (net2, enc2) = other
+            .build_chain_network()
+            .expect("the chain, its edges reordered");
+        assert_eq!(net2.neuron_count(), net.neuron_count());
+        assert_eq!(enc2.encode(&[25, 3, 7]), enc.encode(&[25, 3, 7]));
+    }
+
+    /// The chain's nodes in another order build too: a graph lists its
+    /// nodes in its exporter's order, and listed by name (`input`, `lif`,
+    /// `linear`, `output`) the chain's three edges, in chain order, are out
+    /// of index order. The same network and encoder as the chain listed in
+    /// chain order.
+    #[test]
+    fn the_chain_builds_from_its_nodes_in_any_order() {
+        let by_name = "{\"version\":\"test\",\"node\":{\"type\":\"NIRGraph\",\
+\"edges\":[[\"input\",\"linear\"],[\"linear\",\"lif\"],[\"lif\",\"output\"]],\
+\"nodes\":{\"input\":{\"type\":\"Input\",\"shape\":[3]},\
+\"lif\":{\"type\":\"LIF\",\"tau\":[0.02,0.02],\"r\":[100000000.0,100000000.0],\
+\"v_leak\":[-0.07,-0.07],\"v_threshold\":[-0.055,-0.055],\"v_reset\":[-0.08,-0.08]},\
+\"linear\":{\"type\":\"Linear\",\"weight\":[[0.5,-1.0,0.25],[0.0,0.75,-0.5]]},\
+\"output\":{\"type\":\"Output\",\"shape\":[2]}}}}";
+        let ordered = NirImport::from_json(CHAIN.as_bytes(), mv_options()).expect("imports");
+        let other = NirImport::from_json(by_name.as_bytes(), mv_options()).expect("imports");
+        let names: Vec<&str> = other.nodes.iter().map(|n| n.name).collect();
+        assert_eq!(names, ["input", "lif", "linear", "output"]);
+        let (net, enc) = ordered.build_chain_network().expect("the chain");
+        let (net2, enc2) = other
+            .build_chain_network()
+            .expect("the chain, its nodes by name");
+        assert_eq!(net2.neuron_count(), net.neuron_count());
+        assert_eq!(enc2.encode(&[25, 3, 7]), enc.encode(&[25, 3, 7]));
     }
 }
