@@ -248,14 +248,15 @@ pub const fn q1_0_encoded_len(n: usize) -> usize {
 /// `j%8` of byte `j/8` (LSB-first); set → `+γ`, clear → `−γ`.
 ///
 /// The format is binary, so every decoded trit is [`Trit::One`] or
-/// [`Trit::MinusOne`] — no zeros exist in `q1_0`. Returns the fp16 scale
-/// bits of the first block (see `docs/TERNARY_FORMAT.md` for the
-/// multi-block scale caveat: Prism stores one scale *per block*; this
-/// decode returns per-block scales through `scale_bits_out` when provided,
-/// and the first block's scale for the one-block case).
+/// [`Trit::MinusOne`] — no zeros exist in `q1_0`. Prism stores one scale
+/// per block (`docs/TERNARY_FORMAT.md`): each block's fp16 scale bits are
+/// written to `scale_bits_out`, which needs `n/128` entries
+/// (`q1_0_decodes_every_block_at_its_own_offset`,
+/// `q1_0_rejects_bad_input`).
 ///
-/// Requires `trits.len() % 128 == 0` and
-/// `bytes.len() >= `[`q1_0_encoded_len`]`(n)`.
+/// Requires `trits.len() % 128 == 0`,
+/// `bytes.len() >= `[`q1_0_encoded_len`]`(n)` and
+/// `scale_bits_out.len() >= n/128`.
 ///
 /// # Errors
 ///
@@ -1242,5 +1243,108 @@ mod tests {
         } else {
             sign * (1.0 + mant / 1024.0) * (2.0_f32).powi(exp - 15)
         }
+    }
+
+    // ----- The doc-vs-code dive (2026-10-15): tests for the mutation
+    // pass's bridge.rs survivors. Tests only: no behavior moves, no
+    // verdict of the closed chapter is read. Each run green at 645afa8
+    // and red under the survivors it answers. -----
+
+    /// The widening is bit-exact for all 65,536 patterns, not for the 256
+    /// the property test draws: the smallest subnormals, `0x0001` and
+    /// `0x8001` (±2^-24), whose leading one is bit 0, included. NaNs as
+    /// the property test reads them.
+    #[cfg(feature = "std")]
+    #[test]
+    fn half_widening_matches_the_reference_for_every_pattern() {
+        for h in 0..=u16::MAX {
+            let got = f32::from_bits(half_to_f32_bits(h));
+            let want = half_to_f32_via_f32(h);
+            if want.is_nan() {
+                assert!(got.is_nan(), "fp16 bits {h:#06x}");
+            } else {
+                assert_eq!(got.to_bits(), want.to_bits(), "fp16 bits {h:#06x}");
+            }
+        }
+        assert_eq!(half_to_f32_bits(0x0001), 0x3380_0000, "2^-24");
+    }
+
+    /// With `SCALE = 1000`, the map is the identity across the whole i16
+    /// range, not only below 500, where any divisor near 1000 gives it
+    /// too; it saturates one past each rail.
+    #[test]
+    fn wire_gamma_is_the_identity_across_the_i16_range() {
+        for g in [1_000, 2_000, 12_345, 32_767, -1_000, -32_768] {
+            assert_eq!(i32::from(wire_gamma_to_substrate(g)), g, "γ milli {g}");
+        }
+        assert_eq!(wire_gamma_to_substrate(32_768), i16::MAX);
+        assert_eq!(wire_gamma_to_substrate(-32_769), i16::MIN);
+    }
+
+    /// `q1_0` is 18 bytes a block, and each block decodes from its own
+    /// offset into its own 128 trits and its own scale: block 0 at 1.0,
+    /// every sign set; block 1 at 2.0, every sign clear.
+    #[test]
+    fn q1_0_decodes_every_block_at_its_own_offset() {
+        let mut bytes = Vec::with_capacity(q1_0_encoded_len(2 * Q1_0_BLOCK));
+        bytes.extend_from_slice(&0x3C00_u16.to_le_bytes());
+        bytes.extend(std::iter::repeat_n(0xFF_u8, 16));
+        bytes.extend_from_slice(&0x4000_u16.to_le_bytes());
+        bytes.extend(std::iter::repeat_n(0x00_u8, 16));
+        assert_eq!(bytes.len(), 36);
+        let mut trits = [Trit::Zero; 2 * Q1_0_BLOCK];
+        let mut scales = [0_u16; 2];
+        decode_q1_0(&bytes, &mut trits, &mut scales).expect("decode");
+        assert_eq!(scales, [0x3C00, 0x4000]);
+        assert!(trits[..Q1_0_BLOCK].iter().all(|&t| t == Trit::One));
+        assert!(trits[Q1_0_BLOCK..].iter().all(|&t| t == Trit::MinusOne));
+    }
+
+    /// `out` one byte short of `n/4` is refused, not only one far short.
+    #[test]
+    fn repack_refuses_an_out_one_byte_short() {
+        let mut out = [0_u8; I2_S_BLOCK / 4 - 1];
+        assert_eq!(
+            repack_i2s_to_kernel(&[0x55; 64], I2_S_BLOCK, &mut out),
+            Err(BridgeError::TooShort)
+        );
+    }
+
+    /// A repack writes its `n/4` bytes whatever `out` held before: from
+    /// a buffer of all ones it gives what it gives from a zeroed one.
+    #[test]
+    fn repack_overwrites_what_out_held() {
+        let trits: Vec<Trit> = (0..I2_S_BLOCK)
+            .map(|i| [Trit::One, Trit::Zero, Trit::MinusOne][i % 3])
+            .collect();
+        let mut wire = [0_u8; 64];
+        encode_i2_s(&trits, 0, &mut wire).expect("encode");
+        let mut zeroed = [0_u8; 32];
+        repack_i2s_to_kernel(&wire, I2_S_BLOCK, &mut zeroed).expect("repack");
+        let mut stale = [0xFF_u8; 32];
+        repack_i2s_to_kernel(&wire, I2_S_BLOCK, &mut stale).expect("repack");
+        assert_eq!(stale, zeroed);
+    }
+
+    /// Each error prints its rule.
+    #[test]
+    fn each_bridge_error_prints_its_rule() {
+        let text = |e: BridgeError| std::format!("{e}");
+        assert_eq!(
+            text(BridgeError::BadLength),
+            "tensor length is not a multiple of the block size"
+        );
+        assert_eq!(
+            text(BridgeError::TooShort),
+            "buffer shorter than the layout requires"
+        );
+        assert_eq!(
+            text(BridgeError::UnsupportedCode),
+            "2-bit code 3 found (reference quantizer cannot emit it)"
+        );
+        assert_eq!(
+            text(BridgeError::RowTooWide),
+            "kernel row wider than 65535: its i32 accumulator could overflow"
+        );
     }
 }

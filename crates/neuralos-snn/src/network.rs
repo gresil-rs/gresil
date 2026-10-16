@@ -16,7 +16,10 @@
 //!   (saturating at `u64::MAX`, about 585,000 years of model time).
 //! - Topology builders never create self-connections.
 //! - LFSR RNG is deterministic: same seed → same network connectivity.
-//! - Synapse weights respect the presynaptic neuron's type (E → positive, I → negative).
+//! - The topology builders' weights respect the presynaptic neuron's type (E →
+//!   positive, I → negative; `prop_topology_weights_respect_presynaptic_type`).
+//!   `add_synapse` keeps the weight it is given, of either sign, as an NIR import
+//!   wires them.
 //! - `step()` delivers each synapse under its own `pre`, in the order it
 //!   was added, however adds and steps interleave.
 //!
@@ -98,11 +101,16 @@ pub enum NetworkTopology {
         /// Fraction of the possible (pre ≠ post) pairs to wire.
         connectivity: f64,
     },
-    /// Watts-Strogatz small-world. Ring lattice with `local_connections` per neuron,
-    /// each rewired with probability `rewiring_prob ∈ [0.0, 1.0]`;
-    /// `build_topology` refuses any other value, NaN included.
+    /// Watts-Strogatz small-world. Ring lattice: each neuron wires to the
+    /// `local_connections` neurons after it on the ring, each edge rewired
+    /// with probability `rewiring_prob ∈ [0.0, 1.0]`; `build_topology`
+    /// refuses any other value, NaN included. Past `neuron_count − 1` the
+    /// offsets go round the ring again: an offset that lands on the neuron
+    /// itself is skipped, and the others wire the same neighbours again, so
+    /// a pair can carry more than one synapse
+    /// (`smallworld_keeps_its_wiring_inside_0_to_1`, 5 neurons at 10).
     SmallWorld {
-        /// Ring-lattice neighbours per neuron, before rewiring.
+        /// Ring offsets per neuron, 1 to this, before rewiring.
         local_connections: u8,
         /// Probability a local connection is rewired.
         rewiring_prob: f64,
@@ -144,8 +152,8 @@ pub struct Spike {
     /// ID of the neuron that fired.
     pub neuron_id: u16,
     /// Simulation time (μs) at which the spike occurred. A `u64`: past 2^32 μs
-    /// (71.6 min) it no longer fits a `u32`, and the neuron's own
-    /// `last_spike_time_us` holds its low 32 bits.
+    /// (71.6 min) it no longer fits a `u32`, and the stamp the neuron keeps
+    /// of its last spike, which has no getter, holds its low 32 bits.
     pub time_us: u64,
 }
 
@@ -388,7 +396,9 @@ impl SpikingNeuralNetwork {
         })
     }
 
-    /// Build the configured topology. Must be called before [`step`](Self::step).
+    /// Build the configured topology. [`new`](Self::new) wires nothing, so
+    /// a network stepped before this call steps with no synapse but those
+    /// [`add_synapse`](Self::add_synapse) gave it.
     ///
     /// A second call clears any existing synapses, CSR state and pending
     /// plasticity entries before it builds, so synapses never accumulate;
@@ -431,7 +441,8 @@ impl SpikingNeuralNetwork {
     }
 
     /// Advance the simulation by one `dt_us`. Returns the spikes emitted
-    /// this step in chronological (neuron-id) order.
+    /// this step in neuron-id order (`every_wiring_steps_as_its_synapses_were_added`
+    /// reads it); every spike of a step carries the step's time.
     ///
     /// A step first sorts the CSR if a synapse came in since the last sort
     /// ([`add_synapse`](Self::add_synapse); a step and `build_topology`
@@ -811,7 +822,10 @@ impl SpikingNeuralNetwork {
 
     /// One-shot BitNet-Round ternarization of all synapse weights: `γ = mean|w|`,
     /// each weight snapped to the nearest of `{-γ, 0, +γ}`. Syncs the CSR
-    /// transmission weights. Returns `γ` (or `0` if there are no synapses).
+    /// transmission weights (`ternary_writes_reach_their_csr_slot`). Returns
+    /// `γ`; when `γ` rounds to 0, with no synapse or a mean magnitude under
+    /// one half, it returns 0 and leaves every weight as it was
+    /// (`ternarize_weights_leaves_the_weights_when_gamma_rounds_to_0`).
     ///
     /// This is a *one-shot* quantizer for the ternary-bridge Stage 1 gate — it
     /// does **not** install an ongoing ternary mode. Keeping weights on-grid
@@ -913,20 +927,30 @@ impl SpikingNeuralNetwork {
         flips
     }
 
-    /// Reset all neurons, stats, and time. Keeps topology + synapse wiring.
-    /// (Synapses carry no per-sim dynamic state since the alpha.3 F5a
-    /// removal — weight + structural params only.)
+    /// Start the run over on the same network: every neuron back to rest
+    /// ([`LIFNeuron::reset`]), the clock at 0, and the stats a fresh
+    /// network's, every count 0 and the means at −70.0 mV and 0 Hz until
+    /// the next step. With `unstable-stdp`, each synapse's two counters,
+    /// `raw_stdp_delta` and `absorbed_delta`, go back to 0, and
+    /// `stochastic_ternary_step` draws its stream from the start. The
+    /// wiring and the weights stay (`reset_brings_every_neuron_to_rest`,
+    /// `reset_clears_time_and_spikes`,
+    /// `reset_gives_fresh_stats_and_keeps_the_weights`,
+    /// `reset_draws_the_flip_stream_from_the_start`).
     pub fn reset(&mut self) {
         for n in &mut self.neurons {
             n.reset();
         }
         self.time_us = 0;
-        self.stats.total_spikes = 0;
+        self.stats = NetworkStats::new();
         #[cfg(feature = "unstable-stdp")]
         {
-            self.stats.plasticity_events = 0;
             self.plasticity_queue.clear();
             self.ternary_flip_lfsr = TERNARY_FLIP_SEED;
+            for s in &mut self.synapses {
+                s.raw_stdp_delta = 0;
+                s.absorbed_delta = 0;
+            }
         }
     }
 
@@ -1926,6 +1950,80 @@ mod tests {
         assert_eq!(net.stats().plasticity_events, 0);
     }
 
+    /// `reset` gives the network a fresh network's stats and, with the
+    /// feature, zeroes each synapse's two counters; the weights stay. The
+    /// run moves every stat and both counters first, or the reset proves
+    /// nothing for them: the synapse added at weight 0 absorbs the LTD its
+    /// two co-firing neurons give it.
+    #[test]
+    fn reset_gives_fresh_stats_and_keeps_the_weights() {
+        let build = || {
+            let mut net =
+                SpikingNeuralNetwork::new(20, 1000, NetworkTopology::default()).expect("valid");
+            net.build_topology().expect("build");
+            net.add_synapse(0, 1, 0).expect("adds");
+            net
+        };
+        let fresh = build();
+        let mut net = build();
+        #[cfg(feature = "unstable-stdp")]
+        net.set_plasticity_enabled(true);
+        for _ in 0..20 {
+            net.step(&[1000; 20]).expect("step");
+        }
+        let (ran, base) = (net.stats().clone(), fresh.stats());
+        assert_ne!(ran.total_spikes, base.total_spikes);
+        assert_ne!(
+            ran.avg_membrane_potential_mv,
+            base.avg_membrane_potential_mv
+        );
+        assert_ne!(ran.firing_rate_hz, base.firing_rate_hz);
+        #[cfg(feature = "unstable-stdp")]
+        {
+            assert_ne!(ran.plasticity_events, base.plasticity_events);
+            assert_ne!(ran.stdp_pairs_same_step, base.stdp_pairs_same_step);
+            assert_ne!(ran.stdp_pairs_post_leads, base.stdp_pairs_post_leads);
+            assert_ne!(ran.stdp_pairs_pre_leads, base.stdp_pairs_pre_leads);
+            assert!(net.synapses().iter().any(|s| s.raw_stdp_delta() != 0));
+            assert!(net.synapses().iter().any(|s| s.absorbed_delta() != 0));
+        }
+        let weights: Vec<i16> = net.synapses().iter().map(Synapse::weight).collect();
+        net.reset();
+        assert_eq!(net.stats(), fresh.stats());
+        let kept: Vec<i16> = net.synapses().iter().map(Synapse::weight).collect();
+        assert_eq!(kept, weights);
+        #[cfg(feature = "unstable-stdp")]
+        assert!(net
+            .synapses()
+            .iter()
+            .all(|s| (s.raw_stdp_delta(), s.absorbed_delta()) == (0, 0)));
+    }
+
+    /// After `reset`, `stochastic_ternary_step` draws its stream from the
+    /// start, where a fresh network's starts: a step that drew moved the
+    /// stream, and the reset brings it back.
+    #[cfg(feature = "unstable-stdp")]
+    #[test]
+    fn reset_draws_the_flip_stream_from_the_start() {
+        let three = || {
+            let neurons = (0..3)
+                .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+                .collect();
+            SpikingNeuralNetwork::from_neurons(neurons, 1_000).expect("three neurons")
+        };
+        let fresh = three();
+        let mut net = three();
+        net.add_synapse(1, 2, 122)
+            .expect("γ − 3: an off-grid weight draws");
+        let _ = net.stochastic_ternary_step(125);
+        assert_ne!(
+            net.ternary_flip_lfsr, fresh.ternary_flip_lfsr,
+            "the step drew, or the reset below proves nothing"
+        );
+        net.reset();
+        assert_eq!(net.ternary_flip_lfsr, fresh.ternary_flip_lfsr);
+    }
+
     #[test]
     fn add_synapse_rejects_out_of_bounds() {
         let mut net =
@@ -2809,6 +2907,26 @@ mod tests {
             rv_mismatches, 0,
             "every reverse-CSR edge must match its synapse's (pre, post)"
         );
+    }
+
+    /// `ternarize_weights` at the `γ` edge: weights whose mean magnitude
+    /// rounds to 0, `[1, 0, 0]`, return 0 and stay as they were; at `γ = 1`
+    /// they snap, `[2, 1, 0]` to `[1, 1, 0]`.
+    #[test]
+    fn ternarize_weights_leaves_the_weights_when_gamma_rounds_to_0() {
+        for (given, gamma, kept) in [([1_i16, 0, 0], 0, [1_i16, 0, 0]), ([2, 1, 0], 1, [1, 1, 0])] {
+            let neurons = (0..3)
+                .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+                .collect();
+            let mut net =
+                SpikingNeuralNetwork::from_neurons(neurons, 1_000).expect("three neurons");
+            for (pre, weight) in (0_u16..).zip(given) {
+                net.add_synapse(pre, (pre + 1) % 3, weight).expect("adds");
+            }
+            assert_eq!(net.ternarize_weights(), gamma, "{given:?}");
+            let weights: Vec<i16> = net.synapses().iter().map(Synapse::weight).collect();
+            assert_eq!(weights, kept, "{given:?}");
+        }
     }
 
     /// A ternary write reaches its own CSR slot. The five edges of
@@ -4427,6 +4545,373 @@ mod tests {
             net.stats().avg_membrane_potential_mv,
             -69.0,
             "centi-mV quanta must be reported in mV"
+        );
+    }
+
+    // ----- The doc-vs-code dive (2026-10-15): a test for each network
+    // sentence no test held at 645afa8; each is run green there and red
+    // under its mutant. -----
+
+    /// `reset` brings every neuron back to rest, as its doc says: after a
+    /// driven run, every neuron reads at rest (`at_rest`, the six fields
+    /// `LIFNeuron::reset` writes).
+    #[test]
+    fn reset_brings_every_neuron_to_rest() {
+        let mut net =
+            SpikingNeuralNetwork::new(20, 1000, NetworkTopology::default()).expect("valid");
+        net.build_topology().expect("build");
+        for _ in 0..5 {
+            net.step(&[1000; 20]).expect("step");
+        }
+        assert!(
+            !net.neurons().iter().all(at_rest),
+            "the run must move a neuron, or the reset below proves nothing"
+        );
+        net.reset();
+        assert!(net.neurons().iter().all(at_rest));
+    }
+
+    /// `Balanced` wires as it did at `645afa8`, its four classes and two
+    /// builds in a row (the second goes on from the seed the first left):
+    /// the hash of every synapse, measured there (the doc-vs-code dive's
+    /// `balanced_hash.py`). The default topology, which `new`'s callers,
+    /// the README and the visualizer build; no test held its wiring.
+    #[test]
+    fn balanced_wires_as_it_did_at_the_pin() {
+        for (n, pins) in [
+            (
+                50,
+                [(416, 0x53d9_2eb0_e102_a144), (404, 0x4e41_80c5_d8a7_5623)],
+            ),
+            (
+                128,
+                [(1069, 0xedd1_168e_1005_322b), (1073, 0x96c1_6dad_c070_6358)],
+            ),
+        ] {
+            let mut net =
+                SpikingNeuralNetwork::new(n, 1000, NetworkTopology::default()).expect("valid");
+            for (synapses, hash) in pins {
+                net.build_topology().expect("build");
+                assert_eq!(net.synapse_count(), synapses, "{n} neurons");
+                assert_eq!(wiring_hash(&net), hash, "{n} neurons");
+            }
+        }
+    }
+
+    /// `build_topology` keeps the runtime spike counter.
+    #[test]
+    fn a_rebuild_keeps_the_spike_count() {
+        let mut net =
+            SpikingNeuralNetwork::new(20, 1000, NetworkTopology::default()).expect("valid");
+        net.build_topology().expect("build");
+        for _ in 0..5 {
+            net.step(&[1000; 20]).expect("step");
+        }
+        let spikes = net.stats().total_spikes;
+        assert!(spikes > 0, "the run must spike, or the count kept is a 0");
+        net.build_topology().expect("rebuild");
+        assert_eq!(net.stats().total_spikes, spikes);
+    }
+
+    /// An entry of `input_currents` past the last neuron is ignored: a
+    /// longer slice steps as the slice cut to the network.
+    #[test]
+    fn an_input_past_the_last_neuron_is_ignored() {
+        let build = || {
+            let neurons = (0..2)
+                .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+                .collect();
+            SpikingNeuralNetwork::from_neurons(neurons, 1000).expect("two neurons")
+        };
+        let (mut cut, mut long) = (build(), build());
+        let membranes = |net: &SpikingNeuralNetwork| {
+            net.neurons()
+                .iter()
+                .map(|n| n.membrane_potential)
+                .collect::<Vec<i16>>()
+        };
+        for _ in 0..20 {
+            let a = cut.step(&[600, 3000]).expect("step");
+            let b = long.step(&[600, 3000, i16::MAX, i16::MIN]).expect("step");
+            assert_eq!(a, b);
+            assert_eq!(membranes(&cut), membranes(&long));
+        }
+    }
+
+    /// The step delivers in id order, and within one `pre` in the CSR's
+    /// order, each add saturating in `i16`: from 0, +30,000 twice then
+    /// −30,000 is 2,767, where −30,000 first would end at 30,000
+    /// (`FixedNetwork::synapses`' example, on the std network).
+    #[test]
+    fn the_step_delivers_in_id_order_then_in_csr_order() {
+        // fires at every integrating step: rest, −70, is over −100
+        let firing = |id| {
+            LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt)
+                .with_threshold(-100)
+        };
+        let quiet = |id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt);
+
+        // across pres: 0 and 1 send +30,000, then 2 sends −30,000
+        let mut net = SpikingNeuralNetwork::from_neurons(
+            vec![firing(0), firing(1), firing(2), quiet(3)],
+            1000,
+        )
+        .expect("four neurons");
+        net.set_synaptic_input_divisor(1).expect("in 1 to 32,767");
+        net.add_synapse(2, 3, -30_000).expect("adds");
+        net.add_synapse(0, 3, 30_000).expect("adds");
+        net.add_synapse(1, 3, 30_000).expect("adds");
+        assert_eq!(net.step(&[0; 4]).expect("step 0").len(), 3);
+        assert_eq!(net.neurons()[3].synaptic_current_pa, 2_767, "id order");
+
+        // within one pre: +30,000 twice then −30,000, as added
+        let mut net = SpikingNeuralNetwork::from_neurons(vec![firing(0), quiet(1)], 1000)
+            .expect("two neurons");
+        net.set_synaptic_input_divisor(1).expect("in 1 to 32,767");
+        net.add_synapse(0, 1, 30_000).expect("adds");
+        net.add_synapse(0, 1, 30_000).expect("adds");
+        net.add_synapse(0, 1, -30_000).expect("adds");
+        assert_eq!(net.step(&[0; 2]).expect("step 0").len(), 1);
+        assert_eq!(
+            net.neurons()[1].synaptic_current_pa,
+            2_767,
+            "the CSR's order"
+        );
+    }
+
+    /// The clock saturates at `u64::MAX`, which no run reaches: the field
+    /// is written as `the_clock_runs_past_the_u32_ceiling` writes it.
+    #[test]
+    fn the_clock_saturates_at_the_u64_ceiling() {
+        let mut net =
+            SpikingNeuralNetwork::new(2, 1000, NetworkTopology::Random { connectivity: 0.0 })
+                .expect("constructs");
+        net.time_us = u64::MAX - 10;
+        net.step(&[0, 0]).expect("step");
+        assert_eq!(net.time_us(), u64::MAX);
+    }
+
+    /// `build_topology` on a `from_neurons` network discards the caller's
+    /// wiring and adds none: its stored marker is `Random` at 0.
+    #[test]
+    fn a_build_on_a_network_from_neurons_discards_its_wiring_and_adds_none() {
+        let neurons = (0..3)
+            .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+            .collect();
+        let mut net = SpikingNeuralNetwork::from_neurons(neurons, 1000).expect("three neurons");
+        net.add_synapse(0, 1, 100).expect("adds");
+        net.add_synapse(1, 2, 100).expect("adds");
+        net.build_topology().expect("the marker builds");
+        assert_eq!(net.synapse_count(), 0);
+    }
+
+    // ----- The doc-vs-code dive (2026-10-15), second batch: tests for the
+    // mutation pass's network.rs survivors, each value measured at 645afa8
+    // and each test run red under the survivors it answers. -----
+
+    /// `Feedforward` wires as it did at `645afa8` on layers past 8, where
+    /// a layer's fan-out is not 1. No test before this one read the wiring
+    /// of a layer past 8, and under 8 the fan-out, `max(next_size / 4, 1)`,
+    /// is 1, so the stride is never read.
+    #[test]
+    fn feedforward_wires_as_it_did_at_the_pin() {
+        let check = |layers: &'static [u16], synapses: u32, hash: u64| {
+            let n = layers.iter().sum();
+            let mut net =
+                SpikingNeuralNetwork::new(n, 1000, NetworkTopology::Feedforward { layers })
+                    .expect("valid");
+            net.build_topology().expect("build");
+            assert_eq!(net.synapse_count(), synapses, "{layers:?}");
+            assert_eq!(wiring_hash(&net), hash, "{layers:?}");
+        };
+        check(&[10, 15, 5], 45, 0xe3a7_11a0_bbec_0fe7);
+        check(&[8, 16, 9], 64, 0xf179_ca2d_997d_60e3);
+    }
+
+    /// `SmallWorld` on two neurons wires the ring both ways.
+    #[test]
+    fn smallworld_wires_two_neurons_both_ways() {
+        let mut net = SpikingNeuralNetwork::new(
+            2,
+            1000,
+            NetworkTopology::SmallWorld {
+                local_connections: 1,
+                rewiring_prob: 0.0,
+            },
+        )
+        .expect("valid");
+        net.build_topology().expect("build");
+        let pairs: Vec<(u16, u16)> = net.synapses().iter().map(|s| (s.pre(), s.post())).collect();
+        assert_eq!(pairs, [(0, 1), (1, 0)]);
+    }
+
+    /// The stats of a network of one neuron are that neuron's: the mean
+    /// membrane is its membrane after the step.
+    #[test]
+    fn the_stats_of_one_neuron_are_its_own() {
+        let one = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
+        let mut net = SpikingNeuralNetwork::from_neurons(vec![one], 1000).expect("one neuron");
+        net.step(&[600]).expect("step");
+        assert_eq!(net.neurons()[0].membrane_potential, -67);
+        assert_eq!(net.stats().avg_membrane_potential_mv, -67.0);
+    }
+
+    /// The firing rate is computed after every step, before a second of
+    /// model time too: one spike over two neurons in 10 ms is 50 Hz.
+    #[test]
+    fn the_firing_rate_reads_before_a_second() {
+        let quiet = |id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt);
+        let mut net =
+            SpikingNeuralNetwork::from_neurons(vec![quiet(0), quiet(1)], 1000).expect("two");
+        assert_eq!(
+            net.step(&[3000, 0]).expect("step 0").len(),
+            1,
+            "neuron 0 fires"
+        );
+        for _ in 1..10 {
+            assert!(net.step(&[0, 0]).expect("step").is_empty());
+        }
+        assert_eq!(net.stats().firing_rate_hz, 50.0);
+    }
+
+    /// STDP's instruments on a scripted run, two neurons and one synapse:
+    /// the post neuron fires alone first (its pre never fired, so no pair:
+    /// the `last_spike_time_us > 0` guard), then a co-fire (the same-step
+    /// tie-break, LTD), then pre-leads and post-leads pairs at 3, 8 and
+    /// 4, 1, 8 ms, a pre-leads pair at 15 ms, whose delta is +1, and a
+    /// post-leads and a pre-leads pair at 20 ms, both outside the window
+    /// (delta 0): the first counts an event and no pair, the second
+    /// neither. Every count, the weight and the raw sum, measured at
+    /// `645afa8`.
+    #[cfg(feature = "unstable-stdp")]
+    #[test]
+    fn the_stdp_instruments_count_a_scripted_run() {
+        let quiet = |id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt);
+        let mut net =
+            SpikingNeuralNetwork::from_neurons(vec![quiet(0), quiet(1)], 1000).expect("two");
+        net.add_synapse(0, 1, 100).expect("adds");
+        net.set_plasticity_enabled(true);
+        let plan: [(u32, [i16; 2]); 10] = [
+            (1, [0, 3000]),
+            (5, [3000, 6000]),
+            (9, [6000, 0]),
+            (12, [0, 6000]),
+            (17, [0, 6000]),
+            (18, [6000, 0]),
+            (25, [6000, 0]),
+            (40, [0, 6000]),
+            (60, [6000, 0]),
+            (80, [0, 6000]),
+        ];
+        let mut fired = Vec::new();
+        for step in 0..85u32 {
+            let input = plan
+                .iter()
+                .find(|(s, _)| *s == step)
+                .map_or([0, 0], |(_, i)| *i);
+            for s in net.step(&input).expect("step") {
+                fired.push((step, s.neuron_id));
+            }
+        }
+        assert_eq!(
+            fired,
+            [
+                (1, 1),
+                (5, 0),
+                (5, 1),
+                (9, 0),
+                (12, 1),
+                (17, 1),
+                (18, 0),
+                (25, 0),
+                (40, 1),
+                (60, 0),
+                (80, 1)
+            ],
+            "every planned spike, and no other"
+        );
+        let st = net.stats();
+        assert_eq!(
+            (
+                st.plasticity_events,
+                st.stdp_pairs_same_step,
+                st.stdp_pairs_post_leads,
+                st.stdp_pairs_pre_leads
+            ),
+            (8, 1, 3, 3)
+        );
+        let s = &net.synapses()[0];
+        assert_eq!(
+            (s.weight(), s.raw_stdp_delta(), s.absorbed_delta()),
+            (91, -9, 0)
+        );
+    }
+
+    /// `stochastic_ternary_step` on a seeded stream: an on-grid synapse is
+    /// skipped and draws nothing; an excitatory one an LTD delta pushed
+    /// off `+γ` flips toward `−γ` and the clamp holds it at 0; two an LTP
+    /// delta pushed off `+γ` draw and stay. The return counts the one
+    /// flip, not the two that stayed, and every CSR slot mirrors its
+    /// synapse.
+    #[cfg(feature = "unstable-stdp")]
+    #[test]
+    fn a_stochastic_step_flips_clamps_counts_and_syncs() {
+        let quiet = |id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt);
+        let mut net = SpikingNeuralNetwork::from_neurons(vec![quiet(0), quiet(1), quiet(2)], 1000)
+            .expect("three");
+        net.add_synapse(0, 1, 125).expect("on grid");
+        net.add_synapse(1, 2, 122).expect("γ − 3: an LTD residual");
+        net.add_synapse(2, 0, 127).expect("γ + 2: an LTP residual");
+        net.add_synapse(0, 2, 126).expect("γ + 1: an LTP residual");
+        net.finalize_synapses();
+        net.ternary_flip_lfsr = 2; // the draws: 1, then 46,080, then 23,040
+        assert_eq!(net.stochastic_ternary_step(125), 1);
+        let weights: Vec<i16> = net.synapses().iter().map(|s| s.weight).collect();
+        assert_eq!(weights, [125, 0, 125, 125]);
+        // each CSR slot beside its synapse, as `ternary_writes_reach_their_csr_slot` reads them
+        let mut slots = Vec::new();
+        for pre in 0..net.neuron_count() {
+            for (_post, weight, idx) in net.synapse_matrix.connections(pre) {
+                slots.push((idx, weight, net.synapses[idx].weight));
+            }
+        }
+        assert_eq!(slots.len(), 4, "every slot read");
+        assert!(
+            slots.iter().all(|&(_, slot, synapse)| slot == synapse),
+            "{slots:?}"
+        );
+    }
+
+    // ----- The doc-vs-code dive (2026-10-15), third batch: the csr.rs
+    // survivor that falls under `build_topology`'s doc; run green at
+    // 645afa8 and red under the survivor. -----
+
+    /// A second `build_topology` clears the CSR's state before it builds,
+    /// as its doc says: after a rebuild, each CSR slot names the synapse of
+    /// its own edge, so `ternarize_weights` writes each synapse's value
+    /// into its own slot. A stale index would land the writes on other
+    /// edges' slots, which a slot-against-its-index check cannot see (it
+    /// reads the index from the same table); the edge check can.
+    #[test]
+    fn a_rebuild_leaves_no_stale_csr_index() {
+        let mut net =
+            SpikingNeuralNetwork::new(20, 1000, NetworkTopology::Random { connectivity: 0.3 })
+                .expect("valid");
+        net.build_topology().expect("first build");
+        net.build_topology().expect("second build");
+        let _ = net.ternarize_weights();
+        let mut slots = Vec::new();
+        for pre in 0..net.neuron_count() {
+            for (post, weight, idx) in net.synapse_matrix.connections(pre) {
+                let s = &net.synapses[idx];
+                assert_eq!((s.pre(), s.post()), (pre, post), "slot of synapse {idx}");
+                slots.push((idx, weight, s.weight));
+            }
+        }
+        assert_eq!(slots.len(), net.synapses().len(), "every slot read");
+        assert!(
+            slots.iter().all(|&(_, slot, synapse)| slot == synapse),
+            "{slots:?}"
         );
     }
 }

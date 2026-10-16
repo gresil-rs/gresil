@@ -117,8 +117,10 @@ pub fn project_to_ternary(weight: i16, scale: i16) -> i16 {
 }
 
 /// BitNet-Round in-place ternarization: compute `γ = mean|w|`, then snap each
-/// weight to the nearest of `{-γ, 0, +γ}`. Sign-preserving. Returns `γ`
-/// (or `0` if the slice is empty).
+/// weight to the nearest of `{-γ, 0, +γ}`. Sign-preserving. Returns `γ`;
+/// when `γ` rounds to 0, for an empty slice or a mean magnitude under one
+/// half, it returns 0 and leaves the weights as they were
+/// (`ternarize_leaves_the_weights_when_gamma_rounds_to_0`).
 ///
 /// No float — `γ` is computed in `i64` and the per-weight decision uses the
 /// `±⌈γ/2⌉` boundary. This is a one-shot quantizer; keeping weights on-grid
@@ -300,6 +302,19 @@ mod tests {
     fn ternarize_empty_returns_zero() {
         let mut w: [i16; 0] = [];
         assert_eq!(ternarize(&mut w), 0);
+    }
+
+    /// `γ` that rounds to 0 leaves the weights as they were: a mean
+    /// magnitude under one half, `[1, 0, 0]`, returns 0 untouched; at
+    /// `γ = 1` the weights snap, `[2, 1, 0]` to `[1, 1, 0]`.
+    #[test]
+    fn ternarize_leaves_the_weights_when_gamma_rounds_to_0() {
+        let mut w = [1_i16, 0, 0];
+        assert_eq!(ternarize(&mut w), 0);
+        assert_eq!(w, [1, 0, 0]);
+        let mut w = [2_i16, 1, 0];
+        assert_eq!(ternarize(&mut w), 1);
+        assert_eq!(w, [1, 1, 0]);
     }
 
     #[test]
@@ -517,5 +532,60 @@ mod tests {
                 );
             }
         }
+    }
+
+    // ----- The doc-vs-code dive (2026-10-15): tests for the trit sentences
+    // the pass's survivors showed no test held at 645afa8; run green there
+    // and red under each survivor. -----
+
+    /// The boundary is `⌈γ/2⌉` for an even γ too: every other test's γ is
+    /// odd (125, 5), where `(γ + 1) / 2` and `(γ + 2) / 2` agree.
+    #[test]
+    fn the_boundary_is_half_gamma_rounded_up_for_an_even_gamma_too() {
+        let g = 100_i16;
+        assert_eq!(Trit::from_weight(50, g), Trit::One);
+        assert_eq!(Trit::from_weight(49, g), Trit::Zero);
+        assert_eq!(Trit::from_weight(-50, g), Trit::MinusOne);
+        assert_eq!(Trit::from_weight(-49, g), Trit::Zero);
+    }
+
+    /// `|i16::MIN|` is 32,768, past `i16::MAX`: the scale is capped there,
+    /// never cast to a negative.
+    #[test]
+    fn the_scale_of_i16_min_is_capped_at_i16_max() {
+        assert_eq!(tensor_scale(&[i16::MIN]), i16::MAX);
+        assert_eq!(tensor_scale(&[i16::MIN, i16::MIN]), i16::MAX);
+    }
+
+    /// The flip's threshold is `|residual| × 3000` of 65,536 draws, the rate
+    /// the constant's doc reads its percentages from: 2,999 flips at a
+    /// residual of 1, 3,000 does not; 8,999 at 3, 9,000 does not.
+    #[cfg(feature = "unstable-stdp")]
+    #[test]
+    fn the_flip_threshold_is_3000_per_unit_of_residual() {
+        assert_eq!(STOCHASTIC_FLIP_RATE, 3000);
+        let g = 125_i16;
+        assert_eq!(stochastic_ternary_flip(0, g, 1, 2_999), g);
+        assert_eq!(stochastic_ternary_flip(0, g, 1, 3_000), 0);
+        assert_eq!(stochastic_ternary_flip(0, g, 3, 8_999), g);
+        assert_eq!(stochastic_ternary_flip(0, g, 3, 9_000), 0);
+    }
+
+    /// Past a residual of 21 the threshold saturates at 65,535: every draw
+    /// but the last flips, where an unsaturated product would wrap in `u16`.
+    #[cfg(feature = "unstable-stdp")]
+    #[test]
+    fn a_residual_past_21_flips_on_every_draw_but_the_last() {
+        let g = 125_i16;
+        assert_eq!(stochastic_ternary_flip(0, g, 30, 65_534), g);
+        assert_eq!(stochastic_ternary_flip(0, g, 30, 65_535), 0);
+    }
+
+    /// A scale of 1 flips like any other.
+    #[cfg(feature = "unstable-stdp")]
+    #[test]
+    fn a_gamma_of_one_flips_too() {
+        assert_eq!(stochastic_ternary_flip(0, 1, 1, 0), 1);
+        assert_eq!(stochastic_ternary_flip(0, 1, -1, 0), -1);
     }
 }

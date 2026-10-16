@@ -6,9 +6,18 @@
 //!   no refractory.
 //! - After a spike, the neuron is refractory for `ceil(refractory_period_us / dt_us)`
 //!   steps: exactly `refractory_period_us` when `dt_us` divides it.
-//! - Membrane potential is always in `[``MEMBRANE_MV_MIN``, ``MEMBRANE_MV_MAX``]` mV.
+//! - The step clamps the membrane to `[``MEMBRANE_MV_MIN``, ``MEMBRANE_MV_MAX``]` mV
+//!   ([`LIFNeuron::integrate_and_fire`] § Semantics, item 7). The potentials the
+//!   chain sets are kept as given, and a spike writes `reset_potential` after the
+//!   clamp, so the membrane stays in the bounds when the resting and reset
+//!   potentials are in them, as `new`'s are (`prop_membrane_potential_stays_bounded`).
 //! - Firing rate cannot exceed `1_000_000 / refractory_period_us` Hz (refractory bound).
-//! - With zero input and large dt, membrane → resting (leak convergence).
+//! - With zero input each step closes `dt/τ` of the gap to rest (§ Semantics, item 5),
+//!   so the membrane converges to rest only while `dt` is under `2τ`: at `dt = τ` it
+//!   lands on rest in one step (`leak_convergence_large_dt_lands_on_rest_exactly`); at
+//!   `2τ` each step mirrors it across rest (`the_neuron_is_exact_where_the_batch_clamps`),
+//!   and at `2.5τ` a neuron left at its reset fires again with no input. At a small
+//!   `dt` the truncation stops the leak short of rest (§ Semantics, item 6).
 //!
 //! # Fixed-point convention
 //!
@@ -56,8 +65,9 @@
 //!
 //! - **Time ownership**: v0.1's `current_time()` returned `last_spike_time_us`,
 //!   so `firing_rate_hz` windows never advanced between spikes. Now the caller
-//!   passes `current_time_us` to `integrate_and_fire`. The neuron stores it as
-//!   `last_update_time_us`, used as the firing-rate reference.
+//!   passes `current_time_us` to `integrate_and_fire` (§ Semantics, item 1), and
+//!   the neuron computes no rate: the network's stats carry one, and the caller
+//!   of a lone neuron records its spikes (§ `no_std` above).
 //! - **Noise seed**: v0.1 seeded the LFSR only by `id`, so every neuron with the
 //!   same id produced identical "noise" forever. Now seeded by `id XOR time`.
 
@@ -218,10 +228,12 @@ fn div_1000_wide(x: i64) -> i64 {
 /// third grid would be a breaking release.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VoltageResolution {
-    /// 1 mV grid, the historical one. Dead zone ≈ 200 pA at rest.
+    /// 1 mV grid, the historical one. Dead zone at rest ≈ 200 pA for an
+    /// excitatory neuron at its defaults, 100 pA for an inhibitory one.
     Millivolt,
-    /// 0.01 mV (10 μV) grid — 100× finer. Dead zone ≈ 2 pA; the ternary
-    /// substrate's ±12 pA recurrent pulses become visible membrane motion.
+    /// 0.01 mV (10 μV) grid — 100× finer. Dead zone ≈ 2 pA (excitatory) and
+    /// 1 pA (inhibitory); the ternary substrate's ±12 pA recurrent pulses
+    /// become visible membrane motion.
     CentiMillivolt,
 }
 
@@ -1987,6 +1999,69 @@ mod tests {
              frozen file ever written — and then PROVE that default, by replaying one frozen \
              module kept in the old emitted form against its pinned trace (the obligation the \
              ISA's round-43 close-out records). This number is edited last."
+        );
+    }
+
+    // ----- The doc-vs-code dive (2026-10-15): a test for each neuron
+    // sentence no test held at 645afa8; each is run green there and red
+    // under its mutant. -----
+
+    /// `add_synaptic_current` saturates, at both ends: "Saturating —
+    /// never overflows".
+    #[test]
+    fn add_synaptic_current_saturates_at_both_ends() {
+        let mut n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt);
+        n.add_synaptic_current(i16::MAX);
+        n.add_synaptic_current(1);
+        assert_eq!(n.synaptic_current_pa, i16::MAX);
+        n.clear_synaptic_current();
+        n.add_synaptic_current(i16::MIN);
+        n.add_synaptic_current(-1);
+        assert_eq!(n.synaptic_current_pa, i16::MIN);
+    }
+
+    /// A spike's 2 pA of adaptation saturates: with no refractory period
+    /// and the threshold at the membrane's floor, every step fires, and
+    /// with no decay 16,384 spikes reach `i16::MAX` and stay there.
+    #[test]
+    fn the_adaptation_current_saturates() {
+        let mut n = LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt)
+            .with_threshold(MEMBRANE_MV_MIN)
+            .with_refractory_period_us(0);
+        let mut t = 0u32;
+        for _ in 0..16_400 {
+            assert!(n.integrate_and_fire(0, 1_000, t), "every step fires");
+            t = t.wrapping_add(1_000);
+        }
+        assert_eq!(n.adaptation_current_pa, i16::MAX);
+    }
+
+    /// The noise is seeded by `id XOR current_time_us`, as § Semantics item
+    /// 4 says: a neuron's noise at `t` is neuron 0's at `id ^ t`. Three of
+    /// the four pairs overlap in their low bits, where `+` and `^` part:
+    /// every trace's ids are below 8 and its 1 ms clock a multiple of 8,
+    /// where they agree.
+    #[test]
+    fn noise_is_seeded_by_id_xor_time() {
+        let noisy = |id| {
+            LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt)
+                .with_noise_amplitude_pa(100)
+        };
+        let mut parts = 0;
+        for (id, t) in [(9u16, 1_000u32), (13, 2_000), (255, 7_000), (1_000, 3_000)] {
+            let seed = u32::from(id) ^ t;
+            assert_eq!(
+                noisy(id).generate_noise(t),
+                noisy(0).generate_noise(seed),
+                "id {id} at {t}"
+            );
+            if noisy(0).generate_noise(u32::from(id) + t) != noisy(0).generate_noise(seed) {
+                parts += 1;
+            }
+        }
+        assert!(
+            parts > 0,
+            "the pairs must tell xor from add, or the test proves nothing"
         );
     }
 }

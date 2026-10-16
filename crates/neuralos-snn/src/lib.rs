@@ -41,9 +41,15 @@ pub use synapse::Synapse;
 
 /// Crate-level error type.
 ///
-/// Fallible public functions return `Result<T>` via this type; infallible
-/// accessors return plain values. No `unwrap()` / `expect()` outside tests
-/// (v0.1 lesson).
+/// The network's fallible functions, `Synapse::new`, `FixedNetwork::try_from`
+/// and `trace::header` return [`Result<T>`](Result) via this type; `nir`'s
+/// return [`NirError`](crate::nir::NirError), the bridge's and the kernel's
+/// `BridgeError`, and `trace::row` a `fmt::Result`. Infallible accessors
+/// return plain values. No `unwrap()` outside tests (v0.1 lesson); the
+/// `expect`s outside them, in `nir`'s graph assembly and in
+/// `freeze::module`, each follow the check they name, and a `NirImport`
+/// edited after it was built can still reach the assembly's
+/// (`NirImport::build_network` § Panics).
 ///
 /// One variant per rule: a refusal returns the variant of the rule it
 /// breaks, and a function's `# Errors` names the variants it returns. Not

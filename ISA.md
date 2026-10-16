@@ -4,9 +4,9 @@ slug: 20260815-125500_neuralos-v2
 project: NeuralOS v2
 phase: complete
 progress: 88/88
-head: "main@1df1c44 (PR #65 merged 2026-10-14 18:24 UTC: round 68, tier 2, the NIR sitting: ten `nir` structs and four `NirError` variants not exhaustive, a const blank for the four structs a caller fills; `NirImportOptions` without `Default`; `NirError` without its lifetime, its six names in a `NirName`; the reader's empty shape a `BadShape`; mirror synced, tags identical, branch deleted) · alpha.8 stamped 2026-09-14 (`docs/releases/v0.1.0-alpha.8.md` § Stamped); the tree is ahead of it by rounds 34 to 68 (D8, the spiking Linear edge; `trace::row`, and the freezer behind `unstable-freeze`; `nir2json --freeze`; the firmware's stranger slot and `stranger.sh`, check 7; capacity, the bar `44·N + 6·S ≤ 262,144` measured at its two corners on the C3, check 8; the README's first example a doctest with `missing_docs` on and the default build forbidding `unsafe`, checks 10 and 12; the `audit` job scanning the firmware's own lock, which ticks no check; `integrate_and_fire` § Semantics and the step's § Order with the one-step delay, check 11; STDP behind `unstable-stdp` and plasticity off at construction, check 9; the membrane average the mean of all neurons; the CSR agreeing with the synapse list; the frozen file built by constructors; the error types' 0.1.0 shape; the public enums' 0.1.0 shape; what stops being public; § Practical next moves the chapter, which ticks no check; the closed bridge chapter behind `unstable-bridge`, which ticks no check; the root and the paths, with `simd` on the exact `i64` factor, which ticks no check; the batch by name, `simd` on a `LIFBatch` and checked off x86, which ticks no check; NIR at true scale under `--sim-units`, with its parity test against snnTorch, which ticks no check; the converter surface, the units mark and `--drive` with the report, which ticks no check; Affine under `--sim-units` and the input in thousandths, with a trained model in the parity set, which ticks no check; the mutation pass and the close-out check, which ticks no check; the import's memory with the weights, which ticks no check; the NIR round trip, C and an object's own keys, which ticks no check; the NIR mutation loop, which ticks no check; the NIR overflow fix, which ticks no check; the `.nir` file fix, which ticks no check; the networks' clock and the noise default, which ticks no check; the refusals, which ticks no check; the constructor holes, which ticks no check; the stale CSR, which ticks no check; the 17 fields, which ticks no check; the cosmetics at step 6's end, which ticks no check; step 7, which ticks no check; the NIR sitting, which ticks no check), alpha.9 open; the fourteen checks hold, and 0.1.0 is the principal's call · wrote-from: work/goal-programs, round 69 (tier 2, the walk's last PR: the API sketch's goal programs as four examples, `stranger`, `freeze`, `board` and `learner`, each with its test; the dev-dependencies under a target table, and a gate line that checks `board` and `learner` on riscv32imc; built in scratch, three commits, the brief's four Calls ruled as it leaned and the one the build met, the learner's noise at 5 pA; reviewed once, its findings folded by one rebuild, each survivor's spike train measured and `stranger`'s pinned; not pushed; no check ticks) · open(session): the push and the PR, each on the principal's word · next-work: ROADMAP § Practical next moves"
+head: "main@645afa8 (PR #66 merged 2026-10-15 01:58 UTC: round 69, tier 2, the goal programs: the API sketch's starter set as four examples with their tests, `stranger`, `freeze`, `board` and `learner`, `board` and `learner` checked on riscv32imc; mirror synced, tags identical, branch deleted) · alpha.8 stamped 2026-09-14 (`docs/releases/v0.1.0-alpha.8.md` § Stamped); the tree is ahead of it by rounds 34 to 69 (D8, the spiking Linear edge; `trace::row`, and the freezer behind `unstable-freeze`; `nir2json --freeze`; the firmware's stranger slot and `stranger.sh`, check 7; capacity, the bar `44·N + 6·S ≤ 262,144` measured at its two corners on the C3, check 8; the README's first example a doctest with `missing_docs` on and the default build forbidding `unsafe`, checks 10 and 12; the `audit` job scanning the firmware's own lock, which ticks no check; `integrate_and_fire` § Semantics and the step's § Order with the one-step delay, check 11; STDP behind `unstable-stdp` and plasticity off at construction, check 9; the membrane average the mean of all neurons; the CSR agreeing with the synapse list; the frozen file built by constructors; the error types' 0.1.0 shape; the public enums' 0.1.0 shape; what stops being public; § Practical next moves the chapter, which ticks no check; the closed bridge chapter behind `unstable-bridge`, which ticks no check; the root and the paths, with `simd` on the exact `i64` factor, which ticks no check; the batch by name, `simd` on a `LIFBatch` and checked off x86, which ticks no check; NIR at true scale under `--sim-units`, with its parity test against snnTorch, which ticks no check; the converter surface, the units mark and `--drive` with the report, which ticks no check; Affine under `--sim-units` and the input in thousandths, with a trained model in the parity set, which ticks no check; the mutation pass and the close-out check, which ticks no check; the import's memory with the weights, which ticks no check; the NIR round trip, C and an object's own keys, which ticks no check; the NIR mutation loop, which ticks no check; the NIR overflow fix, which ticks no check; the `.nir` file fix, which ticks no check; the networks' clock and the noise default, which ticks no check; the refusals, which ticks no check; the constructor holes, which ticks no check; the stale CSR, which ticks no check; the 17 fields, which ticks no check; the cosmetics at step 6's end, which ticks no check; step 7, which ticks no check; the NIR sitting, which ticks no check; the goal programs, which ticks no check), alpha.9 open; the fourteen checks hold, and 0.1.0 is the principal's call · wrote-from: work/doc-truth, round 70 (tier 2, the consolidation sitting's first PR, the docs say what the code does: the doc-vs-code dive's 61 tests for the sentences and lines no test held, and six more; `reset` gives a fresh network's stats; the chain builder takes its three edges in any order; the dive's false sentences made true, each naming the test that holds it; built in scratch, six commits, the dive's Calls 1, 2, 3 and 7 as ruled; not reviewed, not pushed; no check ticks) · open(session): the review, the push and the PR, each on the principal's word · next-work: ROADMAP § Practical next moves"
 started: 2026-08-15T12:55:00Z
-updated: 2026-10-15T00:34:00Z
+updated: 2026-10-16T18:03:19Z
 principal_stated_goal: "Session I: the null-ladder adjudication — BRANCH B (unattributed perturbation); P5 on infrastructure + method"
 ---
 
@@ -10494,3 +10494,35 @@ move (round 61), and is 529 again by Call 5; its program A compiles at
 the pin and refuses its fixture when it runs. No check ticks.
 **Guards.** 1: appended, head refreshed; 2: no existing example changes,
 the seven the pin's bytes; 3: not in play.
+
+## Close-out (round 70 — the docs say what the code does: tests for what no test held, `reset` a fresh network's stats, the chain's edges in any order, the false sentences made true; tier 2 — 2026-10-16)
+
+Branch `work/doc-truth` from `main@645afa8`, tier 2, the consolidation
+sitting's first PR, built in scratch, twice BREAKING: `3eee4e7` the
+spine's 25 tests the doc-vs-code dive wrote; `c9c9c10` nir's 26 and the
+closed chapter's ten, tests only; `7bbfabc` `reset` a fresh network's
+stats and, with the feature, each synapse's two counters at 0, its doc
+and two tests; `7dcec62` the chain builder's three edges in any order,
+two tests; `538d8e2` the dive's false sentences made true, two tests for
+the γ edge; this. **Rulings** (philo, 2026-10-15): the dive's Calls 1
+(b), 2 (a), 3 (a) and 7 (b); 6, three PRs, this the first.
+**Falsifiers**: the pass, 15 mutants, 3 missed, each equivalent (the
+queue the step clears first, the edge buffer's start values the import
+overwrites); its first run missed the chain's sort, red now by a chain
+listed by name; 28 hand mutants, 25 red, 3 green by design (the queue,
+two returns at γ 0 no sentence states); the 61 tests red at the pin
+under the dive's mutants and survivors, as it measured. **Measured** at
+the pin and the tip: `.text` the same at one scratch path, the canary
+moves it; the three NIR gates that call the chain builder print the
+same; no frozen example calls `reset` or the chain builder; each figure
+the new sentences give, by a probe. **Moved**: `reset`'s means and
+counters, the chain's edge order; no trace. **Message check** (the
+trial), commits 1 to 5: 13 findings, 11 fixed in place, 2 claims the
+diff cannot show kept, measured. **Counts**: unit tests 250 to 299, 336
+to 402 with the features, 268 to 318 with simd; doctests the same.
+**Record-only**: `nir_format_gate`'s container note repeats the HDF5
+sentence made true here (the sitting's second PR opens that file); the
+returns at γ 0 of `reproject_ternary` and the stochastic step, no
+sentence. No check ticks. **Guards.** 1: appended, head refreshed; 2: no
+frozen example's file or verdict moves, the closed chapter's two files
+take ten tests and one doc, by Call 3; 3: not in play.

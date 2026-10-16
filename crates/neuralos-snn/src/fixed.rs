@@ -676,4 +676,21 @@ mod tests {
         let fixed = FixedNetwork::<3, 2>::try_from(&net).expect("plasticity off, 3 and 2");
         assert_eq!((fixed.dt_us(), fixed.time_us()), (1_000, 5_000));
     }
+
+    // ----- The doc-vs-code dive (2026-10-15): a test for the fixed
+    // network's sentence no test held at 645afa8 (F7); run green there and
+    // red under the hand mutant `fixed-clock-wrapping`. -----
+
+    /// The clock saturates at `u64::MAX`, as `step`'s doc says: a step
+    /// from 400 μs below it ends there, and the next leaves it there.
+    #[test]
+    fn the_clock_saturates_at_u64_max() {
+        let mut net = FixedNetwork::new([quiet(0)], [], 1_000);
+        net.time_us = u64::MAX - 400;
+        let mut fired = [false];
+        net.step(&[0], &mut fired);
+        assert_eq!(net.time_us(), u64::MAX);
+        net.step(&[0], &mut fired);
+        assert_eq!(net.time_us(), u64::MAX);
+    }
 }

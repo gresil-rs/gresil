@@ -407,4 +407,59 @@ mod tests {
             }
         }
     }
+
+    // ----- The doc-vs-code dive (2026-10-15): tests for the mutation
+    // pass's kernel.rs survivors. Tests only: no behavior moves, no
+    // verdict of the closed chapter is read. Each run green at 645afa8
+    // and red under the survivors it answers. -----
+
+    /// `pack_trits` writes the packing whatever `out` held: from a buffer
+    /// of all ones it gives what it gives from a zeroed one.
+    #[test]
+    fn pack_overwrites_what_out_held() {
+        let trits = [Trit::One, Trit::MinusOne, Trit::Zero, Trit::Zero];
+        let mut zeroed = [0_u8; 1];
+        let mut stale = [0xFF_u8; 1];
+        assert_eq!(pack_trits(&trits, &mut zeroed), Ok(1));
+        assert_eq!(pack_trits(&trits, &mut stale), Ok(1));
+        assert_eq!(stale, zeroed);
+        assert_eq!(stale, [0x52]);
+    }
+
+    /// An empty vector is all zero too: it normalizes to nothing and
+    /// returns 0, as the doc says an all-zero vector does.
+    #[test]
+    fn absmax_of_an_empty_vector_is_0() {
+        assert_eq!(absmax_normalize_q15(&[], &mut []), Ok(0));
+    }
+
+    /// `TooShort` for each buffer alone: weights one row short with `out`
+    /// long enough, and `out` one row short with the weights long enough.
+    #[test]
+    fn matvec_refuses_each_short_buffer_alone() {
+        let a8 = [1_i16; 8];
+        let mut out = [0_i32; 2];
+        assert_eq!(
+            ternary_matvec(&[0x55; 3], &a8, 2, &mut out),
+            Err(BridgeError::TooShort),
+            "2 rows of 8 need 4 bytes"
+        );
+        let a4 = [1_i16; 4];
+        let mut one = [0_i32; 1];
+        assert_eq!(
+            ternary_matvec(&[0x55; 2], &a4, 2, &mut one),
+            Err(BridgeError::TooShort),
+            "2 rows need 2 accumulators"
+        );
+    }
+
+    /// `out` receives `rows` accumulators; a longer `out` keeps its tail.
+    #[test]
+    fn matvec_writes_rows_into_a_longer_out() {
+        let mut packed = [0_u8; 1];
+        pack_trits(&[Trit::One; 4], &mut packed).expect("pack");
+        let mut out = [7_i32; 3];
+        assert_eq!(ternary_matvec(&packed, &[1, 2, 3, 4], 1, &mut out), Ok(()));
+        assert_eq!(out, [10, 7, 7]);
+    }
 }

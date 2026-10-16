@@ -18,7 +18,8 @@
 //!   for a weight of 0 or more, `[-2000, 0]` below 0. The fields are the
 //!   crate's, so no caller writes the bounds.
 //! - Weight stays within `[min_weight, max_weight]` after every `update_weight` call.
-//! - `STDPRule::calculate_weight_change(dt)` returns 0 for `|dt| ≥ 10·tau` (decay floor).
+//! - `STDPRule::calculate_weight_change(dt)` returns 0 for `|dt| ≥ tau`, where the
+//!   linear factor reaches 0.
 //! - LTP (pre before post, dt < 0) returns a non-negative delta.
 //! - LTD (post before pre, dt > 0) returns a non-positive delta.
 //!
@@ -58,7 +59,8 @@ pub const SCALE: i32 = 1000;
 /// Its fields are the crate's. [`new`](Self::new) builds it, the bounds
 /// from the weight's sign; `update_weight`, behind `unstable-stdp`, is
 /// its one method that changes it, and a network writes its own
-/// synapses' weights, never their bounds, in its STDP and ternary passes.
+/// synapses' weights, never their bounds, in its STDP and ternary passes;
+/// its `reset` sets their two counters to 0.
 /// A getter reads each value. A network's synapses reach a caller as a
 /// slice (`SpikingNeuralNetwork::synapses`). Pairs with
 /// [`LIFNeuron`](crate::LIFNeuron) for full integrate-and-fire + STDP.
@@ -168,8 +170,9 @@ impl Synapse {
     }
 
     /// Unstable: behind `unstable-stdp`.
-    /// The signed sum of every delta `update_weight` was given, before the
-    /// clamp (session G instrumentation, the mechanism-label evidence). Read
+    /// The signed sum of every delta `update_weight` was given since the
+    /// synapse was built or its network's last `reset`, before the clamp
+    /// (session G instrumentation, the mechanism-label evidence). Read
     /// it per class (intra vs inter assemblies) to decide whether a bucket's
     /// movement was pairing-driven or clamp/flip-machinery-driven.
     #[cfg(feature = "unstable-stdp")]
@@ -237,7 +240,8 @@ fn bounds_by_sign(weight: i16) -> (i16, i16) {
 /// Spike-Timing-Dependent Plasticity rule.
 ///
 /// The audit flagged this as **the better STDP implementation** (vs `stdp_plasticity.rs`):
-/// real exp-decay via fixed-point linear approximation, sign-correct (positive dt → LTD,
+/// a linear stand-in for the exponential decay, in fixed point (the factor is
+/// `1000 − |dt|·1000/tau`, clamped at 0), sign-correct (positive dt → LTD,
 /// negative dt → LTP).
 #[cfg(feature = "unstable-stdp")]
 #[derive(Debug, Clone)]
@@ -282,7 +286,7 @@ impl STDPRule {
     ///
     /// - `dt > 0` → returns ≤ 0 (LTD)
     /// - `dt < 0` → returns ≥ 0 (LTP)
-    /// - `|dt| ≥ 10·tau` → returns 0 (decay floor)
+    /// - `|dt| ≥ tau` → returns 0 (the linear factor reaches 0)
     ///
     /// # Bug fix vs v0.1
     ///
@@ -589,5 +593,28 @@ mod tests {
                 prop_assert!(delta >= 0, "in-window pre-before-post must be LTP at dt={}", dt_us);
             }
         }
+    }
+
+    // ----- The doc-vs-code dive (2026-10-15): a test for the synapse
+    // sentence no test held at 645afa8; run green there and red under the
+    // pass's three survivors. -----
+
+    /// `STDPRule::new` is the rule its doc and the crate README name: 20 ms
+    /// and 20 ms, a₊ 50, a₋ −53, learning rate 100. `stdp_zero_at_zero_dt`
+    /// reads `a_plus` from the rule itself, so it cannot see the number.
+    #[cfg(feature = "unstable-stdp")]
+    #[test]
+    fn the_default_rule_is_the_one_its_doc_names() {
+        let r = STDPRule::new();
+        assert_eq!(
+            (
+                r.tau_plus_us,
+                r.tau_minus_us,
+                r.a_plus,
+                r.a_minus,
+                r.learning_rate
+            ),
+            (20_000, 20_000, 50, -53, 100)
+        );
     }
 }
