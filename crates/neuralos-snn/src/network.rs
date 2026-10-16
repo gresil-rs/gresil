@@ -913,20 +913,30 @@ impl SpikingNeuralNetwork {
         flips
     }
 
-    /// Reset all neurons, stats, and time. Keeps topology + synapse wiring.
-    /// (Synapses carry no per-sim dynamic state since the alpha.3 F5a
-    /// removal — weight + structural params only.)
+    /// Start the run over on the same network: every neuron back to rest
+    /// ([`LIFNeuron::reset`]), the clock at 0, and the stats a fresh
+    /// network's, every count 0 and the means at −70.0 mV and 0 Hz until
+    /// the next step. With `unstable-stdp`, each synapse's two counters,
+    /// `raw_stdp_delta` and `absorbed_delta`, go back to 0, and
+    /// `stochastic_ternary_step` draws its stream from the start. The
+    /// wiring and the weights stay (`reset_brings_every_neuron_to_rest`,
+    /// `reset_clears_time_and_spikes`,
+    /// `reset_gives_fresh_stats_and_keeps_the_weights`,
+    /// `reset_draws_the_flip_stream_from_the_start`).
     pub fn reset(&mut self) {
         for n in &mut self.neurons {
             n.reset();
         }
         self.time_us = 0;
-        self.stats.total_spikes = 0;
+        self.stats = NetworkStats::new();
         #[cfg(feature = "unstable-stdp")]
         {
-            self.stats.plasticity_events = 0;
             self.plasticity_queue.clear();
             self.ternary_flip_lfsr = TERNARY_FLIP_SEED;
+            for s in &mut self.synapses {
+                s.raw_stdp_delta = 0;
+                s.absorbed_delta = 0;
+            }
         }
     }
 
@@ -1924,6 +1934,80 @@ mod tests {
         assert_eq!(net.stats().total_spikes, 0);
         #[cfg(feature = "unstable-stdp")]
         assert_eq!(net.stats().plasticity_events, 0);
+    }
+
+    /// `reset` gives the network a fresh network's stats and, with the
+    /// feature, zeroes each synapse's two counters; the weights stay. The
+    /// run moves every stat and both counters first, or the reset proves
+    /// nothing for them: the synapse added at weight 0 absorbs the LTD its
+    /// two co-firing neurons give it.
+    #[test]
+    fn reset_gives_fresh_stats_and_keeps_the_weights() {
+        let build = || {
+            let mut net =
+                SpikingNeuralNetwork::new(20, 1000, NetworkTopology::default()).expect("valid");
+            net.build_topology().expect("build");
+            net.add_synapse(0, 1, 0).expect("adds");
+            net
+        };
+        let fresh = build();
+        let mut net = build();
+        #[cfg(feature = "unstable-stdp")]
+        net.set_plasticity_enabled(true);
+        for _ in 0..20 {
+            net.step(&[1000; 20]).expect("step");
+        }
+        let (ran, base) = (net.stats().clone(), fresh.stats());
+        assert_ne!(ran.total_spikes, base.total_spikes);
+        assert_ne!(
+            ran.avg_membrane_potential_mv,
+            base.avg_membrane_potential_mv
+        );
+        assert_ne!(ran.firing_rate_hz, base.firing_rate_hz);
+        #[cfg(feature = "unstable-stdp")]
+        {
+            assert_ne!(ran.plasticity_events, base.plasticity_events);
+            assert_ne!(ran.stdp_pairs_same_step, base.stdp_pairs_same_step);
+            assert_ne!(ran.stdp_pairs_post_leads, base.stdp_pairs_post_leads);
+            assert_ne!(ran.stdp_pairs_pre_leads, base.stdp_pairs_pre_leads);
+            assert!(net.synapses().iter().any(|s| s.raw_stdp_delta() != 0));
+            assert!(net.synapses().iter().any(|s| s.absorbed_delta() != 0));
+        }
+        let weights: Vec<i16> = net.synapses().iter().map(Synapse::weight).collect();
+        net.reset();
+        assert_eq!(net.stats(), fresh.stats());
+        let kept: Vec<i16> = net.synapses().iter().map(Synapse::weight).collect();
+        assert_eq!(kept, weights);
+        #[cfg(feature = "unstable-stdp")]
+        assert!(net
+            .synapses()
+            .iter()
+            .all(|s| (s.raw_stdp_delta(), s.absorbed_delta()) == (0, 0)));
+    }
+
+    /// After `reset`, `stochastic_ternary_step` draws its stream from the
+    /// start, where a fresh network's starts: a step that drew moved the
+    /// stream, and the reset brings it back.
+    #[cfg(feature = "unstable-stdp")]
+    #[test]
+    fn reset_draws_the_flip_stream_from_the_start() {
+        let three = || {
+            let neurons = (0..3)
+                .map(|id| LIFNeuron::new(id, NeuronType::Excitatory, VoltageResolution::Millivolt))
+                .collect();
+            SpikingNeuralNetwork::from_neurons(neurons, 1_000).expect("three neurons")
+        };
+        let fresh = three();
+        let mut net = three();
+        net.add_synapse(1, 2, 122)
+            .expect("γ − 3: an off-grid weight draws");
+        let _ = net.stochastic_ternary_step(125);
+        assert_ne!(
+            net.ternary_flip_lfsr, fresh.ternary_flip_lfsr,
+            "the step drew, or the reset below proves nothing"
+        );
+        net.reset();
+        assert_eq!(net.ternary_flip_lfsr, fresh.ternary_flip_lfsr);
     }
 
     #[test]

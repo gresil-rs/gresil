@@ -58,7 +58,8 @@ pub const SCALE: i32 = 1000;
 /// Its fields are the crate's. [`new`](Self::new) builds it, the bounds
 /// from the weight's sign; `update_weight`, behind `unstable-stdp`, is
 /// its one method that changes it, and a network writes its own
-/// synapses' weights, never their bounds, in its STDP and ternary passes.
+/// synapses' weights, never their bounds, in its STDP and ternary passes;
+/// its `reset` sets their two counters to 0.
 /// A getter reads each value. A network's synapses reach a caller as a
 /// slice (`SpikingNeuralNetwork::synapses`). Pairs with
 /// [`LIFNeuron`](crate::LIFNeuron) for full integrate-and-fire + STDP.
@@ -168,8 +169,9 @@ impl Synapse {
     }
 
     /// Unstable: behind `unstable-stdp`.
-    /// The signed sum of every delta `update_weight` was given, before the
-    /// clamp (session G instrumentation, the mechanism-label evidence). Read
+    /// The signed sum of every delta `update_weight` was given since the
+    /// synapse was built or its network's last `reset`, before the clamp
+    /// (session G instrumentation, the mechanism-label evidence). Read
     /// it per class (intra vs inter assemblies) to decide whether a bucket's
     /// movement was pairing-driven or clamp/flip-machinery-driven.
     #[cfg(feature = "unstable-stdp")]
