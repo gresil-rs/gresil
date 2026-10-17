@@ -2480,7 +2480,8 @@ mod tests {
         // don't), ternary-stochastic must PRESERVE that differential (intra
         // mean < inter mean) with nonzero flips and non-collapsed spiking.
         // Gates whether the Stage 2 format bridge is worth building.
-        // See examples/ternary_selectivity.rs for the full diagnostic.
+        // See the repository's examples/ternary_selectivity.rs, which the
+        // package leaves out, for the full diagnostic.
         let neurons: u16 = 128;
         let exc = (f64::from(neurons) * 0.8) as u16;
         let groups: u16 = 4;

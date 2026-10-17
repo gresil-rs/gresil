@@ -11,7 +11,8 @@
 //! Stage 1 asks: does an SNN whose synapse weights are *constrained* to three
 //! levels still spike and learn? This module is the quantizer; the network
 //! methods `ternarize_weights` / `reproject_ternary` apply it; the
-//! `ternary_gate` example runs the falsifier and prints the verdict evidence.
+//! repository's `ternary_gate` example, which the published package leaves
+//! out, runs the falsifier and prints the verdict evidence.
 //!
 //! Stage 1.5b adds `stochastic_ternary_flip`, behind `unstable-stdp`: a pure,
 //! `no_std` Bernoulli bucket-flip driven by the STDP residual. Under

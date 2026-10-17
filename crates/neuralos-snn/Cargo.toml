@@ -11,6 +11,12 @@ keywords.workspace = true
 categories.workspace = true
 description = "Spiking Neural Network library, no_std, i16 fixed-point — NeuralOS sovereignty stack core"
 readme = "README.md"
+# The closed bridge chapter's four `ternary_*` examples stay in the
+# repository, where the workspace build checks them, and out of the
+# package: they are that chapter's evidence programs, and each needs an
+# unstable feature, `unstable-stdp` or `unstable-bridge`. Their
+# `[[example]]` entries stay; `cargo package` warns once for each.
+exclude = ["examples/ternary_*"]
 
 [lib]
 name = "neuralos_snn"

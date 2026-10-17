@@ -1,7 +1,7 @@
 //! NIR format gate (Phase 1 / R7, slice 1) — the import/export gate
-//! over the REFERENCE-emitted fixtures, in the family style of
-//! `ternary_format_gate`: test vectors derived from the pinned
-//! reference implementation's own outputs, never from our
+//! over the REFERENCE-emitted fixtures, in the family style of the
+//! repository's `ternary_format_gate`: test vectors derived from the
+//! pinned reference implementation's own outputs, never from our
 //! re-implementation of ourselves.
 //!
 //! Reference: `neuromorphs/NIR` @ 7883c3c85f1be27ed113ccc9e8d6ab47ab541df4
