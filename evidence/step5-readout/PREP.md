@@ -34,7 +34,9 @@ Findings of record (all H2 pins reproduced first — k 10060.46,
 
 - pre-clamp |I| (window r0): p50 311,874 μA · p90 523,144 · p99
   1,881,305 · max 4,839,080 — ≈1000× the 450 μA target
-  (milli/norm-unit domain mismatch, hybrid_invivo.rs:343 vs :325);
+  (milli/norm-unit domain mismatch, `hybrid_invivo.rs` at `73cb614`:
+  the step drives took `raw = (row[d] as f64) * k`, in milli-units,
+  with `k` fit on `v as f64 / 1000.0`, in norm units);
 - clamped fraction IDENTICAL (69.477%) at ceilings
   ±1000/2000/3000/10000/32767 — the ceiling ladder is dead within
   the i16 input path;

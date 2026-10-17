@@ -63,8 +63,8 @@ failure mode.
   ESP32-C3 board landing together gate outreach. Source: `ISA.md`
   § Decision (M1 step-4 amendment — the pure-Rust exporter ruling),
   the widened rule, artifact-named per B1b.
-- **Never force-push Gitea, and no branch on GitHub.** Gitea is canonical
-  and the only gate. GitHub is a mirror, and philo's
+- **No bare force push to Gitea, and no branch on GitHub.** Gitea is
+  canonical and the only gate. GitHub is a mirror, and philo's
   meaning of the word is the rule: "no branch on github, github is a
   mirror." It carries `main` and Gitea's tags, nothing else; no branch,
   PR, or CI run exists there except on `main`. `origin` pushes to Gitea
@@ -72,7 +72,9 @@ failure mode.
   procedure in § Merge procedure, and the release binaries live on the
   Gitea release.
   `origin` has one push URL since 2026-09-06. If Gitea is ahead,
-  rebase. GitHub is the only force-push target, and only with the
+  rebase. Gitea takes one kind of force push, the lease rewrite of a
+  `work/*` or `fix/*` branch (`AGENTS.md` § Session protocol), never on
+  `main`. GitHub is the only bare-force target, and only with the
   principal's explicit OK. Source: `AGENTS.md` § Remotes (push
   carefully) and § Merge procedure.
 - **`evidence/` holds three species.** sha-pinned machine outputs are
