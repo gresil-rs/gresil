@@ -18,7 +18,11 @@
 # commit the remotes do not already have. Proven 2026-09-06: a --dry-run
 # push of a work branch toward the github remote was refused by (d), and
 # the hook fed the range of b4a9b7d (a banked-evidence commit that added
-# 16 home-path lines) refused it by (a).
+# 16 home-path lines) refused it by (a). (c) reads the same range since
+# 2026-10-17, where a new ref handed gitleaks its whole history. Proven
+# that day in a scratch clone (round 72): a fake secret on a new branch
+# refused, 1 commit scanned where the old line scanned 599; an existing
+# ref's scan unchanged.
 # `--no-verify` bypasses it; the Gitea CI job is the second wall.
 set -u
 remote_name="$1"; remote_url="$2"
@@ -87,8 +91,7 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 
   # (c)
   if command -v gitleaks >/dev/null 2>&1; then
-    if [ "$remote_sha" = "$zero" ]; then opts="$local_sha"; else opts="$remote_sha..$local_sha"; fi
-    gitleaks detect --no-banner --redact --log-opts="$opts"
+    gitleaks detect --no-banner --redact --log-opts="$range"
     rc=$?
     if [ "$rc" -eq 1 ]; then
       echo "pre-push: gitleaks found a secret in $range, push refused" >&2
