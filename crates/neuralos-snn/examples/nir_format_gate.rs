@@ -13,7 +13,9 @@
 //! Container note of record: at the pinned sha the reference
 //! serializes via HDF5 (h5py); the dict schema is container-
 //! independent and this gate carries its JSON encoding (the
-//! historical NIR container). HDF5 `.nir` IO is slice 2 (std-side).
+//! historical NIR container). HDF5 `.nir` files are read outside this
+//! crate, by `neuralos-rt`'s `hdf5` feature, which writes them too, and
+//! by `neuralos-nir2json`.
 //!
 //! Gates:
 //! 1. the reference chain imports with EXACT dyadic quantization
@@ -30,10 +32,10 @@
 //! fixtures are embedded.
 
 use neuralos_snn::nir::{
-    nir_export, nir_scan, NirBuffers, NirError, NirImport, NirImportOptions, NirLif, NirNode,
-    NirNote, EXPORT_VERSION, NIR_REF_SHA,
+    nir_export, nir_scan, NirBuffers, NirError, NirLif, NirNode, NirNote, EXPORT_VERSION,
+    NIR_REF_SHA,
 };
-use neuralos_snn::VoltageResolution;
+use neuralos_snn::{NirImport, NirImportOptions, VoltageResolution};
 
 const CHAIN: &str = include_str!("../tests/nir_fixtures/chain.json");
 const CHAIN_VRESET: &str = include_str!("../tests/nir_fixtures/chain_vreset_absent.json");

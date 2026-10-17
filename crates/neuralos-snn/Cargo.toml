@@ -66,6 +66,11 @@ proptest = "1.5"
 # test in spike_recorder.rs (prop_ring_matches_the_heapless_oracle).
 heapless = "0.8"
 
+# An example that needs `std` lists it, so a build without the default
+# features skips it (`--examples`) or names the feature it lacks
+# (`--example`) instead of failing on its first import. `board`,
+# `learner` and `ternary_format_gate` need no `std`; `bench_simd`'s
+# `simd` turns it on.
 [[example]]
 name = "bench_simd"
 required-features = ["simd"]
@@ -77,19 +82,19 @@ required-features = ["simd"]
 # nir2json for the freezer) and covers them.
 [[example]]
 name = "demo"
-required-features = ["unstable-stdp"]
+required-features = ["std", "unstable-stdp"]
 
 [[example]]
 name = "ternary_gate"
-required-features = ["unstable-stdp"]
+required-features = ["std", "unstable-stdp"]
 
 [[example]]
 name = "ternary_selectivity"
-required-features = ["unstable-stdp"]
+required-features = ["std", "unstable-stdp"]
 
 [[example]]
 name = "ternary_hybrid_gate"
-required-features = ["unstable-stdp", "unstable-bridge"]
+required-features = ["std", "unstable-stdp", "unstable-bridge"]
 
 # The closed chapter's Stage 2 gate, behind `unstable-bridge` with the
 # codecs; rt asks for the feature, so the workspace build covers it.
@@ -99,7 +104,16 @@ required-features = ["unstable-bridge"]
 
 [[example]]
 name = "trace"
-required-features = ["unstable-stdp", "unstable-freeze"]
+required-features = ["std", "unstable-stdp", "unstable-freeze"]
+
+# The two NIR gates: the import, the export and the graph assembly.
+[[example]]
+name = "nir_assembly_gate"
+required-features = ["std"]
+
+[[example]]
+name = "nir_format_gate"
+required-features = ["std"]
 
 # The starter set, code a stranger copies (each header says what it
 # shows). Each runs its test under `cargo test` (`test = true`). `board`
@@ -110,11 +124,12 @@ required-features = ["unstable-stdp", "unstable-freeze"]
 [[example]]
 name = "stranger"
 test = true
+required-features = ["std"]
 
 [[example]]
 name = "freeze"
 test = true
-required-features = ["unstable-freeze"]
+required-features = ["std", "unstable-freeze"]
 
 [[example]]
 name = "board"
