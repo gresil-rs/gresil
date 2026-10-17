@@ -15,6 +15,9 @@
 #     docs/RESEARCH_LOG.md;
 #   - the crate README's version notes, its `## Since alpha.` sections,
 #     frozen at publish;
+#   - docs/releases/, the release notes, frozen at publish as those
+#     version notes are; a draft names a published version's fields as
+#     that version spelled them;
 #   - three lines of that README, allowed by their exact text until
 #     alpha.9's publish round changes them. An allowed line that is gone
 #     is red too, so the commit that changes it drops it here;
@@ -45,7 +48,7 @@ set +e
 hits=$(git grep --no-color -I -n -E -e "$pat" -- . \
   ':!:crates/neuralos-rt/' ':!:crates/neuralos-snn/examples/ternary_*' \
   ':!:paper/' ':!:evidence/' ':!:ISA.md' ':!:docs/RESEARCH_LOG.md' \
-  ":!:$readme" ':!:tools/units.sh')
+  ':!:docs/releases/' ":!:$readme" ':!:tools/units.sh')
 rc=$?
 set -e
 if [ "$rc" -gt 1 ]; then
