@@ -40,12 +40,11 @@
 //! Exits non-zero on any gate failure. No models, no network — the
 //! fixtures are embedded.
 
-use neuralos_snn::lif_neuron::VoltageResolution;
-use neuralos_snn::network::SpikingNeuralNetwork;
 use neuralos_snn::nir::{
-    nir_export, LinearFusedRecord, NirAssemblyReport, NirError, NirGraphEncoder, NirImport,
-    NirImportOptions, Thousandths, EDGE_PULSE_QUANTA,
+    nir_export, LinearFusedRecord, NirAssemblyReport, NirError, NirGraphEncoder, Thousandths,
+    EDGE_PULSE_QUANTA,
 };
+use neuralos_snn::{NirImport, NirImportOptions, SpikingNeuralNetwork, VoltageResolution};
 
 const CHAIN: &[u8] = include_bytes!("../tests/nir_fixtures/chain.json");
 const BRANCH: &[u8] = include_bytes!("../tests/nir_fixtures/branch.json");

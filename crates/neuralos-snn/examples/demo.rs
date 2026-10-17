@@ -264,7 +264,7 @@ fn weight_stats(weights: &[i16]) -> (f64, f64) {
 fn print_footer() {
     println!("┌─ About this library ───────────────────────────────────────┐");
     println!("│ Every neuron uses i16 fixed-point math (no FPU required).  │");
-    println!("│ Every synapse uses fixed-point conductance (no allocator).  │");
+    println!("│ Every synapse holds integers, no float (no allocator).      │");
     println!("│ The hot-path primitives compile to no_std (verified).       │");
     println!("│                                                             │");
     println!("│ This same code runs on:                                     │");

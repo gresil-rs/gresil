@@ -42,9 +42,12 @@ or grab a prebuilt static binary from the releases (linux-x86_64).
   unseen: `hdf5-pure` lists none, so a key behind one reads as absent,
   a `v_reset` as zeros, where `nir.read` follows it.
 - **Filters:** none or gzip (deflate) — the reference emission
-  conventions. `lzf`, `szip`, anything else: refused by name before a
-  single byte decodes (a filter we cannot decode is a silent-corruption
-  hazard).
+  conventions. `lzf`, `szip`, anything else: refused by name before the
+  graph's edges or any node's data decodes (a filter we cannot decode is
+  a silent-corruption hazard). Two datasets are read first: the file's
+  `version`, which the check never reads, so an `lzf` `version`
+  converts, and the graph's `node/type`, decoded before its filter is
+  refused.
 - **Size:** before any dataset is read, every dataset the conversion
   reads is counted from its dims. A file past `MAX_VALUES` values in
   all (the crate's constant, 2^22), or with a dataset stored in chunks

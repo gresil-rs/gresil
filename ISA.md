@@ -4,9 +4,9 @@ slug: 20260815-125500_neuralos-v2
 project: NeuralOS v2
 phase: complete
 progress: 88/88
-head: "main@645afa8 (PR #66 merged 2026-10-15 01:58 UTC: round 69, tier 2, the goal programs: the API sketch's starter set as four examples with their tests, `stranger`, `freeze`, `board` and `learner`, `board` and `learner` checked on riscv32imc; mirror synced, tags identical, branch deleted) · alpha.8 stamped 2026-09-14 (`docs/releases/v0.1.0-alpha.8.md` § Stamped); the tree is ahead of it by rounds 34 to 69 (D8, the spiking Linear edge; `trace::row`, and the freezer behind `unstable-freeze`; `nir2json --freeze`; the firmware's stranger slot and `stranger.sh`, check 7; capacity, the bar `44·N + 6·S ≤ 262,144` measured at its two corners on the C3, check 8; the README's first example a doctest with `missing_docs` on and the default build forbidding `unsafe`, checks 10 and 12; the `audit` job scanning the firmware's own lock, which ticks no check; `integrate_and_fire` § Semantics and the step's § Order with the one-step delay, check 11; STDP behind `unstable-stdp` and plasticity off at construction, check 9; the membrane average the mean of all neurons; the CSR agreeing with the synapse list; the frozen file built by constructors; the error types' 0.1.0 shape; the public enums' 0.1.0 shape; what stops being public; § Practical next moves the chapter, which ticks no check; the closed bridge chapter behind `unstable-bridge`, which ticks no check; the root and the paths, with `simd` on the exact `i64` factor, which ticks no check; the batch by name, `simd` on a `LIFBatch` and checked off x86, which ticks no check; NIR at true scale under `--sim-units`, with its parity test against snnTorch, which ticks no check; the converter surface, the units mark and `--drive` with the report, which ticks no check; Affine under `--sim-units` and the input in thousandths, with a trained model in the parity set, which ticks no check; the mutation pass and the close-out check, which ticks no check; the import's memory with the weights, which ticks no check; the NIR round trip, C and an object's own keys, which ticks no check; the NIR mutation loop, which ticks no check; the NIR overflow fix, which ticks no check; the `.nir` file fix, which ticks no check; the networks' clock and the noise default, which ticks no check; the refusals, which ticks no check; the constructor holes, which ticks no check; the stale CSR, which ticks no check; the 17 fields, which ticks no check; the cosmetics at step 6's end, which ticks no check; step 7, which ticks no check; the NIR sitting, which ticks no check; the goal programs, which ticks no check), alpha.9 open; the fourteen checks hold, and 0.1.0 is the principal's call · wrote-from: work/doc-truth, round 70 (tier 2, the consolidation sitting's first PR, the docs say what the code does: the doc-vs-code dive's 61 tests for the sentences and lines no test held, and six more; `reset` gives a fresh network's stats; the chain builder takes its three edges in any order; the dive's false sentences made true, each naming the test that holds it; built in scratch, six commits, the dive's Calls 1, 2, 3 and 7 as ruled; not reviewed, not pushed; no check ticks) · open(session): the review, the push and the PR, each on the principal's word · next-work: ROADMAP § Practical next moves"
+head: "main@ffb0b98 (PR #67 merged 2026-10-16 21:13 UTC: round 70, tier 2, the docs say what the code does: tests for the sentences and lines no test held, `reset` a fresh network's stats, the chain builder's three edges in any order, the false sentences made true; mirror synced, tags identical, branch deleted) · alpha.8 stamped 2026-09-14 (`docs/releases/v0.1.0-alpha.8.md` § Stamped); the tree is ahead of it by rounds 34 to 70 (D8, the spiking Linear edge; `trace::row`, and the freezer behind `unstable-freeze`; `nir2json --freeze`; the firmware's stranger slot and `stranger.sh`, check 7; capacity, the bar `44·N + 6·S ≤ 262,144` measured at its two corners on the C3, check 8; the README's first example a doctest with `missing_docs` on and the default build forbidding `unsafe`, checks 10 and 12; the `audit` job scanning the firmware's own lock, which ticks no check; `integrate_and_fire` § Semantics and the step's § Order with the one-step delay, check 11; STDP behind `unstable-stdp` and plasticity off at construction, check 9; the membrane average the mean of all neurons; the CSR agreeing with the synapse list; the frozen file built by constructors; the error types' 0.1.0 shape; the public enums' 0.1.0 shape; what stops being public; § Practical next moves the chapter, which ticks no check; the closed bridge chapter behind `unstable-bridge`, which ticks no check; the root and the paths, with `simd` on the exact `i64` factor, which ticks no check; the batch by name, `simd` on a `LIFBatch` and checked off x86, which ticks no check; NIR at true scale under `--sim-units`, with its parity test against snnTorch, which ticks no check; the converter surface, the units mark and `--drive` with the report, which ticks no check; Affine under `--sim-units` and the input in thousandths, with a trained model in the parity set, which ticks no check; the mutation pass and the close-out check, which ticks no check; the import's memory with the weights, which ticks no check; the NIR round trip, C and an object's own keys, which ticks no check; the NIR mutation loop, which ticks no check; the NIR overflow fix, which ticks no check; the `.nir` file fix, which ticks no check; the networks' clock and the noise default, which ticks no check; the refusals, which ticks no check; the constructor holes, which ticks no check; the stale CSR, which ticks no check; the 17 fields, which ticks no check; the cosmetics at step 6's end, which ticks no check; step 7, which ticks no check; the NIR sitting, which ticks no check; the goal programs, which ticks no check; the docs say what the code does, which ticks no check), alpha.9 open; the fourteen checks hold, and 0.1.0 is the principal's call · wrote-from: work/crate-shipped, round 71 (tier 3, the consolidation sitting's second PR, the crate as shipped: the examples that need `std` say so, and the two NIR gates import the root's names from the root; a path gate for the crate README's shortest-path sentence, at every commit; the four `ternary_*` examples out of the package; `doc_cfg` under `docsrs`, for docs.rs's feature badges; `demo`'s footer says what a synapse holds; the converter README's filter sentence made true; four mutants no value reads in `exclude_re`; built in scratch, six commits, the dive's Calls 4 and 5 as ruled; one fresh review, its blocking finding and three cosmetic ones folded in one rebuild; not pushed; no check ticks) · open(session): the push and the PR, each on the principal's word · next-work: ROADMAP § Practical next moves"
 started: 2026-08-15T12:55:00Z
-updated: 2026-10-16T18:03:19Z
+updated: 2026-10-17T02:39:18Z
 principal_stated_goal: "Session I: the null-ladder adjudication — BRANCH B (unattributed perturbation); P5 on infrastructure + method"
 ---
 
@@ -10526,3 +10526,36 @@ returns at γ 0 of `reproject_ternary` and the stochastic step, no
 sentence. No check ticks. **Guards.** 1: appended, head refreshed; 2: no
 frozen example's file or verdict moves, the closed chapter's two files
 take ten tests and one doc, by Call 3; 3: not in play.
+
+## Close-out (round 71 — the crate as shipped: the examples that need `std` say so, a path gate, the ternary examples out of the package, docs.rs's badges, `demo`'s footer, the converter's filter sentence; tier 3 — 2026-10-16)
+
+`work/crate-shipped` from `main@ffb0b98`, tier 3, the consolidation
+sitting's second PR, six commits: `0227ed5` the nine examples that need
+`std` say so, the NIR gates' six imports; `c3222b8` the path gate at
+every commit; `fdcbfe4` the four `ternary_*` examples out of the
+package, `doc_cfg` under `docsrs`; `c8b1dc0` `demo`'s footer; `7063353`
+the converter's filter sentence, four mutants in `exclude_re`; this.
+**Rulings** (philo): the dive's Calls 4 (b), 5 (b) and 6, 2026-10-15;
+the review, 2026-10-16; the fix round, 2026-10-17. **Review**: 11
+findings, 1 blocking, 4 cosmetic-list, 6 record-only; one rebuild folded
+F1 (eight `Fixes:` trailers), F2 (the root parse drops comments, exits 2
+on a name that is not an identifier), F3 (the header names its blind
+spots; on philo's word the gate reads a root enum's variant too) and F6
+(`7063353`'s subject); F8 out. **Falsifiers**: the gate red at the pin
+on the six imports, its twenty canaries each as stated; GUARD 2's
+differential, the seven examples byte for byte from the pin to `fdcbfe4`
+and from `c8b1dc0` to the tip, `c8b1dc0` one line apart, the noise at
+0 pA red in each part; the four mutants missed under the 520 tests.
+**Measured**, pin and tip: the examples without default features, five
+checks, 101 to 0; the package, 88 files to 84; docs.rs's nightly, 3
+pages badged to 60; the firmware's `.text` `e3f9f169` at both, at one
+path, a canary moves it. **Moved**: a stable build with `--cfg docsrs`
+stops on E0554; no library behavior, trace, or frozen example's verdict.
+**Message check** (the trial): 11 findings, 10 true; the review found
+F1 and F6 outside its brief. **Record-only**: two root names through
+`nir` in two files of `tests/`, one of which `trace` includes, outside
+the gate; no CI line runs the five checks; the converter's source says
+what its README said; alpha.9's notes, for the package and docs.rs. No
+check ticks. **Guards.** 1: appended, head refreshed; 2: `demo`'s footer
+by the ruled differential, the four `ternary_*` out of the package,
+files and verdicts unmoved; 3: not in play.
