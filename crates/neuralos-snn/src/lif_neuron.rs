@@ -2037,9 +2037,11 @@ mod tests {
 
     /// The noise is seeded by `id XOR current_time_us`, as § Semantics item
     /// 4 says: a neuron's noise at `t` is neuron 0's at `id ^ t`. Three of
-    /// the four pairs overlap in their low bits, where `+` and `^` part:
-    /// every trace's ids are below 8 and its 1 ms clock a multiple of 8,
-    /// where they agree.
+    /// the four pairs overlap in their low bits, where `+` and `^` part. In
+    /// every trace of `tests/traces/` the two agree, no id sharing a bit
+    /// with the clock: at 1 ms the ids are below 8 and the clock a multiple
+    /// of 8, and at 0.1 ms, in `snntorch-two-layer` and `two-lif-neurons`,
+    /// the ids are 0 and 1 and the clock a multiple of 4.
     #[test]
     fn noise_is_seeded_by_id_xor_time() {
         let noisy = |id| {
