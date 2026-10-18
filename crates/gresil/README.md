@@ -5,7 +5,8 @@
 > AVX2 batch kernel, and, behind unstable features, pairwise STDP, the
 > ternary bridge codecs and the freezer.
 
-Published on crates.io as `0.1.0-alpha.8` (AGPL-3.0-or-later).
+Published on crates.io as `neuralos-snn` `0.1.0-alpha.8`, as `gresil`
+from alpha.9 (AGPL-3.0-or-later).
 
 ## What this crate is
 
@@ -398,7 +399,8 @@ ternary SNN↔LLM bridge on this substrate lives in the workspace's
 
 ## Status
 
-**`0.1.0-alpha.8` is live on crates.io**: `FixedNetwork`, a network in
+**`0.1.0-alpha.8` is live on crates.io, as `neuralos-snn`**:
+`FixedNetwork`, a network in
 arrays, replays every plasticity-off trace bit for bit on the ESP32-C3
 and under QEMU `riscv64gc`, with no panic path in its step, proven at
 link time; the traces; the spike ring out of the neuron; the MSRV

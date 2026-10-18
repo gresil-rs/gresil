@@ -1,13 +1,13 @@
-# neuralos-nir2json
+# gresil-nir2json
 
 The inbound bridge: a stranger's NIR `.nir` file (HDF5) converted into
-the JSON schema [`neuralos-snn`]'s `nir_import` consumes — **pure
+the JSON schema [`gresil`]'s `nir_import` consumes — **pure
 Rust, no C toolchain** (`hdf5-pure` and what its `std` and `deflate`
 features bring, flate2's rust backend among them;
-`cargo tree -p neuralos-nir2json -e normal` lists them).
+`cargo tree -p gresil-nir2json -e normal` lists them).
 
 ```
-neuralos-nir2json [--sim-units] [--dt µs] [--freeze <out.rs> [--steps N] [--input v1,v2,…] [--drive <file>]] <input.nir> <output.json>
+gresil-nir2json [--sim-units] [--dt µs] [--freeze <out.rs> [--steps N] [--input v1,v2,…] [--drive <file>]] <input.nir> <output.json>
 ```
 
 Exit codes: `0` converted (a sidecar `<output>.meta.json` carries the
@@ -21,7 +21,7 @@ second implementation to drift.
 ## Install
 
 ```bash
-cargo install --git https://gitea.com/Caramoussin/NeuralOs-v2
+cargo install --git https://gitea.com/gresil-rs/gresil gresil-nir2json
 ```
 
 or grab a prebuilt static binary from the releases (linux-x86_64).
@@ -128,7 +128,7 @@ or grab a prebuilt static binary from the releases (linux-x86_64).
 ## Freeze: the arrays a `FixedNetwork` steps
 
 ```
-neuralos-nir2json [--sim-units] [--dt µs] --freeze <out.rs> [--steps N] [--input v1,v2,…] [--drive <file>] <input.nir> <output.json>
+gresil-nir2json [--sim-units] [--dt µs] --freeze <out.rs> [--steps N] [--input v1,v2,…] [--drive <file>] <input.nir> <output.json>
 ```
 
 After the conversion, `--freeze` builds the network the JSON describes
@@ -139,7 +139,7 @@ sidecar:
 - **`<out.rs>`**, one `pub mod` named after the file's stem (lowercased,
   anything but a letter, digit or `_` made `_`; a letter or `_` first,
   not a Rust keyword): `N` neurons and `S` synapses as the arrays a
-  `neuralos_snn::FixedNetwork<N, S>` steps, the time step, the run, the
+  `gresil::FixedNetwork<N, S>` steps, the time step, the run, the
   trace's header line (`kind=stranger`), and `DRIVE`, one run of
   `--steps` steps (default 150) of the currents the graph's own encoder
   gives for `--input`: one number per feature of the graph's own inputs,
@@ -150,11 +150,11 @@ sidecar:
   it. `--drive <file>` gives runs instead, one a line, a step count and
   then the numbers (`10 0.5,0`; blank lines and `#` lines skipped), each
   run the currents its numbers give, one after the other. The library's
-  freezer writes it (`neuralos_snn::fixed::freeze::module`), the one
+  freezer writes it (`gresil::fixed::freeze::module`), the one
   that writes the library's own frozen traces.
 - **`<out>.trace`**, that drive on the host in `neuralos-trace v1`: the
   header line, then one row per step, the spikes and every membrane,
-  written by `neuralos_snn::trace::row`, the row writer the firmware
+  written by `gresil::trace::row`, the row writer the firmware
   uses. The host steps the library's std network with plasticity off,
   the network `FixedNetwork::try_from` converts; the two step alike,
   bit for bit, on every network it converts (the library's trace
@@ -187,7 +187,7 @@ What the module is for: the ESP32-C3 firmware's slot for a stranger's
 graph, filled by one command, `firmware/esp32c3/stranger.sh` (its
 README; `docs/ROADMAP.md` § 0.1.0, check 7): the board steps the
 module's arrays, and its rows must equal `<out>.trace`. The
-module needs only `core` and `neuralos-snn`, so it compiles `no_std`.
+module needs only `core` and `gresil`, so it compiles `no_std`.
 
 ## Build (the release artifact)
 
@@ -195,10 +195,10 @@ The prebuilt binary on the Gitea release is this, nothing more:
 
 ```bash
 rustup target add x86_64-unknown-linux-musl          # once
-crates/neuralos-nir2json/build.sh                     # → dist/neuralos-nir2json-v0.1.0-x86_64-unknown-linux-musl
+crates/gresil-nir2json/build.sh                     # → dist/gresil-nir2json-v0.1.0-x86_64-unknown-linux-musl
 ```
 
-The script is the bare cargo line (`cargo build -p neuralos-nir2json
+The script is the bare cargo line (`cargo build -p gresil-nir2json
 --release --locked --target x86_64-unknown-linux-musl`) plus what the
 bring-up binary lacked: rustc's path remap for the four source roots,
 so no home path or registry path of the builder reaches the binary
@@ -219,15 +219,15 @@ compared against.
 Verify a binary by execution, both exits:
 
 ```bash
-B=crates/neuralos-nir2json/dist/neuralos-nir2json-v0.1.0-x86_64-unknown-linux-musl
-$B crates/neuralos-nir2json/tests/fixtures/chain_population_f32.nir /tmp/chain.json   # exit 0, sidecar written
-$B crates/neuralos-nir2json/tests/fixtures/neg_filter_lzf.nir /tmp/lzf.json           # exit 2, lzf refused by name
+B=crates/gresil-nir2json/dist/gresil-nir2json-v0.1.0-x86_64-unknown-linux-musl
+$B crates/gresil-nir2json/tests/fixtures/chain_population_f32.nir /tmp/chain.json   # exit 0, sidecar written
+$B crates/gresil-nir2json/tests/fixtures/neg_filter_lzf.nir /tmp/lzf.json           # exit 2, lzf refused by name
 ```
 
 ## Development
 
 ```bash
-cargo test -p neuralos-nir2json   # corpus v2: fixtures live in tests/fixtures/
+cargo test -p gresil-nir2json   # corpus v2: fixtures live in tests/fixtures/
 ```
 
 Fixture provenance (the stranger files, sha-pinned): see
@@ -241,4 +241,4 @@ not byte-stable across runs, so the committed emission is pinned by its
 sha in PROVENANCE.md; the exporter's edge order follows Python's hash
 seed, and under `PYTHONHASHSEED=0` a second run writes the same bytes).
 
-[`neuralos-snn`]: https://crates.io/crates/neuralos-snn
+[`gresil`]: https://crates.io/crates/neuralos-snn

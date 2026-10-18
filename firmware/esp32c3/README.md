@@ -1,6 +1,6 @@
-# neuralos-esp32c3
+# gresil-esp32c3
 
-`neuralos-snn` on an ESP32-C3. What it runs, in order, is the module
+`gresil` on an ESP32-C3. What it runs, in order, is the module
 note at the top of [`src/main.rs`](src/main.rs): timed burst arms, the
 library's frozen traces replayed over serial, then a neuron that blinks
 the LED. The board's record, every capture and pin, is
@@ -13,11 +13,11 @@ firmware/esp32c3/stranger.sh build <graph.nir> [--steps 150]     # no board need
 firmware/esp32c3/stranger.sh run <graph.nir> [--port /dev/ttyACM0] [--seconds 20] [--steps 150]
 ```
 
-`build` converts the graph (`neuralos-nir2json --sim-units --freeze`:
+`build` converts the graph (`gresil-nir2json --sim-units --freeze`:
 `--steps` steps of the graph's own drive at the converter's 0.1 ms,
 150 unless given, 1 on every input feature; `run` takes `--steps` too
 and replays that many), checks the capacity bar below, and builds this
-firmware with the graph in its slot (`build.rs`, `NEURALOS_GRAPH`)
+firmware with the graph in its slot (`build.rs`, `GRESIL_GRAPH`)
 through `build.sh`: the path remap, the personal-string gate, the ELF
 and `.text` shas, clippy. It writes into
 `firmware/esp32c3/target/stranger/`: `<stem>.json` and its sidecar,
@@ -83,7 +83,7 @@ shorter compare.
 ```bash
 firmware/esp32c3/build.sh          # release, remapped, gated; prints the shas
 firmware/esp32c3/build.sh clippy
-espflash flash --port /dev/ttyACM0 firmware/esp32c3/target/riscv32imc-unknown-none-elf/release/neuralos-esp32c3
+espflash flash --port /dev/ttyACM0 firmware/esp32c3/target/riscv32imc-unknown-none-elf/release/gresil-esp32c3
 python3 tools/esp32c3_capture.py /dev/ttyACM0 20 board.log
 python3 tools/esp32c3_trace_diff.py board.log
 ```

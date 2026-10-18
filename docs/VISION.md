@@ -1,4 +1,4 @@
-# NeuralOS v2 — Vision
+# gresil — Vision
 
 > The open `no_std` spiking-neural substrate for RISC-V edge silicon —
 > and the lab bench to watch it think.
@@ -9,11 +9,11 @@ one-page direction document — the 2026-08-08→20 bridge saga now lives in
 
 ---
 
-## What NeuralOS v2 is
+## What gresil is
 
 A sovereignty stack in pure Rust, organized around one defensible
 artifact: a `no_std`, i16 fixed-point spiking-neural-network library
-(`neuralos-snn`) designed to run on RISC-V edge silicon (ESP32-C3, QEMU,
+(`gresil`) designed to run on RISC-V edge silicon (ESP32-C3, QEMU,
 HiFive). Around that spine: a visualizer that makes the substrate
 legible, and a research runtime (`neuralos-rt`, not published) that
 proved the ternary bridge — a closed, honestly-recorded research chapter
@@ -48,7 +48,7 @@ pass; verification method in parentheses):
 - **NIR (Neuromorphic Intermediate Representation) is the interop
   layer** — Pedersen et al., Nature Communications 15, 4962 (2024),
   DOI 10.1038/s41467-024-52259-9; today 9 simulators + 5 hardware
-  platforms speak it (repo claim, neuromorphs/NIR). NeuralOS imports
+  platforms speak it (repo claim, neuromorphs/NIR). gresil imports
   and exports it.
 
 ## The three chapters
@@ -56,7 +56,7 @@ pass; verification method in parentheses):
 ### 1. The substrate (now — the active front)
 
 `neuralos-snn` on crates.io (`0.1.0-alpha.8`, release notes in
-`docs/releases/v0.1.0-alpha.8.md`):
+`docs/releases/v0.1.0-alpha.8.md`; `gresil` from alpha.9):
 `no_std`, i16 fixed-point,
 LIF + full pairwise STDP (in the tree behind the `unstable-stdp`
 feature, off by default) + 4 topologies + CSR sparse matrix + AVX2 kernel
@@ -123,7 +123,7 @@ roadmap).
    paper (Deshpande et al., DCIS 2025), and NIR (Pedersen et al.,
    Nature Comms 2024).
 4. **Outreach to ETH Zürich Benini / PULP** — they have the hardware;
-   NeuralOS brings the open software library.
+   gresil brings the open software library.
 5. **Paper track:** finish and submit the Branch B article from `paper/`
    (its own gated workflow, never again displacing Phase-1/2 work).
 6. **After 0.1.0, the learning chapter, in two steps and two

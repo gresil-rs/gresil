@@ -9,7 +9,7 @@ and why each graph is in it, in the repo's `.nirenv` (snntorch 1.0.0,
 nir 1.0.9.dev1+g7883c3c85, torch 2.13.0+cpu):
 
     .nirenv/bin/python3 tools/gen_snnTorch_parity.py \
-      crates/neuralos-nir2json/tests/fixtures/parity
+      crates/gresil-nir2json/tests/fixtures/parity
 
 `reference.json` holds snnTorch's spikes: `reset_mechanism="zero"`,
 what NIR's LIF means (snnTorch's exporter writes `v_reset = 0` for
@@ -25,7 +25,7 @@ reference whose weights nobody chose, written by
 2.5.2 too:
 
     .nirenv/bin/python3 tools/gen_snnTorch_digits.py \
-      crates/neuralos-nir2json/tests/fixtures/parity
+      crates/gresil-nir2json/tests/fixtures/parity
 
 A 784 → 32 → 10 model trained on 28 × 28 digits the script draws, and
 snnTorch's own run of the trained model on ten test digits, one a

@@ -1,5 +1,5 @@
 #!/bin/sh
-# NeuralOS v2 pre-push wall. Added 2026-09-06 (ISA round-17), activated
+# gresil pre-push wall. Added 2026-09-06 (ISA round-17), activated
 # with `git config core.hooksPath .githooks` (AGENTS.md § Setup). Git
 # calls it as `pre-push <remote-name> <remote-url>` with one line per ref
 # on stdin: `<local ref> <local sha> <remote ref> <remote sha>`.
@@ -32,7 +32,7 @@ if [ -z "$pattern" ]; then
   exit 1
 fi
 zero=0000000000000000000000000000000000000000
-expected=$(git config --get neuralos.author-email || true)
+expected=$(git config --get gresil.author-email || true)
 
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -z "$local_ref" ] && continue
@@ -69,8 +69,8 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 
   # (b)
   if [ -z "$expected" ]; then
-    echo "pre-push: neuralos.author-email is unset; run:" >&2
-    echo '    git config neuralos.author-email "$(git config user.email)"' >&2
+    echo "pre-push: gresil.author-email is unset; run:" >&2
+    echo '    git config gresil.author-email "$(git config user.email)"' >&2
     exit 1
   fi
   # shellcheck disable=SC2086

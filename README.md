@@ -1,4 +1,4 @@
-# NeuralOS v2
+# gresil
 
 > The open `no_std` spiking-neural substrate for RISC-V edge silicon — and the lab bench to watch it think.
 
@@ -7,11 +7,11 @@
 
 ## What this repo is
 
-NeuralOS v2 is a pure-Rust workspace centered on one defensible artifact — `crates/neuralos-snn`, a `no_std`-by-default, i16 fixed-point spiking neural network library — with `crates/neuralos-app` as the Slint visualizer that runs it live as a spike-raster + weight-map microscope, and `crates/neuralos-rt` as the (unpublished) research runtime that proved the ternary bridge. The bridge chapter is closed and honestly recorded: the distilled article lives in `paper/`, the full session history in `docs/RESEARCH_LOG.md` and `ISA.md`.
+gresil (formerly NeuralOS v2) is a pure-Rust workspace centered on one defensible artifact — `crates/gresil`, a `no_std`-by-default, i16 fixed-point spiking neural network library — with `crates/gresil-scope` as the Slint visualizer that runs it live as a spike-raster + weight-map microscope, and `crates/neuralos-rt` as the (unpublished) research runtime that proved the ternary bridge. The bridge chapter is closed and honestly recorded: the distilled article lives in `paper/`, the full session history in `docs/RESEARCH_LOG.md` and `ISA.md`.
 
 This is **not** the old “AI OS” pretense from v0.1. It is a serious SNN library, a visualizer that makes it legible, and a closed, gated research record documented in `docs/VISION.md`.
 
-The active repo is **`NeuralOs-v2`**. The sibling `NeuralOS` repo is the archived v0.1 codebase and should be treated as read-only source material.
+The active repo is **`gresil`**. The sibling `NeuralOS` repo is the archived v0.1 codebase and should be treated as read-only source material.
 
 ## North star
 
@@ -24,17 +24,17 @@ Project direction lives in:
 
 The short version:
 
-- the spine is the `neuralos-snn` library
+- the spine is the `gresil` library
 - the visible artifact is the Slint visualizer
 - the ternary bridge is a **closed research chapter** — record in `docs/RESEARCH_LOG.md`, article in `paper/`
 
 ## Workspace overview
 
 ```text
-NeuralOs-v2/
+gresil/
 ├── crates/
-│   ├── neuralos-snn/   # no_std-by-default SNN library (published, the spine)
-│   ├── neuralos-app/   # Slint visualizer running the SNN live
+│   ├── gresil/         # no_std-by-default SNN library (published, the spine)
+│   ├── gresil-scope/   # Slint visualizer running the SNN live
 │   └── neuralos-rt/    # research runtime (GGUF / Q1_0 / Q2_0 / tokenizer / NIR .nir IO) — publish = false
 ├── paper/              # the Branch B article (make / make figs / make gate)
 ├── evidence/           # raw judge/experiment logs (INDEX.md)
@@ -48,7 +48,7 @@ NeuralOs-v2/
 
 ## Current status
 
-`neuralos-snn` `0.1.0-alpha.8` on crates.io (release notes: `docs/releases/v0.1.0-alpha.8.md`) · record DOIs: paper [10.5281/zenodo.22064018](https://doi.org/10.5281/zenodo.22064018), source archive [10.5281/zenodo.22064020](https://doi.org/10.5281/zenodo.22064020). Open work lives in `docs/ROADMAP.md` § Practical next moves — this README is not a state source.
+`neuralos-snn` `0.1.0-alpha.8` on crates.io, `gresil` from alpha.9 (release notes: `docs/releases/v0.1.0-alpha.8.md`) · record DOIs: paper [10.5281/zenodo.22064018](https://doi.org/10.5281/zenodo.22064018), source archive [10.5281/zenodo.22064020](https://doi.org/10.5281/zenodo.22064020). Open work lives in `docs/ROADMAP.md` § Practical next moves — this README is not a state source.
 
 ## Design principles
 
@@ -71,7 +71,7 @@ cargo check --workspace --all-targets
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 cargo audit                      # RustSec advisories; tool default, nothing ignored
-cargo build --no-default-features -p neuralos-snn
+cargo build --no-default-features -p gresil
 firmware/esp32c3/build.sh        # ESP32-C3 firmware: the release build under rustc's path remap, the personal-string gate, the shas, the trim-paths canary (AGENTS.md § Commands carries the whole leg)
 PATH="$PWD/.nirenv/bin:$PATH" cargo test -p neuralos-rt --features hdf5  # NIR HDF5 gate leg (vendored HDF5; cmake from .nirenv)
 ```
@@ -83,13 +83,13 @@ The first three were validated in this workspace state.
 For normal iteration:
 
 ```bash
-cargo run -p neuralos-app
+cargo run -p gresil-scope
 ```
 
 For a headless smoke-style launch/exit:
 
 ```bash
-NEURALOS_SMOKE_MS=2500 cargo run -p neuralos-app
+GRESIL_SMOKE_MS=2500 cargo run -p gresil-scope
 ```
 
 The app is a live microscope over the SNN:
@@ -107,13 +107,13 @@ The project claim is narrow and concrete:
 - integer, fixed-point SNN computation is a real hardware-aligned design axis
 - Rust lacks a mature, serious library occupying that slot
 
-NeuralOS v2 aims to fill that gap with a library first, then make it legible through the visualizer, and only then pursue the more ambitious ternary bridge research path.
+gresil aims to fill that gap with a library first, then make it legible through the visualizer, and only then pursue the more ambitious ternary bridge research path.
 
 ## Relation to v0.1
 
 `NeuralOS` v0.1 is archived. It contained some real implementation buried under a large amount of theater, dead structure, and misleading abstractions.
 
-NeuralOS v2 is the cleanup:
+gresil is the cleanup:
 
 - one active workspace
 - real code only
