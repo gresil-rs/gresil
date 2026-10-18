@@ -2799,9 +2799,9 @@ mod tests {
         }
     }
 
-    // ----- The doc-vs-code dive (2026-10-15): the record line of simd's
-    // survivors made a test; run green at 645afa8 and red under the
-    // survivor `runs_avx2 -> false`, both with NEURALOS_REQUIRE_AVX2=1. -----
+    // ----- ISA round 70: a test for one of simd's survivors of a mutation
+    // pass at 645afa8; run green there and red under the survivor,
+    // `runs_avx2 -> false`, both with NEURALOS_REQUIRE_AVX2=1. -----
 
     /// `runs_avx2` keeps the variable's promise itself: with
     /// `NEURALOS_REQUIRE_AVX2` set, as CI sets it on each simd step, it

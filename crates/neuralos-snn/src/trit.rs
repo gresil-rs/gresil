@@ -535,9 +535,9 @@ mod tests {
         }
     }
 
-    // ----- The doc-vs-code dive (2026-10-15): tests for the trit sentences
-    // the pass's survivors showed no test held at 645afa8; run green there
-    // and red under each survivor. -----
+    // ----- ISA round 70: tests for the trit sentences a mutation pass's
+    // survivors showed no test held at 645afa8; run green there and red
+    // under each survivor. -----
 
     /// The boundary is `⌈γ/2⌉` for an even γ too: every other test's γ is
     /// odd (125, 5), where `(γ + 1) / 2` and `(γ + 2) / 2` agree.

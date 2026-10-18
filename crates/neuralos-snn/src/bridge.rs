@@ -1245,10 +1245,10 @@ mod tests {
         }
     }
 
-    // ----- The doc-vs-code dive (2026-10-15): tests for the mutation
-    // pass's bridge.rs survivors. Tests only: no behavior moves, no
-    // verdict of the closed chapter is read. Each run green at 645afa8
-    // and red under the survivors it answers. -----
+    // ----- ISA round 70: tests for the bridge.rs survivors of a mutation
+    // pass at 645afa8. Tests only: no behavior moves, no verdict of the
+    // closed chapter is read. Each run green at 645afa8 and red under the
+    // survivors it answers. -----
 
     /// The widening is bit-exact for all 65,536 patterns, not for the 256
     /// the property test draws: the smallest subnormals, `0x0001` and

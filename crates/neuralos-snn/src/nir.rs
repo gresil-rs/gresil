@@ -7723,8 +7723,8 @@ mod tests {
         assert_eq!(g.edges, clean.edges);
     }
 
-    // ----- The doc-vs-code dive (2026-10-15): a test for the nir sentence
-    // no test held at 645afa8; run green there and red under its mutant. -----
+    // ----- ISA round 70: a test for the nir sentence no test held at
+    // 645afa8; run green there and red under its mutant. -----
 
     /// `NirGraphEncoder::encode` merges its stages saturating in `i16`
     /// (D5): two Inputs, each through its own Linear at full scale, drive
@@ -7759,9 +7759,9 @@ mod tests {
         assert_eq!(enc.encode(&[&x, &x]), [32_767], "two, merged saturating");
     }
 
-    // ----- The doc-vs-code dive (2026-10-15), second batch: tests for the
-    // mutation pass's nir.rs survivors, each value measured at 645afa8
-    // and each test run red under the survivors it answers. -----
+    // ----- ISA round 70: tests for the nir.rs survivors of a mutation pass
+    // at 645afa8, each value measured there and each test run red under the
+    // survivors it answers. -----
 
     const READOUT_DEFERRED: &str =
         "readout (LIF->Linear->Output) deferred — spike-count readout convention not yet named";
@@ -8615,8 +8615,9 @@ mod tests {
         assert!(text.contains("\"zero_tensor\":true"), "{text}");
     }
 
-    // ----- The doc-vs-code dive (2026-10-15): Call 7 (b)'s test, ruled
-    // 15:20 UTC: red at 645afa8, green with the change. -----
+    // ----- ISA round 70: the tests that the chain builder takes its three
+    // edges, and its nodes, in any order; the first red at 645afa8 and
+    // green with the change. -----
 
     /// `build_chain_network` takes the chain's three edges in any order:
     /// an exporter lists them in its own (snnTorch's follows Python's
