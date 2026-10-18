@@ -408,10 +408,10 @@ mod tests {
         }
     }
 
-    // ----- The doc-vs-code dive (2026-10-15): tests for the mutation
-    // pass's kernel.rs survivors. Tests only: no behavior moves, no
-    // verdict of the closed chapter is read. Each run green at 645afa8
-    // and red under the survivors it answers. -----
+    // ----- ISA round 70: tests for the kernel.rs survivors of a mutation
+    // pass at 645afa8. Tests only: no behavior moves, no verdict of the
+    // closed chapter is read. Each run green at 645afa8 and red under the
+    // survivors it answers. -----
 
     /// `pack_trits` writes the packing whatever `out` held: from a buffer
     /// of all ones it gives what it gives from a zeroed one.

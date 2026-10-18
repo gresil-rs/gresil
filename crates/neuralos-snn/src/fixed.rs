@@ -677,9 +677,9 @@ mod tests {
         assert_eq!((fixed.dt_us(), fixed.time_us()), (1_000, 5_000));
     }
 
-    // ----- The doc-vs-code dive (2026-10-15): a test for the fixed
-    // network's sentence no test held at 645afa8 (F7); run green there and
-    // red under the hand mutant `fixed-clock-wrapping`. -----
+    // ----- ISA round 70: a test for the fixed network's sentence no test
+    // held at 645afa8; run green there and red under a mutant that wraps
+    // the clock instead of saturating it. -----
 
     /// The clock saturates at `u64::MAX`, as `step`'s doc says: a step
     /// from 400 μs below it ends there, and the next leaves it there.

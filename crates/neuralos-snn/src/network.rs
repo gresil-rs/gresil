@@ -4549,9 +4549,8 @@ mod tests {
         );
     }
 
-    // ----- The doc-vs-code dive (2026-10-15): a test for each network
-    // sentence no test held at 645afa8; each is run green there and red
-    // under its mutant. -----
+    // ----- ISA round 70: a test for each network sentence no test held at
+    // 645afa8; each is run green there and red under its mutant. -----
 
     /// `reset` brings every neuron back to rest, as its doc says: after a
     /// driven run, every neuron reads at rest (`at_rest`, the six fields
@@ -4574,9 +4573,9 @@ mod tests {
 
     /// `Balanced` wires as it did at `645afa8`, its four classes and two
     /// builds in a row (the second goes on from the seed the first left):
-    /// the hash of every synapse, measured there (the doc-vs-code dive's
-    /// `balanced_hash.py`). The default topology, which `new`'s callers,
-    /// the README and the visualizer build; no test held its wiring.
+    /// the hash of every synapse, measured there. The default topology,
+    /// which `new`'s callers, the README and the visualizer build; no test
+    /// held its wiring.
     #[test]
     fn balanced_wires_as_it_did_at_the_pin() {
         for (n, pins) in [
@@ -4706,9 +4705,9 @@ mod tests {
         assert_eq!(net.synapse_count(), 0);
     }
 
-    // ----- The doc-vs-code dive (2026-10-15), second batch: tests for the
-    // mutation pass's network.rs survivors, each value measured at 645afa8
-    // and each test run red under the survivors it answers. -----
+    // ----- ISA round 70: tests for the network.rs survivors of a mutation
+    // pass at 645afa8, each value measured there and each test run red
+    // under the survivors it answers. -----
 
     /// `Feedforward` wires as it did at `645afa8` on layers past 8, where
     /// a layer's fan-out is not 1. No test before this one read the wiring
@@ -4883,9 +4882,9 @@ mod tests {
         );
     }
 
-    // ----- The doc-vs-code dive (2026-10-15), third batch: the csr.rs
-    // survivor that falls under `build_topology`'s doc; run green at
-    // 645afa8 and red under the survivor. -----
+    // ----- ISA round 70: the csr.rs survivor that falls under
+    // `build_topology`'s doc; run green at 645afa8 and red under the
+    // survivor. -----
 
     /// A second `build_topology` clears the CSR's state before it builds,
     /// as its doc says: after a rebuild, each CSR slot names the synapse of

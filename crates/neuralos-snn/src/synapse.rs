@@ -595,9 +595,9 @@ mod tests {
         }
     }
 
-    // ----- The doc-vs-code dive (2026-10-15): a test for the synapse
-    // sentence no test held at 645afa8; run green there and red under the
-    // pass's three survivors. -----
+    // ----- ISA round 70: a test for the synapse sentence no test held at
+    // 645afa8, where a mutation pass left three survivors; run green there
+    // and red under each. -----
 
     /// `STDPRule::new` is the rule its doc and the crate README name: 20 ms
     /// and 20 ms, a₊ 50, a₋ −53, learning rate 100. `stdp_zero_at_zero_dt`

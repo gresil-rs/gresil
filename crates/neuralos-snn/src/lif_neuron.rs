@@ -2002,9 +2002,8 @@ mod tests {
         );
     }
 
-    // ----- The doc-vs-code dive (2026-10-15): a test for each neuron
-    // sentence no test held at 645afa8; each is run green there and red
-    // under its mutant. -----
+    // ----- ISA round 70: a test for each neuron sentence no test held at
+    // 645afa8; each is run green there and red under its mutant. -----
 
     /// `add_synaptic_current` saturates, at both ends: "Saturating —
     /// never overflows".
