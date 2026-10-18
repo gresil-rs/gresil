@@ -1184,11 +1184,12 @@ to 1 µs.
 
 ```bash
 firmware/esp32c3/build.sh                    # since round 26: cargo build --release --locked under rustc's path remap, then the personal-string gate, the ELF and .text shas, the trim-paths canary (tools/remap.sh); the two pins below were built by the bare cargo line the script wraps
-sha256sum firmware/esp32c3/target/riscv32imc-unknown-none-elf/release/neuralos-esp32c3
+sha256sum firmware/esp32c3/target/riscv32imc-unknown-none-elf/release/gresil-esp32c3
+#   every pin below is an ELF named neuralos-esp32c3, built before the rename
 #   102af8c6374766f290777b4e760a60318a0496f387fbb6a3b534200f3ebd5aed  at 427b6cb (release profile, lto fat)
 #   e26e174999804ce43163f5c2f1cf3113f480a9cdb84148bfc7fedc00da425ebb  at 820d81a (same profile; the alpha.6 spine, second entry)
 espflash board-info --port /dev/ttyACM0
-espflash flash --port /dev/ttyACM0 firmware/esp32c3/target/riscv32imc-unknown-none-elf/release/neuralos-esp32c3
+espflash flash --port /dev/ttyACM0 firmware/esp32c3/target/riscv32imc-unknown-none-elf/release/gresil-esp32c3
 python3 tools/esp32c3_capture.py /dev/ttyACM0 20 bringup.log
 grep -a -c 'spike at' bringup.log            # 296 here: 295 + the pre-reset line
 ```
@@ -1282,7 +1283,9 @@ A firmware asset on a Gitea release is built by `build.sh` at the
 tagged commit (the descriptor stamp is that commit's time), copied
 from the target dir into `firmware/esp32c3/dist/` under the alpha.6
 name pattern
-`neuralos-esp32c3-<fw>-snn-<lib>-riscv32imc-unknown-none-elf.elf`,
+`gresil-esp32c3-<fw>-snn-<lib>-riscv32imc-unknown-none-elf.elf`
+(alpha.6 to alpha.8 shipped it as `neuralos-esp32c3-…`, the package's
+name before the rename),
 listed in `dist/SHA256SUMS`, uploaded with that file, downloaded back,
 checked with `sha256sum -c`, and gated once more on the download:
 
