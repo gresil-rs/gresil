@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Generate the neuralos-nir2json corpus-v2 fixtures (deterministic).
+"""Generate the gresil-nir2json corpus-v2 fixtures (deterministic).
 
 Inputs : existing rt fixtures (chain_population.nir, merge.nir,
          neg_filter_lzl.nir → REUSED for the lzf-refusal test) — the
          f32 twins cast their F64 datasets down; the big graph is
          synthesized with a fixed integer formula (no RNG anywhere).
-Output : crates/neuralos-nir2json/tests/fixtures/
+Output : crates/gresil-nir2json/tests/fixtures/
          - chain_population_f32.nir, merge_f32.nir   (twins)
          - big_linear.nir                            (1M-weight blowup probe)
          - affine_two_layer.nir                      (two biased Affines)
@@ -39,7 +39,7 @@ import h5py
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "crates/neuralos-rt/tests/nir_fixtures"
-OUT = ROOT / "crates/neuralos-nir2json/tests/fixtures"
+OUT = ROOT / "crates/gresil-nir2json/tests/fixtures"
 OUT.mkdir(parents=True, exist_ok=True)
 
 

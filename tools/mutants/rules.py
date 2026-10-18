@@ -59,7 +59,7 @@ usage: tools/mutants/rules.py packages TREE DIFF
                                   [--config TOML]
        tools/mutants/rules.py flags
 `packages` prints the packages that test a diff: those whose `src/` holds
-its files, and neuralos-nir2json when neuralos-snn is one (the trial's
+its files, and gresil-nir2json when gresil is one (the trial's
 set). `build` writes the features each package built with and the tree's
 files rustc read. `flags` prints the caller's flags, `--cap-lints`
 dropped, as `CARGO_ENCODED_RUSTFLAGS` holds them.
@@ -739,11 +739,11 @@ def owner(path, pkgs):
 
 def packages(tree, diff_text):
     """The packages that test a diff: the owners of its Rust files, and
-    neuralos-nir2json when neuralos-snn is one (the trial's set)."""
+    gresil-nir2json when gresil is one (the trial's set)."""
     pkgs = metadata(tree)
     names = {owner(p, pkgs) for p in diff_lines(diff_text) if p.endswith(".rs")} - {None}
-    if "neuralos-snn" in names and "neuralos-nir2json" in pkgs:
-        names.add("neuralos-nir2json")
+    if "gresil" in names and "gresil-nir2json" in pkgs:
+        names.add("gresil-nir2json")
     return sorted(names)
 
 

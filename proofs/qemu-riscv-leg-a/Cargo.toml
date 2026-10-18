@@ -4,12 +4,12 @@ version = "0.1.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 publish = false
-description = "Leg A of the QEMU riscv64gc proof: bare-metal none-elf exact-value gate over the no_std neuralos-snn surface"
+description = "Leg A of the QEMU riscv64gc proof: bare-metal none-elf exact-value gate over the no_std gresil surface"
 
 [workspace]
 
 [dependencies]
-neuralos-snn = { path = "../../crates/neuralos-snn", default-features = false, features = ["unstable-stdp", "unstable-bridge"] }
+gresil = { path = "../../crates/gresil", default-features = false, features = ["unstable-stdp", "unstable-bridge"] }
 
 [profile.dev]
 panic = "abort"

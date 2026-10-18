@@ -18,7 +18,7 @@
 # EXPECTED.tsv names (the planted feature off, then on); exit 1 on any
 # difference from that file. --features goes to cargo-mutants and to the
 # rules' cargo alike. The tests are the packages owning the mutated
-# files, and neuralos-nir2json when neuralos-snn is one; without
+# files, and gresil-nir2json when gresil is one; without
 # --features the library builds with std and unstable-freeze alone, so
 # bridge.rs, kernel.rs and simd.rs read UNBUILT.
 #
@@ -63,7 +63,7 @@ mode=${1:-}
 case $mode in diff | file | selftest) ;; *) usage ;; esac
 
 # The cap: this script again, inside a scope of its own.
-if [ -z "${NEURALOS_MUTANTS_SCOPE:-}" ]; then
+if [ -z "${GRESIL_MUTANTS_SCOPE:-}" ]; then
   cap=${CAP:-6G}
   [ "$mode" = selftest ] && cap=1G
   if ! systemd-run --user --scope --quiet true; then
@@ -72,7 +72,7 @@ if [ -z "${NEURALOS_MUTANTS_SCOPE:-}" ]; then
   fi
   exec systemd-run --user --scope --quiet --unit="mutants-$$" \
     -p MemoryMax="$cap" -p MemorySwapMax=0 -p OOMPolicy=continue \
-    env -u RUSTC_WRAPPER -u CARGO_BUILD_RUSTC_WRAPPER NEURALOS_MUTANTS_SCOPE="$cap" \
+    env -u RUSTC_WRAPPER -u CARGO_BUILD_RUSTC_WRAPPER GRESIL_MUTANTS_SCOPE="$cap" \
     bash "${BASH_SOURCE[0]}" "$@"
 fi
 shift
@@ -81,9 +81,9 @@ case $cg in
   *.scope) ;;
   *) echo "mutants.sh: not in a scope: $cg" >&2; exit 2 ;;
 esac
-if [ "$(cat "$cg/memory.max")" != "$(numfmt --from=iec "$NEURALOS_MUTANTS_SCOPE")" ] ||
+if [ "$(cat "$cg/memory.max")" != "$(numfmt --from=iec "$GRESIL_MUTANTS_SCOPE")" ] ||
   [ "$(cat "$cg/memory.swap.max")" != 0 ]; then
-  echo "mutants.sh: $cg is not capped at $NEURALOS_MUTANTS_SCOPE without swap" >&2
+  echo "mutants.sh: $cg is not capped at $GRESIL_MUTANTS_SCOPE without swap" >&2
   exit 2
 fi
 

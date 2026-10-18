@@ -17,20 +17,20 @@ exclude_re = [
     # buffer of the dataspace's size. A 2-D weight read gives rows × cols
     # values, so the check never fires; it stays as the guard before `W` is
     # read as rows by cols.
-    'crates/neuralos-nir2json/src/lib\.rs:[0-9]+:[0-9]+: replace if condition vals\.len\(\) != rows \* cols with false in read_weight',
+    'crates/gresil-nir2json/src/lib\.rs:[0-9]+:[0-9]+: replace if condition vals\.len\(\) != rows \* cols with false in read_weight',
     # nir2json's `convert_file_opts`, the edge list's capacity
     # `flat.len() / 2` made `/ 3` (PR #52's first run, `db52d06`): a
     # `Vec`'s capacity, which no value reads. Its column, since `replace 2
     # with 3` names three more mutants in the function.
-    'crates/neuralos-nir2json/src/lib\.rs:[0-9]+:74: replace 2 with 3 in convert_file_opts',
+    'crates/gresil-nir2json/src/lib\.rs:[0-9]+:74: replace 2 with 3 in convert_file_opts',
     # The CSR's capacity in the two constructors,
     # `SparseSynapseMatrix::new(neuron_count, 0)` made 1 (round 67's
     # pass): it sizes empty `Vec`s, and no value reads a capacity. Their
     # column, since `replace 0 with 1` names three more mutants in each.
-    'crates/neuralos-snn/src/network\.rs:[0-9]+:68: replace 0 with 1 in SpikingNeuralNetwork::new_with_voltage_resolution',
-    'crates/neuralos-snn/src/network\.rs:[0-9]+:68: replace 0 with 1 in SpikingNeuralNetwork::from_neurons',
+    'crates/gresil/src/network\.rs:[0-9]+:68: replace 0 with 1 in SpikingNeuralNetwork::new_with_voltage_resolution',
+    'crates/gresil/src/network\.rs:[0-9]+:68: replace 0 with 1 in SpikingNeuralNetwork::from_neurons',
     # `NirName::new`'s padding, `[0u8; Self::CAP]` made `1u8` (round 68's
     # pass): only the derived equality reads the bytes past the kept
     # ones, and every name is built by `new`, so any two pad alike.
-    'crates/neuralos-snn/src/nir\.rs:[0-9]+:26: replace 0u8 with 1u8 in NirName::new',
+    'crates/gresil/src/nir\.rs:[0-9]+:26: replace 0u8 with 1u8 in NirName::new',
 ]

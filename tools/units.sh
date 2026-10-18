@@ -37,7 +37,7 @@ mu=$'\xc2\xb5'      # U+00B5 MICRO SIGN
 greek=$'\xce\xbc'   # U+03BC GREEK SMALL LETTER MU
 pat="${mu}A|${greek}A|(^|[^[:alpha:]])uA([^[:alpha:]]|$)|[0-9]ua([^[:alpha:]]|$)|_ua([^[:alnum:]]|$)|_UA([^[:alnum:]]|$)|[Mm]icroamp"
 
-readme=crates/neuralos-snn/README.md
+readme=crates/gresil/README.md
 allowed=(
   'microamps, u32 microseconds) — no floating point, no allocator in the'
   "One LIF neuron on the centi-mV grid, driven by a constant 160 ${greek}A at a"
@@ -46,7 +46,7 @@ allowed=(
 
 set +e
 hits=$(git grep --no-color -I -n -E -e "$pat" -- . \
-  ':!:crates/neuralos-rt/' ':!:crates/neuralos-snn/examples/ternary_*' \
+  ':!:crates/neuralos-rt/' ':!:crates/gresil/examples/ternary_*' \
   ':!:paper/' ':!:evidence/' ':!:ISA.md' ':!:docs/RESEARCH_LOG.md' \
   ':!:docs/releases/' ":!:$readme" ':!:tools/units.sh')
 rc=$?

@@ -7,17 +7,17 @@ use core::panic::PanicInfo;
 use core::ptr::{read_volatile, write_volatile};
 use core::sync::atomic::{AtomicU32, Ordering};
 
-use neuralos_snn::bridge::{
+use gresil::bridge::{
     decode_i2_s, decode_q1_0, decode_q2_0, encode_i2_s, encode_q2_0, half_to_f32_bits,
     half_to_milli, i2_s_encoded_len, q2_0_encoded_len, repack_i2s_to_kernel,
     wire_gamma_to_substrate, I2_S_BLOCK, Q1_0_BLOCK, Q2_0_BLOCK,
 };
-use neuralos_snn::kernel::{absmax_normalize_q15, pack_trits, ternary_matvec, unpack_trit};
-use neuralos_snn::lif_neuron::{LIFNeuron, NeuronType, VoltageResolution};
-use neuralos_snn::nir::{quantize_lif, quantize_linear, NirError, NirImportOptions, NirLinear};
-use neuralos_snn::synapse::{STDPRule, Synapse, SCALE};
-use neuralos_snn::trit::{project_to_ternary, stochastic_ternary_flip, tensor_scale, Trit};
-use neuralos_snn::Error;
+use gresil::kernel::{absmax_normalize_q15, pack_trits, ternary_matvec, unpack_trit};
+use gresil::lif_neuron::{LIFNeuron, NeuronType, VoltageResolution};
+use gresil::nir::{quantize_lif, quantize_linear, NirError, NirImportOptions, NirLinear};
+use gresil::synapse::{STDPRule, Synapse, SCALE};
+use gresil::trit::{project_to_ternary, stochastic_ternary_flip, tensor_scale, Trit};
+use gresil::Error;
 
 const UART_BASE: usize = 0x1000_0000;
 const SIFIVE_TEST: usize = 0x0010_0000;
@@ -150,9 +150,9 @@ fn lin_sentinel() -> NirLinear {
 pub extern "C" fn rust_main() -> ! {
     let _ = writeln!(
         Uart,
-        "neuralos-snn Leg A: bare-metal riscv64gc-unknown-none-elf, QEMU virt, no allocator"
+        "gresil Leg A: bare-metal riscv64gc-unknown-none-elf, QEMU virt, no allocator"
     );
-    let _ = writeln!(Uart, "cited asserts: values mirrored from crates/neuralos-snn unit tests");
+    let _ = writeln!(Uart, "cited asserts: values mirrored from crates/gresil unit tests");
     lif_checks();
     synapse_checks();
     bridge_checks();

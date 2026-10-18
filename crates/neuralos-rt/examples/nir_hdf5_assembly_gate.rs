@@ -80,8 +80,8 @@ fn main() {
     );
 
     // ---- gate 2: HDF5 == JSON (cross-container contract) -----------
-    let json_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../neuralos-snn/tests/nir_fixtures/merge.json");
+    let json_path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../gresil/tests/nir_fixtures/merge.json");
     let json_bytes = std::fs::read(&json_path).unwrap_or_else(|e| {
         fail(&format!(
             "JSON fixture: {e} (regenerate via tools/gen_nir_fixtures.py)"

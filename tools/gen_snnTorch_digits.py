@@ -3,7 +3,7 @@
 for the NIR bridge's parity test.
 
 The one reference whose weights nobody chose.
-`crates/neuralos-nir2json/tests/parity.rs` converts the model as a
+`crates/gresil-nir2json/tests/parity.rs` converts the model as a
 stranger's `--sim-units` does, at snnTorch's 0.1 ms, holds each test digit's
 pixels as a current, `p` as `p/255` in thousandths, and compares each
 layer's spike trains and the class to snnTorch's own run of the trained
@@ -44,7 +44,7 @@ are part of the reference). Run:
 
     .nirenv/bin/python3 tools/gen_snnTorch_digits.py <out dir>
 
-Out, as committed: crates/neuralos-nir2json/tests/fixtures/parity/,
+Out, as committed: crates/gresil-nir2json/tests/fixtures/parity/,
 `digits.nir` and `digits.json`.
 """
 import json

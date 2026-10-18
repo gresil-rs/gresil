@@ -1756,6 +1756,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "gresil"
+version = "0.1.0-alpha.8"
+dependencies = [
+ "heapless",
+ "proptest",
+]
+
+[[package]]
+name = "gresil-nir2json"
+version = "0.1.0"
+dependencies = [
+ "gresil",
+ "hdf5-pure",
+ "serde_json",
+]
+
+[[package]]
+name = "gresil-scope"
+version = "0.1.0-alpha.8"
+dependencies = [
+ "gresil",
+ "slint",
+ "slint-build",
+]
+
+[[package]]
 name = "grid"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3046,39 +3072,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "neuralos-app"
-version = "0.1.0-alpha.8"
-dependencies = [
- "neuralos-snn",
- "slint",
- "slint-build",
-]
-
-[[package]]
-name = "neuralos-nir2json"
-version = "0.1.0"
-dependencies = [
- "hdf5-pure",
- "neuralos-snn",
- "serde_json",
-]
-
-[[package]]
 name = "neuralos-rt"
 version = "0.1.0-alpha.8"
 dependencies = [
+ "gresil",
  "hdf5",
  "hdf5-sys",
  "ndarray",
- "neuralos-snn",
-]
-
-[[package]]
-name = "neuralos-snn"
-version = "0.1.0-alpha.8"
-dependencies = [
- "heapless",
- "proptest",
 ]
 
 [[package]]

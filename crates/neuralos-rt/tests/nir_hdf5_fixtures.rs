@@ -99,7 +99,7 @@ fn hdf5_matches_the_json_path_record_for_record() {
         .expect("import");
     let json_doc = std::fs::read_to_string(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../neuralos-snn/tests/nir_fixtures/chain_population.json"),
+            .join("../gresil/tests/nir_fixtures/chain_population.json"),
     )
     .expect("json fixture");
     let js = NirImport::from_json(

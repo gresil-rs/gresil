@@ -8,8 +8,8 @@
 // _stack_start" and friends). A build-script link-arg survives any
 // environment.
 //
-// The stranger slot (PR H): NEURALOS_GRAPH names a module written by
-// `neuralos-nir2json --freeze`; a relative path resolves against this
+// The stranger slot (PR H): GRESIL_GRAPH names a module written by
+// `gresil-nir2json --freeze`; a relative path resolves against this
 // crate's directory, cargo's cwd for a build script, and stranger.sh
 // exports an absolute one. This script copies it into OUT_DIR as
 // graph.rs with one line more, `pub use self::<name> as graph;`, and sets
@@ -39,9 +39,9 @@ fn main() {
 /// rerun guard, and the cfg declared, since an undeclared cfg fires
 /// `unexpected_cfgs`, which CI's `-D warnings` makes an error.
 fn stranger_slot() {
-    println!("cargo:rerun-if-env-changed=NEURALOS_GRAPH");
+    println!("cargo:rerun-if-env-changed=GRESIL_GRAPH");
     println!("cargo:rustc-check-cfg=cfg(stranger)");
-    let Some(given) = env::var_os("NEURALOS_GRAPH") else {
+    let Some(given) = env::var_os("GRESIL_GRAPH") else {
         return;
     };
     let path = fs::canonicalize(&given).unwrap_or_else(|e| fail(Path::new(&given), &e.to_string()));
@@ -56,7 +56,7 @@ fn stranger_slot() {
         fail(
             &path,
             &format!(
-                "{} lines `pub mod <name> {{`, not one: not a `neuralos-nir2json --freeze` module",
+                "{} lines `pub mod <name> {{`, not one: not a `gresil-nir2json --freeze` module",
                 names.len()
             ),
         );
@@ -73,6 +73,6 @@ fn stranger_slot() {
 
 /// A hard build error that names the path.
 fn fail(path: &Path, why: &str) -> ! {
-    eprintln!("NEURALOS_GRAPH: {}: {why}", path.display());
+    eprintln!("GRESIL_GRAPH: {}: {why}", path.display());
     exit(1);
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The parity references: snnTorch's own spikes, for the NIR bridge's test.
 
-`crates/neuralos-nir2json/tests/parity.rs` converts each graph here as a
+`crates/gresil-nir2json/tests/parity.rs` converts each graph here as a
 stranger's `--sim-units` does, at snnTorch's 0.1 ms, and holds every neuron's
 spike train to snnTorch's, step for step. This script makes both halves with
 snnTorch 1.0 itself: each graph through its own `export_to_nir`
@@ -53,7 +53,7 @@ Stack (of record): the repo's .nirenv, snntorch 1.0.0 · nir
 
     .nirenv/bin/python3 tools/gen_snnTorch_parity.py <out dir>
 
-Out, as committed: crates/neuralos-nir2json/tests/fixtures/parity/
+Out, as committed: crates/gresil-nir2json/tests/fixtures/parity/
 """
 import json
 import os

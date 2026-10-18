@@ -5,28 +5,28 @@
 # The crate README says, § Modules, that every example in the crate's
 # docs imports each name by its shortest public path. The root
 # re-exports a few names, read here from the `pub use` statements of
-# crates/neuralos-snn/src/lib.rs, so a new re-export extends the check.
+# crates/gresil/src/lib.rs, so a new re-export extends the check.
 # Each root name has two public paths, and so has what a `use` reaches
 # through one, a root enum's variant. The check assumes no other name
 # has two, which holds while the crate's other `pub use` statements
 # re-export from private modules. So the sentence breaks where a path
-# runs through a root name's module: `neuralos_snn::nir::NirImport` for
-# `neuralos_snn::NirImport`, or
-# `neuralos_snn::lif_neuron::NeuronType::Excitatory` for
-# `neuralos_snn::NeuronType::Excitatory`.
-# Read: each `use neuralos_snn::…;` statement, its lines joined and its
+# runs through a root name's module: `gresil::nir::NirImport` for
+# `gresil::NirImport`, or
+# `gresil::lif_neuron::NeuronType::Excitatory` for
+# `gresil::NeuronType::Excitatory`.
+# Read: each `use gresil::…;` statement, its lines joined and its
 # groups flattened, in
-#   - the doc lines of crates/neuralos-snn/src (`///` and `//!`, the
+#   - the doc lines of crates/gresil/src (`///` and `//!`, the
 #     hidden `# ` lines too), where the crate doc's examples are;
 #   - the crate README, which is the crate doc;
-#   - crates/neuralos-snn/examples, the programs the package ships, their
+#   - crates/gresil/examples, the programs the package ships, their
 #     doc lines too.
 # Not read: tests/, even a file an example compiles from it (`trace`
 # takes tests/traces/cases.rs by `#[path]`), the other crates, a path
 # outside a `use` statement, and a glob import (`use …::*;`), which
 # names nothing. Not seen: a `use` after another statement or an
 # attribute on its line (`#[allow(…)] use …;`), a crate alias
-# (`use neuralos_snn as snn;`), and a block doc comment (`/** … */`).
+# (`use gresil as snn;`), and a block doc comment (`/** … */`).
 # Run from anywhere in the repo. Exit 1 on a hit, each printed as
 # file:line:text with the root path; exit 2 when `git grep` fails,
 # lib.rs gives no root name, re-exports a glob or names a path that is
@@ -36,7 +36,7 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 export LC_ALL=C
 
-crate=crates/neuralos-snn
+crate=crates/gresil
 lib=$crate/src/lib.rs
 
 # trim TEXT: TEXT without its leading and trailing blanks, in $trimmed.
@@ -107,13 +107,13 @@ while IFS= read -r line || [ -n "$line" ]; do
   body=${body#crate::}
   body=${body#self::}
   paths=()
-  flatten neuralos_snn "$body"
+  flatten gresil "$body"
   for p in "${paths[@]}"; do
-    if ! [[ $p =~ ^neuralos_snn(::[A-Za-z_][A-Za-z0-9_]*)+$ ]]; then
-      echo "$lib: \`pub use $body;\` names \`${p#neuralos_snn::}\`, which is not a path of identifiers" >&2
+    if ! [[ $p =~ ^gresil(::[A-Za-z_][A-Za-z0-9_]*)+$ ]]; then
+      echo "$lib: \`pub use $body;\` names \`${p#gresil::}\`, which is not a path of identifiers" >&2
       exit 2
     fi
-    root[$p]=neuralos_snn::${p##*::}
+    root[$p]=gresil::${p##*::}
   done
   if [[ $body == *'*'* ]]; then
     echo "$lib: \`pub use $body;\` re-exports a glob, whose names the check cannot read" >&2
@@ -142,7 +142,7 @@ grep_lines() {
 
 hits=
 declare -A statements=() imported=()
-start='^[[:space:]]*(pub([[:space:]]*\([^)]*\))?[[:space:]]+)?use[[:space:]]+(::)?neuralos_snn::'
+start='^[[:space:]]*(pub([[:space:]]*\([^)]*\))?[[:space:]]+)?use[[:space:]]+(::)?gresil::'
 docline='^[[:space:]]*//(/([^/]|$)|!)'
 
 # scan KEY PLACE: reads the `file:line:text` records in $out and counts
@@ -181,7 +181,7 @@ scan() {
       [[ $code =~ $start ]] || continue
       open=1
       sfile=$file
-      stext=${code#*neuralos_snn::}
+      stext=${code#*gresil::}
       slines=()
     else
       stext+=" $code"
@@ -194,7 +194,7 @@ scan() {
     body=${stext%%;*}
     statements[$key]=$((statements[$key] + 1))
     paths=()
-    flatten neuralos_snn "$body"
+    flatten gresil "$body"
     imported[$key]=$((imported[$key] + ${#paths[@]}))
     for p in "${paths[@]}"; do
       # p, or its start: a root enum's variant reached through the
@@ -222,7 +222,7 @@ scan() {
     exit 2
   fi
   if [ "${statements[$key]}" -eq 0 ]; then
-    echo "no \`use neuralos_snn::…;\` statement in $place: the scan read nothing" >&2
+    echo "no \`use gresil::…;\` statement in $place: the scan read nothing" >&2
     exit 2
   fi
 }

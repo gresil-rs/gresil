@@ -16,11 +16,11 @@
 # One deliberate difference from the job: it runs in a scratch worktree
 # and target dir (the clean-build proof; the job builds in place on one
 # cache). The environment is the job's: RUSTFLAGS="-D warnings" from
-# both workflow files' top-level env block, NEURALOS_REQUIRE_AVX2=1
+# both workflow files' top-level env block, GRESIL_REQUIRE_AVX2=1
 # from the per-commit step's own env, so a rustc warning is red here
 # exactly as it is there.
 #
-# Scratch: $NEURALOS_PERCOMMIT_SCRATCH, default .percommit/ at the repo
+# Scratch: $GRESIL_PERCOMMIT_SCRATCH, default .percommit/ at the repo
 # root (gitignored). The worktree is removed on exit; the target dir is
 # kept so the next run is incremental. Every gate's output goes to
 # $scratch/gate.out; on red the last 40 lines are printed and the script
@@ -36,13 +36,13 @@ set -euo pipefail
 
 repo=$(git rev-parse --show-toplevel)
 range=${1:-main..HEAD}
-scratch=${NEURALOS_PERCOMMIT_SCRATCH:-$repo/.percommit}
+scratch=${GRESIL_PERCOMMIT_SCRATCH:-$repo/.percommit}
 wt=$scratch/wt
 mkdir -p "$scratch"
 
 export CARGO_TARGET_DIR=$scratch/target
 export RUSTFLAGS="-D warnings"
-export NEURALOS_REQUIRE_AVX2=1
+export GRESIL_REQUIRE_AVX2=1
 export PATH="$repo/.nirenv/bin:$PATH"
 
 commits=$(git -C "$repo" rev-list --reverse "$range")
@@ -101,38 +101,38 @@ for c in $commits; do
   run cargo check --workspace --all-targets
   run cargo test --workspace
   run cargo clippy --workspace --all-targets -- -D warnings
-  run cargo test -p neuralos-snn
-  run cargo clippy -p neuralos-snn --all-targets -- -D warnings
-  run cargo build --no-default-features -p neuralos-snn
-  run cargo build --no-default-features --features unstable-stdp -p neuralos-snn
-  run cargo build --no-default-features --features unstable-bridge -p neuralos-snn
+  run cargo test -p gresil
+  run cargo clippy -p gresil --all-targets -- -D warnings
+  run cargo build --no-default-features -p gresil
+  run cargo build --no-default-features --features unstable-stdp -p gresil
+  run cargo build --no-default-features --features unstable-bridge -p gresil
   # the freezer without std (round 51): the same two lines as the
   # per-commit job.
   run rustup target add riscv32imc-unknown-none-elf
-  run cargo check -p neuralos-snn --lib --no-default-features --features unstable-freeze --target riscv32imc-unknown-none-elf
+  run cargo check -p gresil --lib --no-default-features --features unstable-freeze --target riscv32imc-unknown-none-elf
   # the starter set's two no_std examples on the same target (round 69):
   # the same line as the per-commit job.
-  run cargo check -p neuralos-snn --example board --example learner --no-default-features --features unstable-stdp --target riscv32imc-unknown-none-elf
-  run env RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib
-  run env RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --no-default-features
-  run env RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --features simd
-  run env RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --features unstable-stdp
-  run env RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --features unstable-bridge
-  run env RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --features unstable-freeze
-  run cargo test -p neuralos-snn --features simd
-  run cargo clippy -p neuralos-snn --features simd --all-targets -- -D warnings
+  run cargo check -p gresil --example board --example learner --no-default-features --features unstable-stdp --target riscv32imc-unknown-none-elf
+  run env RUSTFLAGS= cargo +1.92.0 check -p gresil --lib
+  run env RUSTFLAGS= cargo +1.92.0 check -p gresil --lib --no-default-features
+  run env RUSTFLAGS= cargo +1.92.0 check -p gresil --lib --features simd
+  run env RUSTFLAGS= cargo +1.92.0 check -p gresil --lib --features unstable-stdp
+  run env RUSTFLAGS= cargo +1.92.0 check -p gresil --lib --features unstable-bridge
+  run env RUSTFLAGS= cargo +1.92.0 check -p gresil --lib --features unstable-freeze
+  run cargo test -p gresil --features simd
+  run cargo clippy -p gresil --features simd --all-targets -- -D warnings
   # simd off x86 (round 50): the same two lines as the per-commit job.
   run rustup target add riscv64gc-unknown-linux-musl
-  run cargo check -p neuralos-snn --lib --features simd --target riscv64gc-unknown-linux-musl
-  run env RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps
-  run env RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --features simd
-  run env RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --features unstable-stdp
-  run env RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --features unstable-bridge
-  run env RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --features unstable-freeze
-  run env RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --no-default-features
-  run env RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --no-default-features --features unstable-stdp
-  run env RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --no-default-features --features unstable-bridge
-  run cargo test -p neuralos-snn --release --features simd -- --include-ignored
+  run cargo check -p gresil --lib --features simd --target riscv64gc-unknown-linux-musl
+  run env RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps
+  run env RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --features simd
+  run env RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --features unstable-stdp
+  run env RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --features unstable-bridge
+  run env RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --features unstable-freeze
+  run env RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --no-default-features
+  run env RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --no-default-features --features unstable-stdp
+  run env RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --no-default-features --features unstable-bridge
+  run cargo test -p gresil --release --features simd -- --include-ignored
   run cargo test -p neuralos-rt --features hdf5
   run cargo run -p neuralos-rt --features hdf5 --example nir_hdf5_gate
   run cargo clippy -p neuralos-rt --features hdf5 --all-targets -- -D warnings
@@ -165,7 +165,7 @@ for c in $commits; do
   # valid. Its target dir, firmware/esp32c3/target/stranger, lives in
   # the scratch worktree, so it builds cold once per run.
   if [ -f firmware/esp32c3/stranger.sh ]; then
-    run firmware/esp32c3/stranger.sh build crates/neuralos-nir2json/tests/fixtures/community/snnTorch_two_layer.nir
+    run firmware/esp32c3/stranger.sh build crates/gresil-nir2json/tests/fixtures/community/snnTorch_two_layer.nir
   else
     echo "(no firmware/esp32c3/stranger.sh at this commit)"
   fi

@@ -3,12 +3,12 @@
 version = 4
 
 [[package]]
-name = "neuralos-snn"
+name = "gresil"
 version = "0.1.0-alpha.8"
 
 [[package]]
 name = "qemu-riscv-leg-a"
 version = "0.1.0"
 dependencies = [
- "neuralos-snn",
+ "gresil",
 ]

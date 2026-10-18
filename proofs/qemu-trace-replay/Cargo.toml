@@ -12,7 +12,7 @@ description = "The frozen traces under QEMU riscv64gc, bare metal: every plastic
 [workspace]
 
 [dependencies]
-neuralos-snn = { path = "../../crates/neuralos-snn", default-features = false }
+gresil = { path = "../../crates/gresil", default-features = false }
 
 [profile.dev]
 panic = "abort"

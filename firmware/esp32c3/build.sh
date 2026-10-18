@@ -35,7 +35,7 @@ else
 fi
 
 # CARGO_TARGET_DIR is honored (tools/percommit.sh sets it to its scratch).
-elf=${CARGO_TARGET_DIR:-$here/target}/riscv32imc-unknown-none-elf/release/neuralos-esp32c3
+elf=${CARGO_TARGET_DIR:-$here/target}/riscv32imc-unknown-none-elf/release/gresil-esp32c3
 case ${1:-build} in
   build)
     # The app-descriptor stamp: its build script has no env rerun guard

@@ -1,4 +1,4 @@
-//! A LIF neuron and a `FixedNetwork` from `neuralos-snn` on an ESP32-C3.
+//! A LIF neuron and a `FixedNetwork` from `gresil` on an ESP32-C3.
 //!
 //! What it does, in order, once esp-hal's init has run and the stack below
 //! `main`'s frame is painted (the mark, step 3):
@@ -27,7 +27,7 @@
 //!    stranger's gate.
 //! 3. replay: every frozen case (`for_each_frozen!`), its trace's header
 //!    line, then its rows through the library's writer
-//!    (`neuralos_snn::trace::row`) into `esp_println::Printer`; then, in
+//!    (`gresil::trace::row`) into `esp_println::Printer`; then, in
 //!    a build that names a stranger's graph, that graph the same way; then
 //!    one end line, `# neuralos-trace end`.
 //!    `tools/esp32c3_trace_diff.py` diffs a capture against
@@ -66,8 +66,8 @@
 //! `.cargo/config.toml`, linker script from `build.rs`). Flash + monitor:
 //! `cargo run --release`, a plain dev build with no remap; a release asset
 //! comes from `build.sh` only (evidence README § Release asset). The
-//! stranger slot: `build.rs` reads `NEURALOS_GRAPH`, the path of a
-//! `neuralos-nir2json --freeze` module, and adds it to the replay
+//! stranger slot: `build.rs` reads `GRESIL_GRAPH`, the path of a
+//! `gresil-nir2json --freeze` module, and adds it to the replay
 //! (`cfg(stranger)`; the rules are in its header); unset, the build is the
 //! default one.
 
@@ -80,21 +80,21 @@ use esp_hal::gpio::{Level, Output, OutputConfig};
 use esp_hal::main;
 use esp_hal::time::Instant;
 use esp_println::{println, Printer};
-use neuralos_snn::lif_neuron::{LIFNeuron, NeuronType, VoltageResolution};
-use neuralos_snn::trace::row;
-use neuralos_snn::FixedNetwork;
+use gresil::lif_neuron::{LIFNeuron, NeuronType, VoltageResolution};
+use gresil::trace::row;
+use gresil::FixedNetwork;
 
 // The frozen cases, by path into the library's tests directory: the
 // arrays are the cases' derivative and live with them, so the library's
 // package stays self-contained. rustfmt leaves the generated file as
 // written (its head says why). Their rows go through the library's one
-// row writer, `neuralos_snn::trace::row`.
+// row writer, `gresil::trace::row`.
 #[rustfmt::skip]
-#[path = "../../../crates/neuralos-snn/tests/traces/frozen.rs"]
+#[path = "../../../crates/gresil/tests/traces/frozen.rs"]
 mod frozen;
 
-// The stranger slot: a `neuralos-nir2json --freeze` module, in a build
-// that names one in NEURALOS_GRAPH. build.rs copies it into OUT_DIR as
+// The stranger slot: a `gresil-nir2json --freeze` module, in a build
+// that names one in GRESIL_GRAPH. build.rs copies it into OUT_DIR as
 // graph.rs with one line more, `pub use self::<name> as graph;`, and sets
 // `cfg(stranger)` (its header carries the rules). Two allows. dead_code is
 // the one frozen.rs carries and the freezer's module does not: the replay
@@ -256,7 +256,7 @@ fn main() -> ! {
     let delay = Delay::new();
 
     println!(
-        "neuralos-esp32c3: LIF neuron, centi-mV grid, dt={} us, input={} pA",
+        "gresil-esp32c3: LIF neuron, centi-mV grid, dt={} us, input={} pA",
         DT_US, INPUT_PA
     );
 

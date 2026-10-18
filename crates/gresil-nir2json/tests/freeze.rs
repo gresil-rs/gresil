@@ -1,0 +1,357 @@
+//! `--freeze` on the reference witness, `two_lif_neurons.nir` under
+//! `--sim-units`, with the default drive (feature 1, 150 steps) at the
+//! default step, 0.1 ms, which `--dt` overrides. The
+//! library's trace case `two-lif-neurons` runs the same graph on the same
+//! drive, so the tool's trace is that file line for line and its module
+//! the case's frozen module, the header's kind aside. The module then
+//! compiles in a scratch crate against the `no_std` library, and
+//! `FixedNetwork`, stepping its arrays, prints the tool's trace. A graph
+//! that does not assemble is refused by name, and nothing is written.
+
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+/// A path from the repository root.
+fn repo(path: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(path)
+}
+
+/// A scratch directory under the target dir, empty, with a `src/`.
+fn scratch(name: &str) -> PathBuf {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(dir.join("src")).expect("the scratch directory");
+    dir
+}
+
+/// The first line where two texts part, or `None`.
+fn first_difference(have: &str, want: &str) -> Option<(usize, String, String)> {
+    let (mut a, mut b) = (have.lines(), want.lines());
+    for n in 1.. {
+        match (a.next(), b.next()) {
+            (None, None) => return None,
+            (x, y) if x != y => {
+                return Some((n, x.unwrap_or("<end>").into(), y.unwrap_or("<end>").into()));
+            }
+            _ => {}
+        }
+    }
+    unreachable!()
+}
+
+/// The scratch crate's program: the frozen module stepped by
+/// `FixedNetwork`, its header and rows written by the library's writer,
+/// as the firmware steps a frozen case.
+const MAIN: &str = r#"use gresil::trace::row;
+use gresil::FixedNetwork;
+
+include!("two_lif_neurons.rs");
+
+fn main() {
+    use two_lif_neurons as c;
+    let mut net = FixedNetwork::<{ c::N }, { c::S }>::new(c::NEURONS, c::SYNAPSES, c::DT_US);
+    let mut fired = [false; c::N];
+    let mut text = format!("{}\n", c::HEADER);
+    let mut step = 0u32;
+    for &(count, input) in c::DRIVE {
+        for _ in 0..count {
+            let time_us = net.time_us();
+            net.step(&input, &mut fired);
+            if !c::SPIKES_ONLY || fired.contains(&true) {
+                row(&mut text, step, time_us, &fired, net.neurons()).expect("a String takes every write");
+            }
+            step += 1;
+        }
+    }
+    assert_eq!(step, c::STEPS, "the drive covers the run");
+    print!("{text}");
+}
+"#;
+
+#[test]
+fn freeze_writes_the_witness_as_the_library_freezes_it() {
+    let dir = scratch("freeze-two-lif");
+    let module = dir.join("src/two_lif_neurons.rs");
+    let out = Command::new(env!("CARGO_BIN_EXE_gresil-nir2json"))
+        .arg("--sim-units")
+        .arg("--freeze")
+        .arg(&module)
+        .arg(repo(
+            "crates/gresil-nir2json/tests/fixtures/community/two_lif_neurons.nir",
+        ))
+        .arg(dir.join("two_lif_neurons.json"))
+        .output()
+        .expect("the binary runs");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // the trace: the case's file, line for line, under a stranger's kind
+    let trace = fs::read_to_string(dir.join("src/two_lif_neurons.trace")).expect("the trace");
+    let case = fs::read_to_string(repo("crates/gresil/tests/traces/two-lif-neurons.trace"))
+        .expect("the case's trace");
+    let want = case.replacen("kind=regression", "kind=stranger", 1);
+    if let Some((n, have, want)) = first_difference(&trace, &want) {
+        panic!(
+            "the tool's trace parts from two-lif-neurons.trace at line {n}:\n  tool: {have}\n  case: {want}"
+        );
+    }
+
+    // the module: the case's frozen module, one writer, the kind aside
+    let frozen =
+        fs::read_to_string(repo("crates/gresil/tests/traces/frozen.rs")).expect("frozen.rs");
+    let start = frozen
+        .find("pub mod two_lif_neurons {")
+        .expect("the frozen case");
+    let end = start + frozen[start..].find("\n}\n").expect("its end") + "\n}\n".len();
+    let written = fs::read_to_string(&module).expect("the module");
+    assert_eq!(
+        written,
+        frozen[start..end].replacen("kind=regression", "kind=stranger", 1),
+        "the tool's module is the frozen case's"
+    );
+
+    // the scratch build: the module compiles against the no_std library,
+    // and FixedNetwork steps its arrays to the tool's trace
+    fs::write(
+        dir.join("Cargo.toml"),
+        format!(
+            "[package]\nname = \"freeze-scratch\"\nversion = \"0.0.0\"\nedition = \"2021\"\npublish = false\n\n\
+             [workspace]\n\n[dependencies]\ngresil = {{ path = {:?}, default-features = false }}\n",
+            repo("crates/gresil").display().to_string()
+        ),
+    )
+    .expect("the scratch manifest");
+    fs::write(dir.join("src/main.rs"), MAIN).expect("the scratch program");
+    let run = Command::new(env!("CARGO"))
+        .args(["run", "--quiet", "--offline", "--manifest-path"])
+        .arg(dir.join("Cargo.toml"))
+        .env(
+            "CARGO_TARGET_DIR",
+            Path::new(env!("CARGO_TARGET_TMPDIR")).join("freeze-scratch-target"),
+        )
+        .output()
+        .expect("cargo runs");
+    assert!(
+        run.status.success(),
+        "the scratch build: {}",
+        String::from_utf8_lossy(&run.stderr)
+    );
+    let stepped = String::from_utf8(run.stdout).expect("utf-8");
+    if let Some((n, have, want)) = first_difference(&stepped, &trace) {
+        panic!(
+            "FixedNetwork on the module's arrays parts from the tool's trace at line {n}:\n  fixed: {have}\n  tool:  {want}"
+        );
+    }
+}
+
+#[test]
+fn freeze_refuses_by_name_and_writes_nothing() {
+    let dir = scratch("freeze-refusals");
+    let run = |nir: &str, extra: &[&str], name: &str| {
+        Command::new(env!("CARGO_BIN_EXE_gresil-nir2json"))
+            .args(extra)
+            .arg("--freeze")
+            .arg(dir.join(format!("{name}.rs")))
+            .arg(repo(&format!(
+                "crates/gresil-nir2json/tests/fixtures/community/{nir}"
+            )))
+            .arg(dir.join(format!("{name}.json")))
+            .output()
+            .expect("the binary runs")
+    };
+
+    // no LIF at all: the library's named refusal, exit 2
+    let out = run("snnTorch_linear_head.nir", &[], "head");
+    assert_eq!(out.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("encoder-only"), "names why: {stderr}");
+
+    // one input feature, two values: a usage error, exit 1
+    let out = run(
+        "two_lif_neurons.nir",
+        &["--sim-units", "--input", "1,2"],
+        "two",
+    );
+    assert_eq!(out.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("--input gives 2 values"), "{stderr}");
+
+    for name in ["head", "two"] {
+        for ext in ["rs", "trace", "json", "json.meta.json"] {
+            let path = dir.join(format!("{name}.{ext}"));
+            assert!(!path.exists(), "nothing written: {}", path.display());
+        }
+    }
+}
+
+#[test]
+fn dt_sets_the_step_and_refuses_zero() {
+    let dir = scratch("freeze-dt");
+    let run = |dt: &str| {
+        Command::new(env!("CARGO_BIN_EXE_gresil-nir2json"))
+            .args(["--sim-units", "--dt", dt, "--freeze"])
+            .arg(dir.join("src/two_lif_neurons.rs"))
+            .arg(repo(
+                "crates/gresil-nir2json/tests/fixtures/community/two_lif_neurons.nir",
+            ))
+            .arg(dir.join("two_lif_neurons.json"))
+            .output()
+            .expect("the binary runs")
+    };
+    let out = run("1000");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let trace = fs::read_to_string(dir.join("src/two_lif_neurons.trace")).expect("the trace");
+    let header = trace.lines().next().expect("a header line");
+    assert!(
+        header.contains(" dt_us=1000 "),
+        "--dt 1000 overrides the 0.1 ms default: {header}"
+    );
+    assert_eq!(run("0").status.code(), Some(1), "--dt 0 is a usage error");
+}
+
+#[test]
+fn a_drive_file_freezes_its_runs_and_the_sidecar_carries_the_report() {
+    let dir = scratch("freeze-drive");
+    let run_file = |file: &str| {
+        Command::new(env!("CARGO_BIN_EXE_gresil-nir2json"))
+            .args(["--sim-units", "--freeze"])
+            .arg(dir.join("src/snntorch_two_layer.rs"))
+            .arg("--drive")
+            .arg(dir.join(file))
+            .arg(repo(
+                "crates/gresil-nir2json/tests/fixtures/community/snnTorch_two_layer.nir",
+            ))
+            .arg(dir.join("snntorch_two_layer.json"))
+            .output()
+            .expect("the binary runs")
+    };
+    let run = |drive: &str| {
+        fs::write(dir.join("drive.txt"), drive).expect("the drive file");
+        run_file("drive.txt")
+    };
+    let out = run("# a burst, then quiet\n10 1\n40 0\n");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let module = fs::read_to_string(dir.join("src/snntorch_two_layer.rs")).expect("the module");
+    assert!(
+        module.contains("        (10, [1000, 0]),\n        (40, [0, 0]),\n"),
+        "{module}"
+    );
+    let trace = fs::read_to_string(dir.join("src/snntorch_two_layer.trace")).expect("the trace");
+    assert_eq!(trace.lines().count(), 51, "the header and 50 rows");
+    let sidecar =
+        fs::read_to_string(dir.join("snntorch_two_layer.json.meta.json")).expect("the sidecar");
+    assert!(
+        sidecar.contains("\"assembly\":{\"neurons\":2,\"synapses\":1,"),
+        "{sidecar}"
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("(module snntorch_two_layer: 2 neurons, 1 synapse, 50 steps)"),
+        "the counts it prints, each noun plural but for one: {stdout}"
+    );
+
+    let out = run("10 1\n40\n");
+    assert_eq!(out.status.code(), Some(1), "a line that does not read");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("drive.txt: line 2:"), "{stderr}");
+
+    let out = run("4294967295 1\n1 1\n");
+    assert_eq!(out.status.code(), Some(1), "more steps than a u32 counts");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("more steps than a trace counts"),
+        "{stderr}"
+    );
+
+    let out = run("10 1,1\n");
+    assert_eq!(out.status.code(), Some(1), "a run of the wrong length");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains(
+            "drive.txt: run 1 gives 2 values; the graph has 1 input feature, one value each"
+        ),
+        "{stderr}"
+    );
+
+    // a value in thousandths: 0.5 through a weight of 1.0, 500 quanta
+    let out = run("10 0.5\n");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let module = fs::read_to_string(dir.join("src/snntorch_two_layer.rs")).expect("the module");
+    assert!(module.contains("        (10, [500, 0]),\n"), "{module}");
+
+    let out = run("10 0.0005\n");
+    assert_eq!(out.status.code(), Some(1), "four decimals");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("drive.txt: line 1:"), "{stderr}");
+
+    let out = run_file("no-such-drive.txt");
+    assert_eq!(out.status.code(), Some(1), "a missing drive file");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("cannot read"), "{stderr}");
+}
+
+#[test]
+fn freeze_drives_each_bias_input_and_names_it() {
+    // two biased Affines under --sim-units (the converter's generator):
+    // the summary and the sidecar name each bias input and its start, and
+    // the one run of three steps splits where c/bias starts
+    let dir = scratch("freeze-bias");
+    let out = Command::new(env!("CARGO_BIN_EXE_gresil-nir2json"))
+        .args(["--sim-units", "--freeze"])
+        .arg(dir.join("src/affine.rs"))
+        .args(["--steps", "3"])
+        .arg(repo(
+            "crates/gresil-nir2json/tests/fixtures/affine_two_layer.nir",
+        ))
+        .arg(dir.join("affine.json"))
+        .output()
+        .expect("the binary runs");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    for line in [
+        "  bias input : a/bias, 1 from step 0\n",
+        "  bias input : c/bias, 1 from step 1\n",
+        "(module affine: 5 neurons, 6 synapses, 3 steps)",
+    ] {
+        assert!(stdout.contains(line), "{line:?} in {stdout}");
+    }
+    let sidecar = fs::read_to_string(dir.join("affine.json.meta.json")).expect("the sidecar");
+    assert!(
+        sidecar.contains("\"bias\":{\"a/bias\":0,\"c/bias\":1}"),
+        "{sidecar}"
+    );
+    let module = fs::read_to_string(dir.join("src/affine.rs")).expect("the module");
+    assert!(
+        module.contains(
+            "        (1, [300, 855, -250, 0, 0]),\n        (2, [300, 855, -250, 30, -10]),\n"
+        ),
+        "{module}"
+    );
+}

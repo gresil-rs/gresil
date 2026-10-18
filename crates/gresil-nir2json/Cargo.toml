@@ -1,0 +1,42 @@
+[package]
+# The inbound bridge: a stranger's NIR `.nir` (HDF5) → the snn JSON
+# schema. Leaf tool per the M1 step-4 amendment (2026-08-23).
+name = "gresil-nir2json"
+# Own version — deliberately NOT workspace-inherited (FIX-6): the tool
+# versions independently of the library.
+version = "0.1.0"
+edition = "2024"
+rust-version.workspace = true
+description = "Convert Neuromorphic Intermediate Representation (.nir, HDF5) files into the gresil JSON import schema — pure Rust, no C toolchain"
+license = "AGPL-3.0-or-later"
+# crates.io publish DEFERRED until after the step-7 demand measurement
+# (the one-way-door ruling, ISA 2026-08-23). Distribution: prebuilt
+# release binaries + `cargo install --git`.
+publish = false
+
+[[bin]]
+name = "gresil-nir2json"
+path = "src/main.rs"
+
+[dependencies]
+# Default features OFF: pure Rust, no C anywhere. `std` for the file
+# reader, `deflate` for gzip'd NIR datasets (flate2's rust backend,
+# crc32fast with it); the checksum, ndarray and serde opt-ins stay out.
+# `cargo tree -p gresil-nir2json -e normal` lists what arrives.
+hdf5-pure = { version = "0.39.0", default-features = false, features = ["std", "deflate"] }
+# REGISTRY-VS-PATH (the amendment's manifest comment): `version` +
+# `path` — inside the workspace, and for `cargo install --git`
+# strangers (who receive the whole repo), the PATH resolves and the
+# tool builds against the tree it ships with. A FUTURE crates.io
+# publish of this tool would resolve the version requirement against
+# the registry instead — post-alpha spine API breaks then require a
+# spine republish before the tool's next semver-honest release.
+# The requirement follows the workspace version (0.1.0-alpha.8 since PR
+# G); the path wins here, and --freeze needs the tree's fixed::freeze,
+# behind the library's `unstable-freeze` since round 51.
+gresil = { version = "0.1.0-alpha.8", path = "../gresil", features = ["unstable-freeze"] }
+
+[dev-dependencies]
+# Tests only — never shipped: value-level comparison of converted
+# documents (the f32-twin oracle) and structural assertions.
+serde_json = "1"

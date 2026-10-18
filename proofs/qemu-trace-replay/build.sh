@@ -7,7 +7,7 @@
 # (tools/esp32c3_trace_diff.py), so a wrong writer is red, not trusted.
 # Green only if QEMU exits 0 (the test device's pass code, written after
 # the end line) and the diff's last line is "N cases, 0 red", N the
-# plasticity-off traces of crates/neuralos-snn/tests/traces/ counted here
+# plasticity-off traces of crates/gresil/tests/traces/ counted here
 # from their header lines, as the diff reads them: every one replayed row
 # for row (12 at round 33, 14 since PR G). The tool takes `--trace` since
 # PR H; this proof never passes it. A trace file deleted from the
@@ -45,7 +45,7 @@ cargo build --release --locked
 
 # The count the diff must read: the tree's plasticity-off traces.
 want=0
-for trace in "$repo"/crates/neuralos-snn/tests/traces/*.trace; do
+for trace in "$repo"/crates/gresil/tests/traces/*.trace; do
   if head -1 "$trace" | grep -q ' plasticity=off '; then
     want=$((want + 1))
   fi

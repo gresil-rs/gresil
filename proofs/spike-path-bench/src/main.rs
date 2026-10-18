@@ -15,7 +15,7 @@
 //! then `min` and `median` per arm. Numbers only; the comparison across
 //! the two trees is made in the evidence README, not here.
 
-use neuralos_snn::{LIFNeuron, NeuronType, VoltageResolution};
+use gresil::{LIFNeuron, NeuronType, VoltageResolution};
 use std::hint::black_box;
 use std::time::Instant;
 
@@ -29,7 +29,7 @@ fn run(arm: &str, input_pa: i16, force: bool) -> Vec<f64> {
         let mut n = LIFNeuron::new(1, NeuronType::Excitatory, VoltageResolution::Millivolt);
         if force {
             n = n
-                .with_threshold(neuralos_snn::lif_neuron::MEMBRANE_MV_MIN)
+                .with_threshold(gresil::lif_neuron::MEMBRANE_MV_MIN)
                 .with_refractory_period_us(0);
         }
         let mut t: u32 = 0;

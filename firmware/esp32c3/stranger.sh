@@ -8,13 +8,13 @@
 # finds it. README.md beside this file is the stranger's page. --steps
 # goes with either phase, --port and --seconds with run alone.
 #
-# build: neuralos-nir2json --sim-units --freeze writes
+# build: gresil-nir2json --sim-units --freeze writes
 #   target/stranger/<stem>.{json,rs,trace} under this crate (gitignored
 #   by **/target/; the sidecar beside the JSON) with --steps N, the run
 #   the trace holds and the board replays, 150 unless given, which keeps
 #   a small graph's capture inside the default 20 s; then the capacity
 #   check below; then
-#   build.sh and build.sh clippy with NEURALOS_GRAPH=<the module> and
+#   build.sh and build.sh clippy with GRESIL_GRAPH=<the module> and
 #   CARGO_TARGET_DIR=<that directory>, so the remap, the personal-string
 #   gate, the shas, the canary and the lint apply to this configuration
 #   and the default artifact under target/ never moves; the ELF is
@@ -28,7 +28,7 @@
 #   is green only when the fragment before the reset carries no header:
 #   a reboot mid-replay is red by design, not a shorter compare.
 #
-# Paths. The root is resolved first, and NEURALOS_GRAPH and
+# Paths. The root is resolved first, and GRESIL_GRAPH and
 # CARGO_TARGET_DIR are exported absolute, since a relative one resolves
 # against whatever directory cargo is read from. The converter runs from
 # the root with the caller's target dir: under this crate,
@@ -115,7 +115,7 @@ mkdir -p "$out"
 
 # 1. The converter, from the root (the header says why), its paths
 #    repo-relative so its own lines print them that way.
-(cd "$repo" && cargo run --locked -p neuralos-nir2json -- --sim-units \
+(cd "$repo" && cargo run --locked -p gresil-nir2json -- --sim-units \
   --freeze "$(rel "$module")" --steps "$steps" "$(rel "$nir")" "$(rel "$out/$stem.json")")
 
 # 2. The capacity check (the header). 10# reads the counts as decimal.
@@ -136,12 +136,12 @@ echo "capacity: 44·$n + 6·$s = $bytes bytes of arrays, within the bar of 262,1
 
 # 3. The firmware with the graph in its slot, through build.sh.
 #    Assigned first: `echo "$(f)"` hides f's exit status (tools/remap.sh).
-export NEURALOS_GRAPH="$module"
+export GRESIL_GRAPH="$module"
 export CARGO_TARGET_DIR="$out"
 built=$("$here/build.sh")
 printf '%s\n' "$built"
 "$here/build.sh" clippy
-cp "$out/riscv32imc-unknown-none-elf/release/neuralos-esp32c3" "$elf"
+cp "$out/riscv32imc-unknown-none-elf/release/gresil-esp32c3" "$elf"
 elf_sha=$(sed -n 's/^elf  sha256 \([0-9a-f]\{64\}\) .*/\1/p' <<<"$built")
 text_sha=$(sed -n 's/^text sha256 \([0-9a-f]\{64\}\) .*/\1/p' <<<"$built")
 copy_sha=$(sha256sum "$elf" | cut -d' ' -f1)
