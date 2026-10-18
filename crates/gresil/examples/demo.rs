@@ -1,4 +1,4 @@
-//! NeuralOS v2 — SNN Showcase Demo
+//! gresil — SNN Showcase Demo
 //!
 //! Creates a balanced E/I spiking neural network, runs a simulation, and prints
 //! a spike raster + learning statistics. This is the RVO Ottawa hallway artifact.
@@ -25,7 +25,7 @@ fn main() {
 fn print_header() {
     println!();
     println!("  ╔═══════════════════════════════════════════════════════════╗");
-    println!("  ║           NeuralOS v2 — SNN Showcase Demo                 ║");
+    println!("  ║           gresil — SNN Showcase Demo                      ║");
     println!("  ║   no_std · i16 fixed-point · Rust · RISC-V-ready          ║");
     println!("  ╚═══════════════════════════════════════════════════════════╝");
     println!();

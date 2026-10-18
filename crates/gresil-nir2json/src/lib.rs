@@ -2299,7 +2299,8 @@ mod tests {
         )
         .expect("converts");
         let s = stamp_json(&c.stamp, std::path::Path::new("x.nir"), None);
-        serde_json::from_str::<serde_json::Value>(&s).expect("sidecar is valid JSON");
+        let v = serde_json::from_str::<serde_json::Value>(&s).expect("sidecar is valid JSON");
+        assert_eq!(v["tool"], "gresil-nir2json", "{s}");
         assert!(s.contains("\"f32_widened\":[]"));
     }
 

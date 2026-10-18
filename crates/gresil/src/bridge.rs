@@ -2,7 +2,7 @@
 //! Stage 2 of the ternary bridge: the **format bridge** (see `docs/VISION.md`
 //! and `docs/TERNARY_FORMAT.md`).
 //!
-//! `NeuralOS` speaks the byte layouts of the two ternary ecosystems that
+//! `gresil` speaks the byte layouts of the two ternary ecosystems that
 //! actually ship models:
 //!
 //! - **`BitNet` `i2_s`** (microsoft/BitNet, `utils/convert-hf-to-gguf-bitnet.py`

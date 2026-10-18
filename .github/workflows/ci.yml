@@ -230,8 +230,8 @@ jobs:
   # by content and mtime, and checkout touches what changed, so a stale
   # artifact does not satisfy a changed source; the cold scratch-worktree
   # loop in AGENTS.md stays the clean-build proof. The runner is a single
-  # self-hosted box (cp-desktop) that runs one job at a time, so a PR's
-  # wall time is check + hdf5 + this, in sequence, not in parallel.
+  # self-hosted box (cp-desktop-gresil) that runs one job at a time, so a
+  # PR's wall time is check + hdf5 + this, in sequence, not in parallel.
   # This job gates a merge only once branch protection on main names it
   # as a required status; adding the job does not do that by itself.
   per-commit:

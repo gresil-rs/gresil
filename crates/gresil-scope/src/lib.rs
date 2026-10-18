@@ -1,4 +1,4 @@
-//! Framework-agnostic SNN sim-runner core for the `NeuralOS` visualizer.
+//! Framework-agnostic SNN sim-runner core for the gresil visualizer.
 //!
 //! Holds a [`SpikingNeuralNetwork`] and a rolling spike raster (ring buffer).
 //! UI-agnostic: the Slint bin calls [`SimRunner::tick`] each frame and renders

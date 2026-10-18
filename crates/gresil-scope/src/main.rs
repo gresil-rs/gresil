@@ -1,4 +1,4 @@
-//! NeuralOS SNN visualizer — Slint entry point.
+//! The gresil SNN visualizer — Slint entry point.
 //!
 //! A worker thread owns the [`SimRunner`] (which owns the `SpikingNeuralNetwork`)
 //! and ticks it at ~60 fps, posting each raster frame + stats line back to the UI
@@ -156,7 +156,7 @@ fn main() -> Result<(), slint::PlatformError> {
         }
     });
 
-    // --- Headless smoke hook: quit after N ms so CI can verify launch + clean exit ---
+    // --- Smoke hook: quit after N ms (launch + clean exit); needs a display, no CI runs it ---
     if let Ok(ms) = std::env::var("GRESIL_SMOKE_MS") {
         if let Ok(ms) = ms.parse::<u64>() {
             std::thread::spawn(move || {

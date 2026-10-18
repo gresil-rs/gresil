@@ -6,8 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
-homepage.workspace = true
-description = "NeuralOS SNN visualizer — a live microscope onto the spiking neural network"
+description = "The gresil SNN visualizer — a live microscope onto the spiking neural network"
 
 # App-specific metadata.
 keywords = ["spiking-neural-network", "visualization", "slint", "local"]
