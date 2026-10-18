@@ -29,14 +29,14 @@
 //! reset potential. Everything is decimal.
 //!
 //! `<step>` counts the run's steps from 0, and `<time_us>` is the network's
-//! clock, so a run from a network that has not stepped starts at time 0, as
-//! a board's frozen network does: a board matches no other trace. Every
-//! line, the header's too, ends with `\n`, with no `\r`. The library's
-//! traces hold all three: `every_header_describes_its_rows` reads each row's
-//! time as its step times `dt_us`, and a `rows=all` trace's steps from 0;
-//! `every_case_regenerates_line_for_line` compares the bytes, and
-//! `every_frozen_network_writes_its_trace` compares them with what `row`
-//! writes.
+//! clock, so a run from a network that has not stepped starts at time 0,
+//! and a board, whose frozen network starts at 0, can only match such a
+//! trace. Every line, the header's too, ends with `\n`, with no `\r`. The
+//! library's traces hold all three: `every_header_describes_its_rows` reads
+//! each row's time as its step times `dt_us`, and a `rows=all` trace's
+//! steps from 0; `every_case_regenerates_line_for_line` compares the bytes,
+//! and `every_frozen_network_writes_its_trace` compares them with what
+//! `row` writes.
 //!
 //! A replay that prints several traces over one serial port ends with
 //! `# neuralos-trace end`: the ESP32-C3 firmware and the QEMU replay print
