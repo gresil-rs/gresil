@@ -1,0 +1,148 @@
+[package]
+name = "gresil"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Spiking Neural Network library, no_std, i16 fixed-point — gresil sovereignty stack core"
+readme = "README.md"
+# The closed bridge chapter's four `ternary_*` examples stay in the
+# repository, where the workspace build checks them, and out of the
+# package: they are that chapter's evidence programs, and each needs an
+# unstable feature, `unstable-stdp` or `unstable-bridge`. Their
+# `[[example]]` entries stay; `cargo package` warns once for each.
+exclude = ["examples/ternary_*"]
+
+[lib]
+name = "gresil"
+
+[features]
+default = ["std"]
+std = []
+# The AVX2 batch LIF kernel on x86_64, the scalar reference on any other
+# target. Implies `std` because runtime feature detection
+# (`is_x86_feature_detected!`) is std-only.
+# A future `no_std` variant could select backends at compile time via
+# `#[cfg(target_feature)]` for embedded RISC-V.
+simd = ["std"]
+# STDP, outside the semver promise: `STDPRule`, `Synapse::update_weight`,
+# `SpikingNeuralNetwork::set_plasticity_enabled`,
+# `SpikingNeuralNetwork::stochastic_ternary_step`,
+# `trit::stochastic_ternary_flip`, `trit::STOCHASTIC_FLIP_RATE`, and
+# STDP's instruments: `Synapse`'s two bounds and two counters and
+# `NetworkStats`' four counters.
+# Anything behind it may change or go in a minor release. Off by
+# default: a default build does not learn.
+unstable-stdp = []
+# The ternary bridge's closed chapter, outside the semver promise: the
+# `bridge` codecs (Stage 2) and the `kernel` matvec (Stage 3). Anything
+# behind it may change or go in a minor release. Off by default; works
+# with and without `std`.
+unstable-bridge = []
+# The freezer, `fixed::freeze`, outside the semver promise: a network
+# written as the Rust source of the arrays a `FixedNetwork` steps.
+# Anything behind it may change or go in a minor release. Off by
+# default; `std` only, so without `std` it builds nothing.
+unstable-freeze = []
+
+# docs.rs builds the default features alone; the gated items' docs exist
+# only with the features on.
+[package.metadata.docs.rs]
+features = ["simd", "unstable-stdp", "unstable-bridge", "unstable-freeze"]
+
+[dependencies]
+# None. The spike history is a [u32; N] ring, SpikeRecorder in
+# spike_recorder.rs (alpha.8; a field of the neuron in lif_neuron.rs
+# from 2026-09-10, alpha.6); heapless, the one runtime dependency
+# before that, is now the differential oracle below. Audit surface: core.
+
+# Cargo builds the dev-dependencies for an example, and proptest needs
+# an OS (heapless does not): under this table a target with none, the
+# C3's `riscv32imc-unknown-none-elf`, builds the examples without them,
+# so CI checks `board` and `learner` there (AGENTS.md § Commands).
+[target.'cfg(not(target_os = "none"))'.dev-dependencies]
+# Property-based tests — Cardano-grade rigor (leçon v0.1: tout test doit être réel)
+proptest = "1.5"
+# The pre-ring spike history, kept as the oracle of the differential
+# test in spike_recorder.rs (prop_ring_matches_the_heapless_oracle).
+heapless = "0.8"
+
+# An example that needs `std` lists it, so a build without the default
+# features skips it (`--examples`) or names the feature it lacks
+# (`--example`) instead of failing on its first import. `board`,
+# `learner` and `ternary_format_gate` need no `std`; `bench_simd`'s
+# `simd` turns it on.
+[[example]]
+name = "bench_simd"
+required-features = ["simd"]
+
+# The examples that learn, or that write the plasticity-on trace
+# (`trace` writes the frozen file too, so it needs the freezer):
+# `-p gresil` skips them in silence, as it does `bench_simd`; the
+# workspace build turns the features on (rt and the app ask for STDP,
+# nir2json for the freezer) and covers them.
+[[example]]
+name = "demo"
+required-features = ["std", "unstable-stdp"]
+
+[[example]]
+name = "ternary_gate"
+required-features = ["std", "unstable-stdp"]
+
+[[example]]
+name = "ternary_selectivity"
+required-features = ["std", "unstable-stdp"]
+
+[[example]]
+name = "ternary_hybrid_gate"
+required-features = ["std", "unstable-stdp", "unstable-bridge"]
+
+# The closed chapter's Stage 2 gate, behind `unstable-bridge` with the
+# codecs; rt asks for the feature, so the workspace build covers it.
+[[example]]
+name = "ternary_format_gate"
+required-features = ["unstable-bridge"]
+
+[[example]]
+name = "trace"
+required-features = ["std", "unstable-stdp", "unstable-freeze"]
+
+# The two NIR gates: the import, the export and the graph assembly.
+[[example]]
+name = "nir_assembly_gate"
+required-features = ["std"]
+
+[[example]]
+name = "nir_format_gate"
+required-features = ["std"]
+
+# The starter set, code a stranger copies (each header says what it
+# shows). Each runs its test under `cargo test` (`test = true`). `board`
+# and `learner` are `no_std` libraries, since a board's firmware owns the
+# entry point; CI checks them for the C3's target too. `-p gresil`
+# skips `freeze` and `learner` in silence, as it does `bench_simd`; the
+# workspace build turns their features on and covers them.
+[[example]]
+name = "stranger"
+test = true
+required-features = ["std"]
+
+[[example]]
+name = "freeze"
+test = true
+required-features = ["std", "unstable-freeze"]
+
+[[example]]
+name = "board"
+crate-type = ["lib"]
+test = true
+
+[[example]]
+name = "learner"
+crate-type = ["lib"]
+test = true
+required-features = ["unstable-stdp"]

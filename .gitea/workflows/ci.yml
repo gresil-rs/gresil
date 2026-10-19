@@ -1,6 +1,6 @@
 # Gitea Actions twin of .github/workflows/ci.yml.
 #
-# WHY BOTH: origin is gitea (git@gitea.com:Caramoussin/NeuralOs-v2.git);
+# WHY BOTH: origin is gitea (git@gitea.com:gresil-rs/gresil.git);
 # github carries main and tags only (AGENTS.md § Remotes, 2026-09-06), so
 # the GitHub copy runs on main after each sync: the one off-box build,
 # never a gate. The merge-gate protocol (ISA 2026-08-24) keys off branch
@@ -60,7 +60,7 @@ jobs:
         run: cargo check --workspace --all-targets
 
       # Default features only — fully offline. The workspace test suite is the
-      # neuralos-snn property tests + the neuralos-app SimRunner tests; no network.
+      # gresil property tests + the gresil-scope SimRunner tests; no network.
       - name: cargo test --workspace
         run: cargo test --workspace
 
@@ -73,31 +73,31 @@ jobs:
       # `unstable-freeze`, so the two lines above build the library with
       # all three on. These two build it as a crates.io user does, tests
       # and lints (PR L, ROADMAP § 0.1.0, check 9).
-      - name: default config gate (neuralos-snn, unstable-stdp off)
+      - name: default config gate (gresil, unstable-stdp off)
         run: |
-          cargo test -p neuralos-snn
-          cargo clippy -p neuralos-snn --all-targets -- -D warnings
+          cargo test -p gresil
+          cargo clippy -p gresil --all-targets -- -D warnings
 
       # The SNN core stays no_std (the embedded/RISC-V posture), with the
       # `unstable-` features that have code there: `STDPRule`,
       # `update_weight`, the bridge's codecs and its kernel are `no_std`,
       # and the QEMU leg-A proof builds them that way. The freezer has
       # none: the next step.
-      - name: no_std gate (neuralos-snn)
+      - name: no_std gate (gresil)
         run: |
-          cargo build --no-default-features -p neuralos-snn
-          cargo build --no-default-features --features unstable-stdp -p neuralos-snn
-          cargo build --no-default-features --features unstable-bridge -p neuralos-snn
+          cargo build --no-default-features -p gresil
+          cargo build --no-default-features --features unstable-stdp -p gresil
+          cargo build --no-default-features --features unstable-bridge -p gresil
 
       # The freezer without `std` (round 51): `unstable-freeze` builds
       # nothing there, and a `no_std` build that asks for it still builds.
       # The host has `std`, so a host line cannot see a feature that turns
       # `std` on; a target without one can. The library alone, checked,
       # never linked, on the firmware's target.
-      - name: no_std gate with the freezer (neuralos-snn on riscv32imc)
+      - name: no_std gate with the freezer (gresil on riscv32imc)
         run: |
           rustup target add riscv32imc-unknown-none-elf
-          cargo check -p neuralos-snn --lib --no-default-features --features unstable-freeze --target riscv32imc-unknown-none-elf
+          cargo check -p gresil --lib --no-default-features --features unstable-freeze --target riscv32imc-unknown-none-elf
 
       # The starter set's two no_std examples on the C3's target (round
       # 69): `board` steps a frozen graph and `learner` applies STDP by
@@ -106,51 +106,51 @@ jobs:
       # proptest needs an OS, so the crate's manifest leaves them out on a
       # target with none. The target is the one the step above adds.
       - name: no_std examples on riscv32imc (board, learner)
-        run: cargo check -p neuralos-snn --example board --example learner --no-default-features --features unstable-stdp --target riscv32imc-unknown-none-elf
+        run: cargo check -p gresil --example board --example learner --no-default-features --features unstable-stdp --target riscv32imc-unknown-none-elf
 
       # The MSRV gate: `rust-version = "1.92"` is the crate's promise to its
       # users; the pin is ours and follows stable (PR C). The library alone,
       # in the six configurations a user can pick, on the declared floor.
       # RUSTFLAGS is emptied: this proves the crate builds there, not that
       # an old compiler's lints are quiet. `rustc -V` names the pin first.
-      - name: MSRV gate (neuralos-snn on 1.92.0)
+      - name: MSRV gate (gresil on 1.92.0)
         env:
           RUSTFLAGS: ""
         run: |
           rustc -V
           rustup toolchain install 1.92.0 --profile minimal
-          cargo +1.92.0 check -p neuralos-snn --lib
-          cargo +1.92.0 check -p neuralos-snn --lib --no-default-features
-          cargo +1.92.0 check -p neuralos-snn --lib --features simd
-          cargo +1.92.0 check -p neuralos-snn --lib --features unstable-stdp
-          cargo +1.92.0 check -p neuralos-snn --lib --features unstable-bridge
-          cargo +1.92.0 check -p neuralos-snn --lib --features unstable-freeze
+          cargo +1.92.0 check -p gresil --lib
+          cargo +1.92.0 check -p gresil --lib --no-default-features
+          cargo +1.92.0 check -p gresil --lib --features simd
+          cargo +1.92.0 check -p gresil --lib --features unstable-stdp
+          cargo +1.92.0 check -p gresil --lib --features unstable-bridge
+          cargo +1.92.0 check -p gresil --lib --features unstable-freeze
 
       # SIMD kernel equivalence vs scalar (AVX2, x86_64, behind `simd`).
-      # NEURALOS_REQUIRE_AVX2 turns each of the module's "AVX2 not
+      # GRESIL_REQUIRE_AVX2 turns each of the module's "AVX2 not
       # available" skips into a failure of the test that would have
       # skipped (`runs_avx2`, round 50), and `ci_runner_actually_has_avx2`
       # fails too, so a runner without AVX2 cannot pass this gate by not
       # running it. Added 2026-09-02.
-      - name: simd gate (neuralos-snn)
+      - name: simd gate (gresil)
         env:
-          NEURALOS_REQUIRE_AVX2: "1"
-        run: cargo test -p neuralos-snn --features simd
+          GRESIL_REQUIRE_AVX2: "1"
+        run: cargo test -p gresil --features simd
 
       # Workspace clippy never compiles the feature-gated simd module; lint it
       # under its own feature (same pattern as the hdf5 leg). Added 2026-08-30.
-      - name: simd lint gate (neuralos-snn)
-        run: cargo clippy -p neuralos-snn --features simd --all-targets -- -D warnings
+      - name: simd lint gate (gresil)
+        run: cargo clippy -p gresil --features simd --all-targets -- -D warnings
 
       # `simd` off x86 (round 50). The module builds on any target and runs
       # its scalar reference there (its module doc says so), and the lines
       # behind `cfg(not(target_arch = "x86_64"))` compile in no other gate.
       # The library alone, checked, never linked, on the riscv64 Linux
       # target leg B runs under QEMU.
-      - name: simd off-x86 gate (neuralos-snn on riscv64)
+      - name: simd off-x86 gate (gresil on riscv64)
         run: |
           rustup target add riscv64gc-unknown-linux-musl
-          cargo check -p neuralos-snn --lib --features simd --target riscv64gc-unknown-linux-musl
+          cargo check -p gresil --lib --features simd --target riscv64gc-unknown-linux-musl
 
       # The rustdoc gate: the library's docs are where its semantics are
       # stated (ROADMAP § 0.1.0, check 11), so a link that does not resolve
@@ -169,25 +169,25 @@ jobs:
       # configurations: a `std`-only item is a code span in a doc they
       # render, never a link (six were links until then, and no gate
       # built them).
-      - name: rustdoc gate (neuralos-snn)
+      - name: rustdoc gate (gresil)
         env:
           RUSTDOCFLAGS: "-D warnings"
         run: |
-          cargo doc -p neuralos-snn --no-deps
-          cargo doc -p neuralos-snn --no-deps --features simd
-          cargo doc -p neuralos-snn --no-deps --features unstable-stdp
-          cargo doc -p neuralos-snn --no-deps --features unstable-bridge
-          cargo doc -p neuralos-snn --no-deps --features unstable-freeze
-          cargo doc -p neuralos-snn --no-deps --no-default-features
-          cargo doc -p neuralos-snn --no-deps --no-default-features --features unstable-stdp
-          cargo doc -p neuralos-snn --no-deps --no-default-features --features unstable-bridge
+          cargo doc -p gresil --no-deps
+          cargo doc -p gresil --no-deps --features simd
+          cargo doc -p gresil --no-deps --features unstable-stdp
+          cargo doc -p gresil --no-deps --features unstable-bridge
+          cargo doc -p gresil --no-deps --features unstable-freeze
+          cargo doc -p gresil --no-deps --no-default-features
+          cargo doc -p gresil --no-deps --no-default-features --features unstable-stdp
+          cargo doc -p gresil --no-deps --no-default-features --features unstable-bridge
 
       # The slice-length contract is assert_eq!; its regression test is only
       # distinguishable from debug_assert_eq! in release. Added 2026-08-30.
-      - name: simd release gate (neuralos-snn)
+      - name: simd release gate (gresil)
         env:
-          NEURALOS_REQUIRE_AVX2: "1"
-        run: cargo test -p neuralos-snn --release --features simd -- --include-ignored
+          GRESIL_REQUIRE_AVX2: "1"
+        run: cargo test -p gresil --release --features simd -- --include-ignored
 
   # The HDF5 feature leg (NIR slice 2): vendored HDF5 (needs cmake) +
   # the reference-fixture tests + THE EVIDENCE GATE + feature clippy.
@@ -244,8 +244,8 @@ jobs:
   # by content and mtime, and checkout touches what changed, so a stale
   # artifact does not satisfy a changed source; the cold scratch-worktree
   # loop in AGENTS.md stays the clean-build proof. The runner is a single
-  # self-hosted box (cp-desktop) that runs one job at a time, so a PR's
-  # wall time is check + hdf5 + this, in sequence, not in parallel.
+  # self-hosted box (cp-desktop-gresil) that runs one job at a time, so a
+  # PR's wall time is check + hdf5 + this, in sequence, not in parallel.
   # This job gates a merge only once branch protection on main names it
   # as a required status; adding the job does not do that by itself.
   per-commit:
@@ -289,7 +289,7 @@ jobs:
 
       - name: gate set at every commit base..head
         env:
-          NEURALOS_REQUIRE_AVX2: "1"
+          GRESIL_REQUIRE_AVX2: "1"
         run: |
           set -euo pipefail
           base="${{ github.event.pull_request.base.sha }}"
@@ -331,40 +331,40 @@ jobs:
             cargo check --workspace --all-targets
             cargo test --workspace
             cargo clippy --workspace --all-targets -- -D warnings
-            cargo test -p neuralos-snn
-            cargo clippy -p neuralos-snn --all-targets -- -D warnings
-            cargo build --no-default-features -p neuralos-snn
-            cargo build --no-default-features --features unstable-stdp -p neuralos-snn
-            cargo build --no-default-features --features unstable-bridge -p neuralos-snn
+            cargo test -p gresil
+            cargo clippy -p gresil --all-targets -- -D warnings
+            cargo build --no-default-features -p gresil
+            cargo build --no-default-features --features unstable-stdp -p gresil
+            cargo build --no-default-features --features unstable-bridge -p gresil
             # the freezer without std (round 51): this commit's pin needs the
             # target, as the firmware leg's does below; a no-op when it is
             # there.
             rustup target add riscv32imc-unknown-none-elf
-            cargo check -p neuralos-snn --lib --no-default-features --features unstable-freeze --target riscv32imc-unknown-none-elf
+            cargo check -p gresil --lib --no-default-features --features unstable-freeze --target riscv32imc-unknown-none-elf
             # the starter set's two no_std examples on the same target
             # (round 69)
-            cargo check -p neuralos-snn --example board --example learner --no-default-features --features unstable-stdp --target riscv32imc-unknown-none-elf
-            RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib
-            RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --no-default-features
-            RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --features simd
-            RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --features unstable-stdp
-            RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --features unstable-bridge
-            RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --features unstable-freeze
-            cargo test -p neuralos-snn --features simd
-            cargo clippy -p neuralos-snn --features simd --all-targets -- -D warnings
+            cargo check -p gresil --example board --example learner --no-default-features --features unstable-stdp --target riscv32imc-unknown-none-elf
+            RUSTFLAGS= cargo +1.92.0 check -p gresil --lib
+            RUSTFLAGS= cargo +1.92.0 check -p gresil --lib --no-default-features
+            RUSTFLAGS= cargo +1.92.0 check -p gresil --lib --features simd
+            RUSTFLAGS= cargo +1.92.0 check -p gresil --lib --features unstable-stdp
+            RUSTFLAGS= cargo +1.92.0 check -p gresil --lib --features unstable-bridge
+            RUSTFLAGS= cargo +1.92.0 check -p gresil --lib --features unstable-freeze
+            cargo test -p gresil --features simd
+            cargo clippy -p gresil --features simd --all-targets -- -D warnings
             # simd off x86 (round 50): this commit's pin needs the target, as
             # the firmware leg's does below; a no-op when it is there.
             rustup target add riscv64gc-unknown-linux-musl
-            cargo check -p neuralos-snn --lib --features simd --target riscv64gc-unknown-linux-musl
-            RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps
-            RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --features simd
-            RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --features unstable-stdp
-            RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --features unstable-bridge
-            RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --features unstable-freeze
-            RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --no-default-features
-            RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --no-default-features --features unstable-stdp
-            RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --no-default-features --features unstable-bridge
-            cargo test -p neuralos-snn --release --features simd -- --include-ignored
+            cargo check -p gresil --lib --features simd --target riscv64gc-unknown-linux-musl
+            RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps
+            RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --features simd
+            RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --features unstable-stdp
+            RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --features unstable-bridge
+            RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --features unstable-freeze
+            RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --no-default-features
+            RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --no-default-features --features unstable-stdp
+            RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --no-default-features --features unstable-bridge
+            cargo test -p gresil --release --features simd -- --include-ignored
             cargo test -p neuralos-rt --features hdf5
             cargo run -p neuralos-rt --features hdf5 --example nir_hdf5_gate
             cargo clippy -p neuralos-rt --features hdf5 --all-targets -- -D warnings
@@ -397,7 +397,7 @@ jobs:
             # rides it), guarded like the firmware leg, so commits before
             # the script stay valid.
             if [ -f firmware/esp32c3/stranger.sh ]; then
-              firmware/esp32c3/stranger.sh build crates/neuralos-nir2json/tests/fixtures/community/snnTorch_two_layer.nir
+              firmware/esp32c3/stranger.sh build crates/gresil-nir2json/tests/fixtures/community/snnTorch_two_layer.nir
             else
               echo "(no firmware/esp32c3/stranger.sh at this commit)"
             fi
@@ -496,9 +496,9 @@ jobs:
       # unmaintained or yanked crate prints a warning and passes. No
       # audit.toml, so the log shows every advisory on every run. Added
       # 2026-09-07. On that day's lock (b7a7222), four of the five crates
-      # warned today reach neuralos-app, `instant` is neuralos-rt's alone
+      # warned today reach gresil-scope, `instant` is neuralos-rt's alone
       # and `paste` is shared by both; none of the five reaches
-      # neuralos-snn or neuralos-nir2json, then or now. This line claimed
+      # gresil or gresil-nir2json, then or now. This line claimed
       # "none in neuralos-rt" until 2026-09-19: wrong when written, since
       # all five advisories predate 2026-09-07 and that lock already had
       # the five crates at today's versions.
@@ -588,7 +588,7 @@ jobs:
       # build.sh clippy with the graph in the slot, in target/stranger/.
       # Its `run` phase needs the board and stays on the bench.
       - name: stranger.sh build (the witness through the slot, build + clippy)
-        run: firmware/esp32c3/stranger.sh build crates/neuralos-nir2json/tests/fixtures/community/snnTorch_two_layer.nir
+        run: firmware/esp32c3/stranger.sh build crates/gresil-nir2json/tests/fixtures/community/snnTorch_two_layer.nir
 
       # The link-time proof that FixedNetwork::step has no panic path
       # (proofs/no-panic-step/build.sh carries the why): its own fmt, then

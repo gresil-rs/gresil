@@ -12,7 +12,7 @@ their node/edge sets (the `infer_types` auto-wire trap).
 ## Rebuild
 
 ```bash
-cargo run -p neuralos-snn --example nir_assembly_gate   # 6/6 gates
+cargo run -p gresil --example nir_assembly_gate         # 6/6 gates
 ```
 
 Since round 65 (2026-10-11) the gate prints the current in pA, as the

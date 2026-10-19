@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Read this before touching anything. NeuralOS v2 is the **active** repo —
+Read this before touching anything. gresil is the **active** repo —
 pure Rust, AGPL-3.0, local-only. One workspace, four crates, one
 research record: a published `no_std` SNN library (the spine), a Slint
 visualizer that runs it live (the microscope), a research runtime that
@@ -16,19 +16,19 @@ scoping work. Shipping order: `docs/ROADMAP.md`. History:
 
 | Repo | Role |
 |---|---|
-| `NeuralOs-v2` (here) | **Active.** Edit this one. Workspace builds clean. |
+| `gresil` (here) | **Active.** Edit this one. Workspace builds clean. |
 | `NeuralOS` (sibling dir) | **Archive** of v0.1 — manifest-broken, READ-ONLY. Mine it for real code (the audit indexed what's worth porting in its `AGENTS.md` + our `docs/AUDIT_PORT_TABLE.md`). Don't build it, don't edit it. |
 
 If `cargo` ever errors with `multiple workspace roots`, you're in the
-archive, not here. `cd` to `NeuralOs-v2`.
+archive, not here. `cd` back to this repo.
 
 ## The workspace
 
 | Path | Role |
 |---|---|
-| `crates/neuralos-snn` | The spine. Published on crates.io; the version is the workspace `version`, § Published crate. `no_std`-by-default, i16 fixed-point. |
-| `crates/neuralos-app` | The microscope. Slint visualizer over the library. |
-| `crates/neuralos-nir2json` | The inbound bridge. Pure-Rust `.nir` (HDF5 via `hdf5-pure`, no C) → the library's JSON schema, for graphs strangers emit (snnTorch, norse, rockpool). The stranger-usable artifact GUARD 3 names: a static musl binary on the Gitea release, built by its README § Build. `publish = false` (crates.io deferred by ruling). |
+| `crates/gresil` | The spine. Published on crates.io, as `neuralos-snn` until alpha.9; the version is the workspace `version`, § Published crate. `no_std`-by-default, i16 fixed-point. |
+| `crates/gresil-scope` | The microscope. Slint visualizer over the library. |
+| `crates/gresil-nir2json` | The inbound bridge. Pure-Rust `.nir` (HDF5 via `hdf5-pure`, no C) → the library's JSON schema, for graphs strangers emit (snnTorch, norse, rockpool). The stranger-usable artifact GUARD 3 names: a static musl binary on the Gitea release, built by its README § Build. `publish = false` (crates.io deferred by ruling). |
 | `crates/neuralos-rt` | The research runtime (GGUF container, Q1_0/Q2_0 compute, tokenizer, model). `publish = false`, std-only. Consumed by the frozen bridge examples. |
 | `paper/` | The Branch B article. Builds with `make` in `paper/` (`make figs` regenerates figures from evidence; `make gate` enforces the language rules of record). |
 | `evidence/` | Raw judge/experiment logs. Indexed by `evidence/INDEX.md`. |
@@ -68,9 +68,9 @@ a capture shows no pane.
 
 ## Commands
 
-Workspace is four members: `crates/neuralos-snn` (the library),
-`crates/neuralos-app` (the visualizer), `crates/neuralos-rt` (the
-research runtime), `crates/neuralos-nir2json` (the `.nir`→JSON
+Workspace is four members: `crates/gresil` (the library),
+`crates/gresil-scope` (the visualizer), `crates/neuralos-rt` (the
+research runtime), `crates/gresil-nir2json` (the `.nir`→JSON
 converter). `rust-toolchain.toml` pins the toolchain; the version
 lives there alone. A bump is its own commit: the lints it adds fixed
 before it, the firmware `.text` re-pinned and the board fold read again
@@ -91,31 +91,31 @@ cargo fmt    --all -- --check                    # formatting gate (2026-09-02):
 cargo check  --workspace --all-targets
 cargo test   --workspace                          # offline; the count is the CI log's (one number, one home) + 5 rt model-gated #[ignore]
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test   -p neuralos-snn                      # the default config gate (PR L): `--workspace` unifies features, and rt and the app ask for `unstable-stdp`, rt for `unstable-bridge` and nir2json for `unstable-freeze`, so the lines above build the library with all three on; this one builds what crates.io users get
-cargo clippy -p neuralos-snn --all-targets -- -D warnings  # same gate, the lints
-cargo build --no-default-features -p neuralos-snn # the no_std gate (RISC-V/embedded posture)
-cargo build --no-default-features --features unstable-stdp -p neuralos-snn  # same gate with STDP: `STDPRule` and `update_weight` are `no_std`
-cargo build --no-default-features --features unstable-bridge -p neuralos-snn  # same gate with the bridge: the codecs and the kernel are `no_std`
-cargo check -p neuralos-snn --lib --no-default-features --features unstable-freeze --target riscv32imc-unknown-none-elf  # same gate with the freezer (round 51): it builds nothing without `std`, and a target with no `std` sees what a host line cannot, a feature that turns `std` on; needs `rustup target add riscv32imc-unknown-none-elf` on the pin
-cargo check -p neuralos-snn --example board --example learner --no-default-features --features unstable-stdp --target riscv32imc-unknown-none-elf  # the starter set's two no_std examples on the same target (round 69): cargo builds the dev-dependencies for an example, and proptest needs an OS, so the manifest leaves them out on a target with none
-RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib                         # the MSRV gate (PR C): rust-version is the crate's promise, the pin is ours; needs `rustup toolchain install 1.92.0 --profile minimal`
-RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --no-default-features   # same gate, the no_std configuration
-RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --features simd         # same gate, the simd configuration
-RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --features unstable-stdp  # same gate, the STDP configuration
-RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --features unstable-bridge  # same gate, the bridge configuration
-RUSTFLAGS= cargo +1.92.0 check -p neuralos-snn --lib --features unstable-freeze  # same gate, the freezer configuration
-cargo test -p neuralos-snn --features simd        # the simd gate (AVX2-vs-scalar equivalence)
-cargo clippy -p neuralos-snn --features simd --all-targets -- -D warnings  # simd lint gate: workspace clippy never compiles the feature-gated module (2026-08-30)
-cargo check -p neuralos-snn --lib --features simd --target riscv64gc-unknown-linux-musl  # simd off-x86 gate (round 50): the module's non-x86 lines compile in no other gate; needs `rustup target add riscv64gc-unknown-linux-musl` on the pin
-RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps                  # the rustdoc gate (2026-09-19): the docs state the semantics (ROADMAP § 0.1.0, check 11), so an unresolved link is a defect
-RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --features simd  # same gate, the simd configuration
-RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --features unstable-stdp  # same gate, the STDP configuration: the gated items' docs exist in no other
-RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --features unstable-bridge  # same gate, the bridge configuration: the gated items' docs exist in no other
-RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --features unstable-freeze  # same gate, the freezer configuration: the gated items' docs exist in no other
-RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --no-default-features  # same gate, the no_std configuration (round 49): a `std`-only item is a code span there, never a link
-RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --no-default-features --features unstable-stdp  # same gate, no_std with STDP
-RUSTDOCFLAGS="-D warnings" cargo doc -p neuralos-snn --no-deps --no-default-features --features unstable-bridge  # same gate, no_std with the bridge
-cargo test -p neuralos-snn --release --features simd -- --include-ignored   # simd release gate: the slice-length contract is assert_eq!, its regression test only fails in release (2026-08-30); --include-ignored pulls the two exhaustive sweeps in, ~12 s in release (round 12, 2026-09-02)
+cargo test   -p gresil                      # the default config gate (PR L): `--workspace` unifies features, and rt and the app ask for `unstable-stdp`, rt for `unstable-bridge` and nir2json for `unstable-freeze`, so the lines above build the library with all three on; this one builds what crates.io users get
+cargo clippy -p gresil --all-targets -- -D warnings  # same gate, the lints
+cargo build --no-default-features -p gresil # the no_std gate (RISC-V/embedded posture)
+cargo build --no-default-features --features unstable-stdp -p gresil  # same gate with STDP: `STDPRule` and `update_weight` are `no_std`
+cargo build --no-default-features --features unstable-bridge -p gresil  # same gate with the bridge: the codecs and the kernel are `no_std`
+cargo check -p gresil --lib --no-default-features --features unstable-freeze --target riscv32imc-unknown-none-elf  # same gate with the freezer (round 51): it builds nothing without `std`, and a target with no `std` sees what a host line cannot, a feature that turns `std` on; needs `rustup target add riscv32imc-unknown-none-elf` on the pin
+cargo check -p gresil --example board --example learner --no-default-features --features unstable-stdp --target riscv32imc-unknown-none-elf  # the starter set's two no_std examples on the same target (round 69): cargo builds the dev-dependencies for an example, and proptest needs an OS, so the manifest leaves them out on a target with none
+RUSTFLAGS= cargo +1.92.0 check -p gresil --lib                         # the MSRV gate (PR C): rust-version is the crate's promise, the pin is ours; needs `rustup toolchain install 1.92.0 --profile minimal`
+RUSTFLAGS= cargo +1.92.0 check -p gresil --lib --no-default-features   # same gate, the no_std configuration
+RUSTFLAGS= cargo +1.92.0 check -p gresil --lib --features simd         # same gate, the simd configuration
+RUSTFLAGS= cargo +1.92.0 check -p gresil --lib --features unstable-stdp  # same gate, the STDP configuration
+RUSTFLAGS= cargo +1.92.0 check -p gresil --lib --features unstable-bridge  # same gate, the bridge configuration
+RUSTFLAGS= cargo +1.92.0 check -p gresil --lib --features unstable-freeze  # same gate, the freezer configuration
+cargo test -p gresil --features simd        # the simd gate (AVX2-vs-scalar equivalence)
+cargo clippy -p gresil --features simd --all-targets -- -D warnings  # simd lint gate: workspace clippy never compiles the feature-gated module (2026-08-30)
+cargo check -p gresil --lib --features simd --target riscv64gc-unknown-linux-musl  # simd off-x86 gate (round 50): the module's non-x86 lines compile in no other gate; needs `rustup target add riscv64gc-unknown-linux-musl` on the pin
+RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps                  # the rustdoc gate (2026-09-19): the docs state the semantics (ROADMAP § 0.1.0, check 11), so an unresolved link is a defect
+RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --features simd  # same gate, the simd configuration
+RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --features unstable-stdp  # same gate, the STDP configuration: the gated items' docs exist in no other
+RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --features unstable-bridge  # same gate, the bridge configuration: the gated items' docs exist in no other
+RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --features unstable-freeze  # same gate, the freezer configuration: the gated items' docs exist in no other
+RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --no-default-features  # same gate, the no_std configuration (round 49): a `std`-only item is a code span there, never a link
+RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --no-default-features --features unstable-stdp  # same gate, no_std with STDP
+RUSTDOCFLAGS="-D warnings" cargo doc -p gresil --no-deps --no-default-features --features unstable-bridge  # same gate, no_std with the bridge
+cargo test -p gresil --release --features simd -- --include-ignored   # simd release gate: the slice-length contract is assert_eq!, its regression test only fails in release (2026-08-30); --include-ignored pulls the two exhaustive sweeps in, ~12 s in release (round 12, 2026-09-02)
 PATH="$PWD/.nirenv/bin:$PATH" cargo test -p neuralos-rt --features hdf5  # the hdf5 gate (vendored HDF5; cmake from .nirenv; the count is the CI log's)
 PATH="$PWD/.nirenv/bin:$PATH" cargo run -p neuralos-rt --features hdf5 --example nir_hdf5_gate  # THE NIR HDF5 EVIDENCE GATE (5/5)
 PATH="$PWD/.nirenv/bin:$PATH" cargo clippy -p neuralos-rt --features hdf5 --all-targets -- -D warnings  # hdf5 lint gate (in CI since the hdf5 leg; listed here 2026-09-02 so this block IS the CI set)
@@ -124,15 +124,15 @@ PATH="$PWD/.nirenv/bin:$PATH" cargo clippy -p neuralos-rt --features hdf5 --all-
 (cd firmware/esp32c3 && cargo fmt -- --check)
 firmware/esp32c3/build.sh                         # the build: path remap for the four source roots, personal-string gate on the ELF, ELF + .text shas, trim-paths canary (tools/remap.sh carries the why); needs the riscv32imc-unknown-none-elf target and the llvm-tools component on the pin
 firmware/esp32c3/build.sh clippy                  # clippy --release --locked -D warnings under the script's flags
-firmware/esp32c3/stranger.sh build crates/neuralos-nir2json/tests/fixtures/community/snnTorch_two_layer.nir  # the one command's build phase on the witness (PR H): the converter, the capacity bar, build.sh + clippy with the graph in the slot, in firmware/esp32c3/target/stranger/; `run` adds the board (firmware/esp32c3/README.md)
+firmware/esp32c3/stranger.sh build crates/gresil-nir2json/tests/fixtures/community/snnTorch_two_layer.nir  # the one command's build phase on the witness (PR H): the converter, the capacity bar, build.sh + clippy with the graph in the slot, in firmware/esp32c3/target/stranger/; `run` adds the board (firmware/esp32c3/README.md)
 proofs/no-panic-step/build.sh                     # the no-panic proof, same job and loop: its own fmt, then FixedNetwork::step linked under the firmware's profile and under one without cross-crate LTO, each leg with a canary the linker must refuse by name (the script's header carries the why)
 # Not a CI job, same treatment: the release musl binary of the inbound bridge.
-crates/neuralos-nir2json/build.sh                 # → crates/neuralos-nir2json/dist/ (gitignored), gated the same way; never overwrites a different binary under the same name
+crates/gresil-nir2json/build.sh                 # → crates/gresil-nir2json/dist/ (gitignored), gated the same way; never overwrites a different binary under the same name
 
 # Run the visualizer (a display required: `DISPLAY` or `WAYLAND_DISPLAY` set):
-cargo run -p neuralos-app --release               # ~2–9 min link on a 2-core CPU; binary cached after
-./target/release/neuralos-app                     # rerun without rebuild
-NEURALOS_SMOKE_MS=2500 cargo run -p neuralos-app  # launch+clean-exit smoke: quits at 2.5 s; it needs a display too, and no CI job runs it
+cargo run -p gresil-scope --release               # ~2–9 min link on a 2-core CPU; binary cached after
+./target/release/gresil-scope                     # rerun without rebuild
+GRESIL_SMOKE_MS=2500 cargo run -p gresil-scope  # launch+clean-exit smoke: quits at 2.5 s; it needs a display too, and no CI job runs it
 
 # SIMD benchmark (AVX2 vs scalar, x86_64 only, behind the `simd` feature):
 cargo run --example bench_simd --features simd --release
@@ -144,12 +144,12 @@ cargo run -p neuralos-rt --release --example hybrid_gate
 # Paper (from paper/): make / make figs / make gate
 ```
 
-**Iterate in debug** (`cargo run -p neuralos-app`, ~7 s build) — release
+**Iterate in debug** (`cargo run -p gresil-scope`, ~7 s build) — release
 is only worth the multi-minute link when you want real smoothness.
 
 ## Features
 
-- `neuralos-snn`: `default = ["std"]`, `std`, `simd` (implies std; the
+- `gresil`: `default = ["std"]`, `std`, `simd` (implies std; the
   AVX2 batch LIF kernel on x86_64, the scalar reference on any other
   target), `unstable-stdp` (STDP, outside the semver promise:
   `STDPRule`, `Synapse::update_weight`,
@@ -169,13 +169,13 @@ is only worth the multi-minute link when you want real smoothness.
   promise; `std` only, so without `std` it builds nothing; nir2json
   asks for it, so every `--workspace` line builds the library with it
   on). The published crate's default config is what CI tests, by
-  `cargo test -p neuralos-snn` and its clippy (§ Commands, PR L).
+  `cargo test -p gresil` and its clippy (§ Commands, PR L).
 - `neuralos-rt`: `hdf5` (first feature gate, simd-precedent posture):
   NIR `.nir` HDF5 container support — vendored static HDF5 via
   `hdf5-sys { static, zlib }`; needs `cmake` on PATH (the repo-local
   `.nirenv` venv carries one). Default build stays std-only, offline,
   `publish = false`. Research tooling, not product.
-- `neuralos-app`: no features (candle/summarizer code was deleted at
+- `gresil-scope`: no features (candle/summarizer code was deleted at
   the `v0.1-summarizer-demo` tag — the app is the SNN visualizer now).
 
 ## Setup (one time per clone)
@@ -186,7 +186,7 @@ or personal information it would be much much worse"). Git does not
 run tracked hooks by itself; activate them once per clone:
 
     git config core.hooksPath .githooks
-    git config neuralos.author-email "$(git config user.email)"
+    git config gresil.author-email "$(git config user.email)"
 
 The second line records the pseudonymous author address the hooks
 enforce; it lives in the clone's own config, never in a tracked file.
@@ -210,8 +210,8 @@ rule until 2026-09-06; the four days of fan-out before it (twelve work
 branches and 44 workflow runs on GitHub) were cleaned the same day
 (ISA round-17, phase A).
 
-Gitea is `Caramoussin/NeuralOs-v2` (remote `origin`, one push URL);
-GitHub is `philo-the-dendron/NeuralOs-v2` (remote `github`). The
+Gitea is `gresil-rs/gresil` (remote `origin`, one push URL);
+GitHub is `gresil-rs/gresil` (remote `github`). The
 `github` remote is written by § Merge procedure and by nothing else:
 never `git push github <branch>`, never `--tags` (pushes local tags;
 three scratch tags leaked that way on 2026-09-06 and were deleted the
@@ -229,7 +229,7 @@ Active.
 The merge is one HTTP call on Gitea, so the laptop's `main` is stale
 right after it; the sync pushes Gitea's refs, never local ones:
 
-    bun ~/.claude/LIFEOS/TOOLS/Gitea.ts merge Caramoussin/NeuralOs-v2 <pr>
+    bun ~/.claude/LIFEOS/TOOLS/Gitea.ts merge gresil-rs/gresil <pr>
     git fetch origin main '+refs/tags/*:refs/remotes/origin/tags/*'
     git push github origin/main:refs/heads/main
     git push github 'refs/remotes/origin/tags/*:refs/tags/*'
@@ -267,8 +267,9 @@ Two rules learned on PR #15 (2026-09-09):
 
 ## Published crate
 
-`neuralos-snn` is on crates.io. Its version is the workspace `version`
-in the root `Cargo.toml`. Publishes since alpha.6 have their notes in
+The library is on crates.io, as `neuralos-snn` until alpha.9 and as
+`gresil` from it. Its version is the workspace `version` in the root
+`Cargo.toml`. Publishes since alpha.6 have their notes in
 `docs/releases/v<version>.md`, whose § Stamped carries the tag, the
 Gitea release and the registry timestamp, frozen at publish (cut 1 of
 § Session protocol, rigor in proportion to the claim); older ones are
@@ -277,7 +278,7 @@ state lives in the ISA head line and TODO.md (cut 5), not here. The
 workspace consumes the crate by path, so library edits take effect
 locally without a publish; a real bugfix or API addition warrants the
 next alpha: bump the workspace `version` and
-`cargo publish -p neuralos-snn` on the principal's word.
+`cargo publish -p gresil` on the principal's word.
 
 ## Session discipline (the autopsy doctrine — read before scoping any session)
 
@@ -412,7 +413,7 @@ claims, reopening frozen records.
 - **Git discipline — main is merge-gated.** Work lands on
   `work/<name>` / `fix/<name>` branches; CI runs on the branch
   (trigger widened to `**`). **The Gitea run is the gate** —
-  `.gitea/workflows/ci.yml` on org runner `cp-desktop` (Caramoussin
+  `.gitea/workflows/ci.yml` on org runner `cp-desktop-gresil` (gresil-rs
   org scope, self-hosted, docker, capped `--cpus=3 --memory=8g`).
   GitHub runs the same workflow on `main` only, after § Merge
   procedure: the one off-box build, never a gate, never a branch run
@@ -521,7 +522,7 @@ claims, reopening frozen records.
   Tier 1, a public claim (a publish, release notes, a number in a
   README or the paper): pinned evidence, a second-model review, the
   sweep, an ISA entry with the numbers. Tier 2, spine behavior
-  (`neuralos-snn`, firmware): CI, per-commit, traces, one review, a
+  (`gresil`, firmware): CI, per-commit, traces, one review, a
   short ISA entry. Tier 3, no claim (docs, CI, tooling, refactors the
   traces prove): CI green, no brief, no review round, one ISA line.
   Six cuts: (1) one number, one home, the evidence README; other files

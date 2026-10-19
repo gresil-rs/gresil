@@ -28,7 +28,7 @@ that too is the emitter reality). Run in a throwaway venv:
     /tmp/snn-venv/bin/pip install snntorch nirtorch nir
     /tmp/snn-venv/bin/python3 tools/gen_snnTorch_stranger.py
 
-Out: crates/neuralos-nir2json/tests/fixtures/community/snnTorch_linear_head.nir
+Out: crates/gresil-nir2json/tests/fixtures/community/snnTorch_linear_head.nir
 """
 import os
 
@@ -40,7 +40,7 @@ from snntorch.export_nir import _extract_snntorch_module
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(
-    ROOT, "crates/neuralos-nir2json/tests/fixtures/community/snnTorch_linear_head.nir"
+    ROOT, "crates/gresil-nir2json/tests/fixtures/community/snnTorch_linear_head.nir"
 )
 
 torch.manual_seed(7883)  # stated in PROVENANCE.md — values ours, pipeline theirs

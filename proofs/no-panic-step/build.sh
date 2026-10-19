@@ -40,7 +40,7 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
 cd "$here"
-symbol=neuralos_fixed_step_has_a_panic_path
+symbol=gresil_fixed_step_has_a_panic_path
 
 cargo fmt -- --check
 

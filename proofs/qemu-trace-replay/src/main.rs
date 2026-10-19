@@ -1,5 +1,5 @@
 //! The frozen traces under QEMU `riscv64gc`, bare metal: every
-//! plasticity-off case of `crates/neuralos-snn/tests/traces/` stepped by
+//! plasticity-off case of `crates/gresil/tests/traces/` stepped by
 //! `FixedNetwork`, its trace's header line and its rows printed over the
 //! UART by the library's writer, then one end line,
 //! `# neuralos-trace end`, then exit 0.
@@ -7,7 +7,7 @@
 //! The replay is the firmware's (`firmware/esp32c3/src/main.rs`, step 3):
 //! `frozen.rs` by `#[path]` from the library's tests directory,
 //! `for_each_frozen!` over the cases, the rows through the library's row
-//! writer, `neuralos_snn::trace::row`. `build.sh` runs it and
+//! writer, `gresil::trace::row`. `build.sh` runs it and
 //! diffs the capture with `tools/esp32c3_trace_diff.py`, the board's
 //! diff, so a wrong writer is red, not trusted.
 //!
@@ -25,14 +25,14 @@ use core::fmt::Write as _;
 use core::panic::PanicInfo;
 use core::ptr::{read_volatile, write_volatile};
 
-use neuralos_snn::trace::row;
-use neuralos_snn::FixedNetwork;
+use gresil::trace::row;
+use gresil::FixedNetwork;
 
 // The frozen cases, by path into the library's tests directory, as the
 // firmware includes them. rustfmt leaves the generated file as written
 // (its head says why).
 #[rustfmt::skip]
-#[path = "../../../crates/neuralos-snn/tests/traces/frozen.rs"]
+#[path = "../../../crates/gresil/tests/traces/frozen.rs"]
 mod frozen;
 
 const UART_BASE: usize = 0x1000_0000;

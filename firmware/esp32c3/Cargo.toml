@@ -1,10 +1,10 @@
 [package]
-name = "neuralos-esp32c3"
+name = "gresil-esp32c3"
 version = "0.1.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 publish = false
-description = "neuralos-snn on an ESP32-C3: the LIF neuron and a FixedNetwork timed in bursts, the host's frozen traces replayed over serial, then a delay-paced neuron with the LED and a serial line on each spike"
+description = "gresil on an ESP32-C3: the LIF neuron and a FixedNetwork timed in bursts, the host's frozen traces replayed over serial, then a delay-paced neuron with the LED and a serial line on each spike"
 
 # Own workspace on purpose (same pattern as proofs/): esp-hal compiles only
 # for the chip target, so a root workspace member would break the host-side
@@ -12,7 +12,7 @@ description = "neuralos-snn on an ESP32-C3: the LIF neuron and a FixedNetwork ti
 [workspace]
 
 [dependencies]
-neuralos-snn = { path = "../../crates/neuralos-snn", default-features = false }
+gresil = { path = "../../crates/gresil", default-features = false }
 esp-hal = { version = "~1.1", features = ["esp32c3", "unstable"] }
 esp-println = { version = "0.16", features = ["esp32c3"] }
 # The ESP-IDF app descriptor. The bootloader espflash bundles (ESP-IDF 5.5)

@@ -692,6 +692,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "gresil"
+version = "0.1.0-alpha.8"
+
+[[package]]
+name = "gresil-esp32c3"
+version = "0.1.0"
+dependencies = [
+ "esp-bootloader-esp-idf",
+ "esp-hal",
+ "esp-println",
+ "gresil",
+]
+
+[[package]]
 name = "hash32"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -844,20 +858,6 @@ name = "nb"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d5439c4ad607c3c23abf66de8c8bf57ba8adcd1f129e699851a6e43935d339d"
-
-[[package]]
-name = "neuralos-esp32c3"
-version = "0.1.0"
-dependencies = [
- "esp-bootloader-esp-idf",
- "esp-hal",
- "esp-println",
- "neuralos-snn",
-]
-
-[[package]]
-name = "neuralos-snn"
-version = "0.1.0-alpha.8"
 
 [[package]]
 name = "num-traits"

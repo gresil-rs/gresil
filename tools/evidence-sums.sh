@@ -36,7 +36,7 @@ export LC_ALL=C
 root_relative=evidence/nir-hdf5-gate/SHA256SUMS
 at_commit=evidence/step5-calibration/generator/PINNED.sha256
 fixtures=evidence/nir-assembly-gate/SHA256SUMS
-fixture_dirs=(crates/neuralos-snn/tests/nir_fixtures crates/neuralos-rt/tests/nir_fixtures)
+fixture_dirs=(crates/gresil/tests/nir_fixtures crates/neuralos-rt/tests/nir_fixtures)
 skipped=evidence/step5-calibration/nulls.SHA256SUMS
 
 mapfile -t manifests < <(git ls-files -- evidence | grep -E '/(SHA256SUMS|[^/]+\.SHA256SUMS|[^/]+\.sha256)$')

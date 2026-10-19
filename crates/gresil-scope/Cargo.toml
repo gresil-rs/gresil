@@ -1,0 +1,31 @@
+[package]
+name = "gresil-scope"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "The gresil SNN visualizer — a live microscope onto the spiking neural network"
+
+# App-specific metadata.
+keywords = ["spiking-neural-network", "visualization", "slint", "local"]
+categories = ["science", "gui"]
+
+[lib]
+name = "gresil_scope"
+path = "src/lib.rs"
+
+[[bin]]
+name = "gresil-scope"
+path = "src/main.rs"
+
+[dependencies]
+# The keystone: gresil-scope is now a visualizer ON TOP of the SNN library.
+# This single dependency is what makes "the library connects all" literally true.
+gresil = { path = "../gresil", features = ["std", "unstable-stdp"] }
+# slint: pure-Rust UI toolkit (GPLv3 option, AGPL-compatible). No webview.
+slint = "1.17"
+
+[build-dependencies]
+slint-build = "1.17"

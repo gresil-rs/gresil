@@ -2,7 +2,7 @@
 """Diff an ESP32-C3 capture against the host's trace files.
 
 The firmware (firmware/esp32c3/src/main.rs) replays every frozen case of
-crates/neuralos-snn/tests/traces/frozen.rs: each prints its trace's
+crates/gresil/tests/traces/frozen.rs: each prints its trace's
 header line, then its rows, and the replay ends with one line,
 `# neuralos-trace end`. This script takes the frozen set from the files
 themselves (every trace whose header says plasticity=off), splits the
@@ -17,7 +17,7 @@ same replay on riscv64gc).
 `--trace FILE`, repeatable, adds a trace from outside the tree to the
 set: a stranger's graph in the firmware's slot (firmware/esp32c3/
 stranger.sh), replayed after the frozen cases, whose trace
-`neuralos-nir2json --freeze` wrote. Its header must say plasticity=off
+`gresil-nir2json --freeze` wrote. Its header must say plasticity=off
 and must not be in the set already; a file that does not read as text
 is a usage error too. Two files with one header, in the tree or given,
 are a usage error, never one case silently standing for two. A given
@@ -31,7 +31,7 @@ Standard library only.
 import sys
 from pathlib import Path
 
-TRACES = Path(__file__).resolve().parent.parent / "crates/neuralos-snn/tests/traces"
+TRACES = Path(__file__).resolve().parent.parent / "crates/gresil/tests/traces"
 HEAD = "# neuralos-trace v1 case="
 END = "# neuralos-trace end"
 USAGE = "usage: tools/esp32c3_trace_diff.py [--trace FILE]... LOG"

@@ -21,7 +21,7 @@ MUTATIONS of that emission (each mutation is the minimal surgery for
 one error class — the reference cannot emit malformed documents by
 construction, so these are the only honest source).
 
-Outputs: crates/neuralos-snn/tests/nir_fixtures/*.json
+Outputs: crates/gresil/tests/nir_fixtures/*.json
          crates/neuralos-rt/tests/nir_fixtures/*.nir
 """
 import json
@@ -34,7 +34,7 @@ sys.path.insert(0, str(ROOT / "nir-ref"))
 import numpy as np  # noqa: E402
 import nir  # noqa: E402  (the pinned clone)
 
-OUT = ROOT / "crates" / "neuralos-snn" / "tests" / "nir_fixtures"
+OUT = ROOT / "crates" / "gresil" / "tests" / "nir_fixtures"
 OUT.mkdir(parents=True, exist_ok=True)
 
 # the frozen population values (both containers share them — the

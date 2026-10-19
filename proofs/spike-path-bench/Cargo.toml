@@ -13,7 +13,7 @@ description = "Host timing of the LIF spike path through the public API: one har
 [workspace]
 
 [dependencies]
-neuralos-snn = { path = "../../crates/neuralos-snn", default-features = false }
+gresil = { path = "../../crates/gresil", default-features = false }
 
 [profile.release]
 opt-level = 3

@@ -1,5 +1,5 @@
 # tools/remap.sh — sourced by the artifact build scripts
-# (firmware/esp32c3/build.sh, crates/neuralos-nir2json/build.sh).
+# (firmware/esp32c3/build.sh, crates/gresil-nir2json/build.sh).
 # Not executable on purpose: `source tools/remap.sh`, then call the
 # functions below. ISA round 26 is the brief; this header is the why.
 #

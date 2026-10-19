@@ -11,7 +11,7 @@ description = "Link-time proof that FixedNetwork::step has no panic path: a reac
 [workspace]
 
 [dependencies]
-neuralos-snn = { path = "../../crates/neuralos-snn", default-features = false }
+gresil = { path = "../../crates/gresil", default-features = false }
 
 [features]
 # The site-finding build that build.sh prints on red: the panic handler

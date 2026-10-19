@@ -2,7 +2,7 @@
 //! (build.sh runs it, under two profiles).
 //!
 //! `_start` steps a `FixedNetwork<8, 6>`, the shape of `feedforward-8` in
-//! `crates/neuralos-snn/tests/traces/cases.rs` (layers 3-3-2: six
+//! `crates/gresil/tests/traces/cases.rs` (layers 3-3-2: six
 //! excitatory neurons and two inhibitory, six synapses), forever. The
 //! network and the input go through `black_box` at every step, so the
 //! optimizer may assume nothing about the neurons, the synapses, the time
@@ -16,7 +16,7 @@
 mod bare;
 
 use core::hint::black_box;
-use neuralos_snn::{FixedNetwork, FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+use gresil::{FixedNetwork, FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
 
 /// `feedforward-8`'s synapses: layer 0 (ids 0 to 2) to layer 1 (3 to 5),
 /// then layer 1 to layer 2 (6 and 7), weight 100 at divisor 1.

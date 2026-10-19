@@ -13,7 +13,7 @@ snnTorch's own `export_to_nir` (snntorch/export_nir.py: `Leaky` → `nir.LIF`,
 with both weights filled with 1.0, β = 0.98 and threshold 1.0: OUR values,
 THEIR pipeline, the pre-authorized class of gen_snnTorch_stranger.py. It
 emits input → 0 → 1 → 2 → 3 → output, LIF nodes of τ 5 ms, r 50 Ω, leak 0,
-threshold 1.0, which neuralos-nir2json converts under --sim-units at a
+threshold 1.0, which gresil-nir2json converts under --sim-units at a
 voltage scale of 10 (r 500 MΩ, threshold 10 mV).
 
 The emission is not byte-stable across runs: the exporter writes the edge
@@ -29,7 +29,7 @@ nirtorch 2.6 · nir 1.0.9.dev1+g7883c3c85 · torch 2.13.0+cpu. Run:
     .nirenv/bin/python3 tools/gen_snnTorch_two_layer.py <out.nir>
 
 Out, as committed:
-crates/neuralos-nir2json/tests/fixtures/community/snnTorch_two_layer.nir
+crates/gresil-nir2json/tests/fixtures/community/snnTorch_two_layer.nir
 """
 import torch, torch.nn as nn, snntorch as snn, nir, sys
 from snntorch.export_nir import export_to_nir
