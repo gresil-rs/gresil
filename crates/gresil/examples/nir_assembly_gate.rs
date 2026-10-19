@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! NIR assembly gate (slice 2 / R18) — the GENERAL four-kind graph
 //! assembly over the REFERENCE-emitted fixtures, in the family style
 //! of `nir_format_gate`: test vectors derived from the pinned

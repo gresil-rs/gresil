@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Session E — THE LOOP-CLOSER: pretrained ternary LLM weights, imported
 //! into the spiking substrate, adapted under local STDP, exported BACK as
 //! Q2_0 bytes into a patched GGUF copy that foreign tooling can run.

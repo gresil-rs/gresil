@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! GGUF container parser — the tensor-file format of the llama.cpp
 //! ecosystem (and therefore of Prism ML's Bonsai models).
 //!

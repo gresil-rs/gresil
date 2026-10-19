@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Integer math for the runtime's nonlinear core — softmax, SiLU, RoPE
 //! (Stage 4, session 3).
 //!

@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Margin census (null-ladder rung 1): top1-vs-top2 margins for
 //! every prompt×step of a `NEURALOS_DUMP` set. Knife-edge set =
 //! margins < θ (pre-registered θ = 0.05).

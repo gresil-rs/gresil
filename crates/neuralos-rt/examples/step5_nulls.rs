@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Step-5 NULL generator — the per-replicate shuffled-drift families
 //! (PREREG §3/§4, evidence/step5-readout/PREREG.md).
 //!

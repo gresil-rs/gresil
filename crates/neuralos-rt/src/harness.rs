@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 #![allow(non_snake_case)]
 //! The frozen-example experiment harness (R4(iii) extraction, 2026-08-20).
 //!

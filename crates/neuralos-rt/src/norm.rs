@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Integer RMSNorm — Qwen3's normalization layer in pure fixed-point
 //! (Stage 4, session 2).
 //!

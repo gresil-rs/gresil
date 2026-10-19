@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! A LIF neuron and a `FixedNetwork` from `gresil` on an ESP32-C3.
 //!
 //! What it does, in order, once esp-hal's init has run and the stack below

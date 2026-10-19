@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! The import's memory grows with the weights, not with the square of
 //! a root's width. `build_stages` composed each stage from an `f64`
 //! identity as wide as its root on both sides, 8 bytes a pair of

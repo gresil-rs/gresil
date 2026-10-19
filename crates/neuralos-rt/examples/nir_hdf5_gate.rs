@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! NIR HDF5 gate (NIR slice 2) — THE EVIDENCE GATE of the HDF5
 //! milestone, in the family style of `nir_format_gate`: the pinned
 //! reference's OWN `write()` emissions, read end-to-end in pure Rust,

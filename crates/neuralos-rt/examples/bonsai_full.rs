@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Stage 4, session 3: the FULL Qwen3 forward pass on the real Bonsai
 //! model — 28 blocks of attention (YaRN RoPE + GQA + integer softmax)
 //! and FFN (SiLU gate/up), final RMSNorm, and last-position logits over

@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Ternary-bridge gate — Stage 1 (deterministic) + Stage 1.5b (stochastic).
 //!
 //! Question: does an SNN whose synapse weights are *constrained* to

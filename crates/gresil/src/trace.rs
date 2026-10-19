@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `neuralos-trace v1`, the trace format: a network's run as text, a
 //! header line then one row per step, which a host and a board write
 //! alike and compare byte for byte.

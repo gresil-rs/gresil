@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! The frozen traces under QEMU `riscv64gc`, bare metal: every
 //! plasticity-off case of `crates/gresil/tests/traces/` stepped by
 //! `FixedNetwork`, its trace's header line and its rows printed over the

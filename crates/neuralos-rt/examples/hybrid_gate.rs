@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Session D slice 2 — THE HYBRID EXPERIMENT: pretrained ternary LLM weights,
 //! imported into the spiking substrate, adapting under local STDP.
 //!

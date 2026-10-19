@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Writes the regression traces and the reference vector of
 //! `tests/traces/`, and `tests/traces/frozen.rs`: the plasticity-off
 //! cases as the arrays a `FixedNetwork` steps. The cases, the format and

@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Qwen3 forward on Bonsai Q1_0 weights — Stage 4, sessions 3–4 + the
 //! 4B generalization (config-driven, 2026-08-16).
 //!

@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! GPT-2 byte-level BPE tokenizer for Qwen — Stage 4, session 4.
 //!
 //! Loads the tokenizer embedded in the GGUF (`tokenizer.ggml.*` metadata)

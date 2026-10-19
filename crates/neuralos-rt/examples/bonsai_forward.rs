@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Stage 4, session 2: the first REAL forward compute on Bonsai weights.
 //!
 //! Slice (all integer, all real tensors from the model file — Q1_0 or

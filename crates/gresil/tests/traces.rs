@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! The compare of `tests/traces/`: every file regenerates line for line
 //! from `tests/traces/cases.rs`, every header describes its rows, the
 //! board case folds to the bench record, the reference vector matches an

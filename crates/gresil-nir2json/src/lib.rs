@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! gresil-nir2json — the inbound bridge: a stranger's NIR `.nir`
 //! (HDF5) file converted into the JSON schema `gresil`'s
 //! [`nir_import`] consumes.

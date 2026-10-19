@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Files one byte edit away from a fixture, from the `.nir` probe of
 //! 2026-10-05: each is made here from its seed, so no edited file is
 //! tracked, and the edit is asserted on the seed's bytes first, so a

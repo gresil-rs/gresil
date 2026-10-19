@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! The judge-log tools — Rust port of `tools/delta.py` +
 //! `tools/margin_census.py` (deleted after parity was proven; the
 //! Python sessions' banked outputs remain the record of record).

@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `--freeze` on the reference witness, `two_lif_neurons.nir` under
 //! `--sim-units`, with the default drive (feature 1, 150 steps) at the
 //! default step, 0.1 ms, which `--dt` overrides. The

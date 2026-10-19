@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Structural encoding of the HDF5 plugin path (never README-only).
 //
 // The vendored HDF5 build's compiled-in plugin search directory

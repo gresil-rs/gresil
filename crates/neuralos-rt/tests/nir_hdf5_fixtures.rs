@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HDF5 `.nir` fixture tests (feature `hdf5`) — the reference's own
 //! `write()` emissions, same doctrine as the snn JSON fixtures.
 //!

@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Link against esp-hal's linker scripts (linkall.x pulls in the chip memory
 // map, riscv-rt, and the ROM symbol tables).
 //

@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Synapse model — clean port from v0.1 `libneuralos/src/core/spiking_neural_network/synapse.rs`.
 //!
 //! # Audit context

@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Session I ladder rung 3 v2 — THE NULL FAMILY: dose-matched primary ×10
 //! + position-shuffle ×3, both derived from the H2 TERMINAL PATCH.
 //!

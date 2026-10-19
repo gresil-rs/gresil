@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! The proof's canary: a panic path the link must refuse, under both
 //! profiles, the linker naming the handler's undefined symbol. Its index
 //! is in range, so the bounds check survives only while `black_box` hides

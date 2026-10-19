@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! The freezer: a network as the Rust source of the arrays a
 //! [`FixedNetwork`](super::FixedNetwork) steps. `std`: it writes
 //! `String`s.

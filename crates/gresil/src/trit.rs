@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Ternary weight representation `{-1, 0, +1} × per-tensor scale` — Stage 1 of
 //! the ternary bridge (see `docs/VISION.md`).
 //!
