@@ -17,6 +17,8 @@ tables). sha256 below; verify with `sha256sum -c SHA256SUMS`.
 | braille_noDelay_bias_zero_subgraph.nir | paper/03_rnn/extras/braille_noDelay_bias_zero_subgraph.nir | HONEST WALL |
 | braille_noDelay_noBias_subtract_subgraph.nir | paper/03_rnn/extras/braille_noDelay_noBias_subtract_subgraph.nir | HONEST WALL |
 
+These eight are under NIR's BSD 3-Clause license: `LICENSE-NIR`.
+
 Anti-circularity: these are emission events we did not cause (the NIR
 paper's authors exporting through third-party frameworks) — the entire
 point of this leg. A loud named rejection of an out-of-subset file is

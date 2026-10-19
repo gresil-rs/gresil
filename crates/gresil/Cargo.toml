@@ -8,7 +8,7 @@ authors.workspace = true
 repository.workspace = true
 keywords.workspace = true
 categories.workspace = true
-description = "Spiking Neural Network library, no_std, i16 fixed-point — gresil sovereignty stack core"
+description = "Spiking neural networks in no_std Rust, i16 fixed point, for microcontrollers"
 readme = "README.md"
 # The closed bridge chapter's four `ternary_*` examples stay in the
 # repository, where the workspace build checks them, and out of the
