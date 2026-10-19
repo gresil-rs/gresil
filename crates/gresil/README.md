@@ -19,7 +19,7 @@ core, `no_std` by default. Designed for FPU-less edge targets
 
 ## Quick start
 
-One LIF neuron on the centi-mV grid, driven by a constant 160 μA at a
+One LIF neuron on the centi-mV grid, driven by a constant 160 pA at a
 1 ms step. It is the neuron `firmware/esp32c3` runs on the ESP32-C3, and
 the asserts are what the board prints over serial: `147 spikes, first
 spike step 55`. Those come from the firmware's burst arm, where
@@ -46,7 +46,11 @@ let mut first_spike_step = None;
 
 for step in 0..10_000u32 {
     neuron.decay_adaptation_current();
-    if neuron.integrate_and_fire(160, 1_000, step * 1_000) {
+    if neuron.integrate_and_fire(
+        160,          // input current, pA
+        1_000,        // time step, µs
+        step * 1_000, // simulation time, µs
+    ) {
         spikes += 1;
         first_spike_step.get_or_insert(step);
     }
