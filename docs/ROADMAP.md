@@ -156,7 +156,7 @@ records it names in `evidence/INDEX.md`. Four lines, in order:
    import options that name their step and grid, and a `NirError` that
    owns the names it reports are in. The starter set closes the walk:
    four examples a stranger copies, which CI builds and tests. Then the
-   rename, the front door, the stamp.
+   front door and the stamp.
 3. **0.1.0: the stamp.** The principal's call, once the fourteen checks
    of § 0.1.0 hold again at the final tree, after the rename.
 4. **After 0.1.0: the learning chapter** (`docs/VISION.md` § Realistic
