@@ -19,14 +19,16 @@
 #   gate, the shas, the canary and the lint apply to this configuration
 #   and the default artifact under target/ never moves; the ELF is
 #   copied to <stem>.elf. build.rs's slot takes the module (its header
-#   carries the rules). A stranger without a board runs this phase.
-# run: build, then `espflash flash` (never `cargo run`: its runner
-#   monitors the port), then tools/esp32c3_capture.py alone on the port
-#   into <stem>.capture.log, then tools/esp32c3_trace_diff.py with
-#   --trace <stem>.trace. The verdict is the diff's last line and exit
-#   code. The bench rules are in esp32c3_capture.py's header. A capture
-#   is green only when the fragment before the reset carries no header:
-#   a reboot mid-replay is red by design, not a shorter compare.
+#   carries the rules). A stranger without a board runs this phase; its
+#   last line is the run command for the same graph.
+# run: the port checked writable before anything is built (below), then
+#   build, then `espflash flash` (never `cargo run`: its runner monitors
+#   the port), then tools/esp32c3_capture.py alone on the port into
+#   <stem>.capture.log, then tools/esp32c3_trace_diff.py with --trace
+#   <stem>.trace. The verdict is the diff's last line and exit code. The
+#   bench rules are in esp32c3_capture.py's header. A capture is green
+#   only when the fragment before the reset carries no header: a reboot
+#   mid-replay is red by design, not a shorter compare.
 #
 # Paths. The root is resolved first, and GRESIL_GRAPH and
 # CARGO_TARGET_DIR are exported absolute, since a relative one resolves
@@ -65,6 +67,8 @@ usage() {
   exit 2
 }
 
+# The command as typed, for the port check's message below.
+typed=$(printf '%q ' "$0" "$@")
 here=$(cd "$(dirname "$0")" && pwd)
 repo=$(git -C "$here" rev-parse --show-toplevel)
 [ $# -ge 2 ] || usage
@@ -103,8 +107,28 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# run checks its port before the build: espflash is the first to open
+# it, after the whole build, so a port the user may not write stopped a
+# stranger there ("Permission denied"). On Linux the port belongs to a
+# group, often dialout, which the message reads from the device; sg
+# takes the group at once, where usermod alone waits for the next
+# login. A setfacl does not last: the C3 enumerates again at each reset.
+if [ "$phase" = run ] && [ ! -w "$port" ]; then
+  if [ -e "$port" ]; then
+    group=$(stat -c %G -- "$port" 2>/dev/null || echo dialout)
+    echo "stranger.sh: $port is not writable. Join its group, $group, then run this command again through sg, which takes the group at once:" >&2
+    echo "  sudo usermod -aG $group \$USER" >&2
+    echo "  sg $group -c \"${typed% }\"" >&2
+  else
+    echo "stranger.sh: $port: no such port; is the board plugged in? (--port names another)" >&2
+  fi
+  exit 2
+fi
+
 # What this script prints is repo-relative, the record's convention.
 rel() { printf '%s' "${1#"$repo"/}"; }
+# The plural as the converter's counted() puts it: 1 neuron, 2 neurons.
+counted() { if [ "$((10#$1))" = 1 ]; then printf '%s %s' "$1" "$2"; else printf '%s %ss' "$1" "$2"; fi; }
 
 stem=$(basename "$nir" .nir)
 out=$here/target/stranger
@@ -149,13 +173,18 @@ if [ -z "$elf_sha" ] || [ -z "$text_sha" ] || [ "$copy_sha" != "$elf_sha" ]; the
   echo "stranger.sh: the shas did not read back from build.sh, or the copy differs from the ELF it built" >&2
   exit 1
 fi
-echo "stranger: $(rel "$nir"), $n neurons, $s synapses"
+echo "stranger: $(rel "$nir"), $(counted "$n" neuron), $(counted "$s" synapse)"
 echo "  module      $(rel "$module")"
 echo "  trace       $(rel "$trace")"
 echo "  elf         $(rel "$elf")"
 echo "  elf  sha256 $elf_sha"
 echo "  text sha256 $text_sha"
-[ "$phase" = run ] || exit 0
+if [ "$phase" = build ]; then
+  extra=
+  [ "$steps" = 150 ] || extra=" --steps $steps"
+  echo "  next        $(rel "$here/stranger.sh") run $(rel "$nir")$extra   # the board plugged in"
+  exit 0
+fi
 
 # 4. The board: flash, capture from the reset, diff.
 log=$out/$stem.capture.log
