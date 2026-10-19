@@ -90,17 +90,19 @@ or grab a prebuilt static binary from the releases (linux-x86_64).
   refused by name: a weight past ±32,767 quanta at true scale, an `r`
   that `V` takes past 65,535 MΩ, a `tau` past 1,000 steps. Limits,
   named: `r` is whole MΩ, so a node whose `r · V` is near 1 rounds
-  coarsely; the current a neuron receives in one step, from the input
-  or from spikes, is not refused at import and saturates past 32.767
-  units; a membrane driven below the −100 mV floor stops there, so a
-  strongly inhibited neuron recovers sooner than snnTorch's; each step
-  moves a membrane by whole quanta, so it stops up to about τ/dt quanta
-  short of the value it settles to: a neuron that settles just above
-  its threshold can stay silent, and one that nears it slowly fires
-  later than in floating point; and snnTorch's default reset,
-  subtraction, does not survive NIR (its exporter writes `v_reset = 0`
-  for every model), so a model runs as
-  trained only with `reset_mechanism="zero"`. The flag is
+  coarsely; the current a neuron receives in one step, from the input or
+  from spikes, is not refused at import and saturates past 32.767 units;
+  a learned β's leak rate, `1 − β` a step, is kept in whole thousandths,
+  so a neuron leaks up to one part in `1000 · (1 − β)` slower than
+  snnTorch's, 5 % at β 0.98; a membrane driven below the −100 mV floor
+  stops there, so a strongly inhibited neuron recovers sooner than
+  snnTorch's; each step moves a membrane by whole quanta, so it stops up
+  to about τ/dt quanta short of the value it settles to: a neuron that
+  settles just above its threshold can stay silent, and one that nears
+  it slowly fires later than in floating point; and snnTorch's default
+  reset, subtraction, does not survive NIR (its exporter writes
+  `v_reset = 0` for every model), so a model runs as trained only with
+  `reset_mechanism="zero"`. The flag is
   **all-or-nothing per file**: mixed-convention graphs (bio
   `r ≥ 1 MΩ` beside sim `r`) transform every `r` of the node — and
   refuse loudly via the r ceiling (a bio 5 MΩ becomes 5×10⁶·V MΩ),
