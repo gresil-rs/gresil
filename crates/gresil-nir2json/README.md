@@ -193,7 +193,11 @@ module needs only `core` and `gresil`, so it compiles `no_std`.
 
 ## Build (the release artifact)
 
-The prebuilt binary on the Gitea release is this, nothing more:
+The Gitea release carries the prebuilt binary with its third-party
+notices, `LICENSE` and the Rust toolchain's notices of the standard
+library, `rust-<version>-COPYRIGHT-library.html`; the script writes the
+notices and that file beside the binary in `dist/`. The binary is this,
+nothing more:
 
 ```bash
 rustup target add x86_64-unknown-linux-musl          # once

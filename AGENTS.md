@@ -122,12 +122,15 @@ PATH="$PWD/.nirenv/bin:$PATH" cargo clippy -p neuralos-rt --features hdf5 --all-
 
 # The firmware leg (CI job `firmware`, and the per-commit loop; own workspace, invisible to --workspace; round 26):
 (cd firmware/esp32c3 && cargo fmt -- --check)
-firmware/esp32c3/build.sh                         # the build: path remap for the four source roots, personal-string gate on the ELF, ELF + .text shas, trim-paths canary (tools/remap.sh carries the why); needs the riscv32imc-unknown-none-elf target and the llvm-tools component on the pin
+firmware/esp32c3/build.sh                         # the build: path remap for the four source roots, personal-string gate on the ELF, ELF + .text shas, the ELF's third-party notices beside it (tools/notices.sh), trim-paths canary (tools/remap.sh carries the why); needs the riscv32imc-unknown-none-elf target and the llvm-tools component on the pin
 firmware/esp32c3/build.sh clippy                  # clippy --release --locked -D warnings under the script's flags
 firmware/esp32c3/stranger.sh build crates/gresil-nir2json/tests/fixtures/community/snnTorch_two_layer.nir  # the one command's build phase on the witness (PR H): the converter, the capacity bar, build.sh + clippy with the graph in the slot, in firmware/esp32c3/target/stranger/; `run` adds the board (firmware/esp32c3/README.md)
 proofs/no-panic-step/build.sh                     # the no-panic proof, same job and loop: its own fmt, then FixedNetwork::step linked under the firmware's profile and under one without cross-crate LTO, each leg with a canary the linker must refuse by name (the script's header carries the why)
 # Not a CI job, same treatment: the release musl binary of the inbound bridge.
-crates/gresil-nir2json/build.sh                 # → crates/gresil-nir2json/dist/ (gitignored), gated the same way; never overwrites a different binary under the same name
+crates/gresil-nir2json/build.sh                 # → crates/gresil-nir2json/dist/ (gitignored), gated the same way, its third-party notices beside it (tools/notices.sh); never overwrites a different binary under the same name
+# Not CI jobs either: the license check of the two release binaries' graphs, run by hand before a release; one deny.toml per workspace, the root's and firmware/esp32c3/'s.
+cargo deny --manifest-path crates/gresil-nir2json/Cargo.toml --offline -t x86_64-unknown-linux-musl check licenses   # licenses ok, exit 0, no warning
+cargo deny --manifest-path firmware/esp32c3/Cargo.toml --offline -t riscv32imc-unknown-none-elf check licenses       # the same for the firmware's graph
 
 # Run the visualizer (a display required: `DISPLAY` or `WAYLAND_DISPLAY` set):
 cargo run -p gresil-scope --release               # ~2–9 min link on a 2-core CPU; binary cached after

@@ -1279,18 +1279,30 @@ moves, which this list never pinned, are in it too.
 
 ### Release asset (the procedure since round 26)
 
-A firmware asset on a Gitea release is built by `build.sh` at the
-tagged commit (the descriptor stamp is that commit's time), copied
-from the target dir into `firmware/esp32c3/dist/` under the alpha.6
-name pattern
+A release's files are staged in one folder, `dist/<tag>/` at the repo
+root (gitignored), with nothing else in it; since round 76
+`firmware/esp32c3/dist/` is no longer a staging place, and the ELFs
+already in it stay. The firmware is built by `build.sh` at the tagged
+commit (the descriptor stamp is that commit's time) and copied from
+the target dir under the alpha.6 name pattern
 `gresil-esp32c3-<fw>-snn-<lib>-riscv32imc-unknown-none-elf.elf`
 (alpha.6 to alpha.8 shipped it as `neuralos-esp32c3-…`, the package's
-name before the rename),
-listed in `dist/SHA256SUMS`, uploaded with that file, downloaded back,
-checked with `sha256sum -c`, and gated once more on the download:
+name before the rename), with the third-party notices `build.sh`
+writes beside it, `THIRD-PARTY-NOTICES-gresil-esp32c3.txt`
+(`tools/notices.sh`). Beside them: the converter and its notices, from
+`crates/gresil-nir2json/dist/` (its README § Build); the root's
+`LICENSE`; `rust-<version>-COPYRIGHT-library.html`, the toolchain's
+notices of the standard library, which both notices files name; and
+one `SHA256SUMS` over the others. Each notices file passes the two
+greps of the gate `tools/notices.sh` runs on its output before the
+upload. Each file is uploaded, downloaded back and checked with
+`sha256sum -c`, and the downloads are gated once more, the binaries by
+the remap's gate and the notices files by the same two greps:
 
 ```bash
-(source tools/remap.sh && remap_env >/dev/null && remap_gate <downloaded.elf>)
+(source tools/remap.sh && remap_env >/dev/null && remap_gate <downloaded binary>)
+grep -n -E -i -e "$(cat .githooks/personal-pattern)" <notices file>   # no line
+grep -n -E '(^|[[:space:](<"=,;:])(/|~/)[A-Za-z0-9._-]' <notices file>  # no line: no word is a path
 ```
 
 No scrub: the remap is what the alpha.6 release's § Scrub did by hand,
@@ -1303,11 +1315,15 @@ the ring's bounds check embeds the source path in rodata, and a
 rebuild of 820d81a from a 72-byte-longer path moved 45 `addi` address
 immediates in `.text` by exactly 72 and nothing else (verified by
 diffing the two `main` listings). That sentence describes the bare
-line; under the script's remap the four source roots become fixed
-aliases, so the third pin is expected from any clone path, home or
-cargo home (the ELF sha still moves: the descriptor stamp is the
-commit date, and the symbol-name hashes follow the package path). A
-different ELF sha with the same log lines is not a finding; a
+line; under the script's remap no path string reaches the ELF, and
+`.text` still follows the clone path: the firmware is its own
+workspace, and cargo hashes `crates/gresil`, outside that workspace's
+root, by its absolute path, so a pin compares at its own path, the
+main clone's (`tools/remap.sh`, ISA round 44; measured again
+2026-10-20: one tree gave one `.text` at five paths, its bumped twin
+three values at five). The ELF sha moves as well: the descriptor stamp
+is the commit date, and the symbol-name hashes follow the package
+path. A different ELF sha with the same log lines is not a finding; a
 different `.text` with the same log lines is one to read. Reproducing
 `boot-no-descriptor.log` means flashing an ELF built from 3525492 with
 `--ignore-app-descriptor`; `factory-empty-flash.log` needs a blank

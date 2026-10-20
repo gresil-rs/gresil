@@ -1,0 +1,14 @@
+# cargo-deny's license check of the firmware's graph, gresil-esp32c3, a
+# workspace of its own: its crates' licenses, the build-time crates'
+# included, each allowed and none more, so a run warns of nothing. Run
+# by hand from the repo root before a release (AGENTS.md § Commands),
+# never in CI:
+#   cargo deny --manifest-path firmware/esp32c3/Cargo.toml --offline -t riscv32imc-unknown-none-elf check licenses
+# Without this file the run takes the root's deny.toml, the converter's,
+# and refuses riscv's ISC: a missing file fails loudly.
+[graph]
+exclude-dev = true
+
+[licenses]
+allow = ["MIT", "Apache-2.0", "ISC", "Zlib", "Unlicense", "BSL-1.0", "Unicode-3.0", "AGPL-3.0-or-later"]
+confidence-threshold = 0.9

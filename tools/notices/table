@@ -1,0 +1,21 @@
+# tools/notices/table: the linked crates tools/notices.sh cannot cover
+# from their package. A crate whose package has no license file and
+# whose expression offers no Apache-2.0 takes its row here, or the
+# script refuses it by name. One row a crate, tab-separated:
+#   name  version  source  sha256  holder
+# source: <file>:<first>-<last>, those lines of a file of the package,
+# or toolchain:<file>, a text of the toolchain's licenses/ folder
+# (share/doc/rust/licenses/ of its sysroot). sha256: the text's, as the
+# script cuts it; a different one refuses, so the row is read again.
+# holder, optional: a copyright line written above the text, for a
+# package that carries none; the notices then say that it carries none
+# and that the holder is the author its manifest gives, the name
+# without the address (ruled 2026-10-20).
+#
+# riscv, riscv-pac and riscv-rt are ISC, their notice the License
+# section of their README; void is MIT, with no notice in its package
+# (its README says "MIT").
+riscv	0.15.0	README.md:17-31	fb8153416c5c41d5df2e8f14a8d6e39a907aca280c212f6e3a92939072f17901
+riscv-pac	0.2.0	README.md:17-31	eaadbb8ddad8fb8601af95661389de28787549273c1f42494b5fb0bf9cf91b0a
+riscv-rt	0.16.0	README.md:17-31	7738bd692924a68f326d4077e282eedd50a1653672835b3b399f00ced48fe46a
+void	1.0.2	toolchain:MIT.txt	b85dcd3e453d05982552c52b5fc9e0bdd6d23c6f8e844b984a88af32570b0cc0	Copyright (c) Jonathan Reem

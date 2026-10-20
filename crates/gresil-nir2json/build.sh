@@ -8,7 +8,9 @@
 # (35 registry, 3 rust-src; ISA round 26); this build carries none or
 # it does not exist. Output: dist/gresil-nir2json-v<crate version>-
 # x86_64-unknown-linux-musl (dist/ is gitignored; the binary lives on
-# the release, its sha in the record), the ELF sha and the .text sha.
+# the release, its sha in the record), the ELF sha and the .text sha,
+# and beside the binary its third-party notices, with the toolchain's
+# notices of the standard library (tools/notices.sh carries the why).
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -39,4 +41,8 @@ elf_sha=$(sha256sum "$out" | cut -d' ' -f1)
 text_sha=$(remap_text_sha "$out")
 echo "elf  sha256 $elf_sha  ${out#"$repo"/}"
 echo "text sha256 $text_sha  (.text image; the comparable)"
+# <out> relative to the root, so the notices line prints it as the sha
+# line does.
+"$repo/tools/notices.sh" "$here/Cargo.toml" gresil-nir2json "$target" \
+  "${here#"$repo"/}/dist/THIRD-PARTY-NOTICES-gresil-nir2json.txt"
 remap_canary "$repo" -p gresil-nir2json --release --locked --target "$target"

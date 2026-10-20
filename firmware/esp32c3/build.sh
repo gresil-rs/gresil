@@ -5,7 +5,9 @@
 # the trim-paths canary (tools/remap.sh carries the why). `build`
 # (default) is what every caller runs — CI's firmware job, the
 # per-commit loop, tools/percommit.sh, the evidence README § Rebuild +
-# run, the release build — and prints the ELF sha and the .text sha.
+# run, the release build — and prints the ELF sha and the .text sha,
+# then writes the ELF's third-party notices beside it, NIR's text for
+# frozen.rs's graph among them (tools/notices.sh carries the why).
 # `clippy` runs the lint under the same flags: clippy never shares
 # build artifacts (it checks, it does not build), but same flags keep
 # its own cache valid across the per-commit loop and make the lints
@@ -49,6 +51,8 @@ case ${1:-build} in
     text_sha=$(remap_text_sha "$elf")
     echo "elf  sha256 $elf_sha  $(remap_show "$elf")"
     echo "text sha256 $text_sha  (.text image; the comparable, README § Rebuild + run)"
+    "$REMAP_REPO/tools/notices.sh" "$here/Cargo.toml" gresil-esp32c3 riscv32imc-unknown-none-elf \
+      "$(dirname "$elf")/THIRD-PARTY-NOTICES-gresil-esp32c3.txt" --nir
     remap_canary "$here" --release --locked
     ;;
   clippy)
