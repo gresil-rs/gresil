@@ -73,12 +73,12 @@ parity test, PR #49 and PR #51).
 
 **Near-term — the starved original list, first-class again:** NIR
 import/export **DONE through general graph assembly** (2026-08-22,
-alpha.5; the R18 deferral family remains), SIMD follow-up/hardening,
-lock-free ports from the v0.1 archive (re-scoped to A-extension
-targets — rv32imc/ESP32-C3 are not), more property tests. The
-`no_std` claim **has** its QEMU `riscv64gc` proof (2026-08-21, both
-postures: bare-metal gate + full test suite under linux-user;
-`evidence/qemu-riscv-gate/`).
+alpha.5; the R18 deferral family remains), SIMD hardening **DONE**
+(2026-09-02), lock-free ports from the v0.1 archive (re-scoped to
+A-extension targets — rv32imc/ESP32-C3 are not), parked (ROADMAP,
+Phase 1), more property tests. The `no_std` claim **has** its QEMU
+`riscv64gc` proof (2026-08-21, both postures: bare-metal gate + full
+test suite under linux-user; `evidence/qemu-riscv-gate/`).
 
 ### 2. The ternary bridge — CLOSED (research record, honestly labeled)
 
@@ -115,8 +115,8 @@ roadmap).
 
 ## Realistic near-term path
 
-1. **Feed the spine:** NIR import/export, SIMD hardening, lock-free
-   ports — the original Phase-1 list.
+1. **Feed the spine:** NIR import/export and SIMD hardening, done; the
+   lock-free ports, parked (ROADMAP, Phase 1).
 2. **QEMU `riscv64gc` proof of the `no_std` claim — DONE 2026-08-21**
    (`evidence/qemu-riscv-gate/`); **ESP32-C3 bring-up DONE 2026-09-09**
    (`evidence/esp32c3-bringup/`, one LIF neuron on real silicon).

@@ -28,7 +28,7 @@ archive, not here. `cd` back to this repo.
 |---|---|
 | `crates/gresil` | The spine. Published on crates.io, as `neuralos-snn` until alpha.9; the version is the workspace `version`, § Published crate. `no_std`-by-default, i16 fixed-point. |
 | `crates/gresil-scope` | The microscope. Slint visualizer over the library. |
-| `crates/gresil-nir2json` | The inbound bridge. Pure-Rust `.nir` (HDF5 via `hdf5-pure`, no C) → the library's JSON schema, for graphs strangers emit (snnTorch, norse, rockpool). The stranger-usable artifact GUARD 3 names: a static musl binary on the Gitea release, built by its README § Build. `publish = false` (crates.io deferred by ruling). |
+| `crates/gresil-nir2json` | The inbound bridge. Pure-Rust `.nir` (HDF5 via `hdf5-pure`, no C) → the library's JSON schema, for graphs strangers emit (spike-checked against snnTorch; its README says what converts). The stranger-usable artifact GUARD 3 names: a static musl binary on the Gitea release, built by its README § Build. `publish = false` (crates.io deferred by ruling). |
 | `crates/neuralos-rt` | The research runtime (GGUF container, Q1_0/Q2_0 compute, tokenizer, model). `publish = false`, std-only. Consumed by the frozen bridge examples. |
 | `paper/` | The Branch B article. Builds with `make` in `paper/` (`make figs` regenerates figures from evidence; `make gate` enforces the language rules of record). |
 | `evidence/` | Raw judge/experiment logs. Indexed by `evidence/INDEX.md`. |

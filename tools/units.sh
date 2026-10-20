@@ -18,9 +18,6 @@
 #   - docs/releases/, the release notes, frozen at publish as those
 #     version notes are; a draft names a published version's fields as
 #     that version spelled them;
-#   - two lines of that README, allowed by their exact text until
-#     alpha.9's publish round changes them. An allowed line that is gone
-#     is red too, so the commit that changes it drops it here;
 #   - this file, which names what it looks for.
 # These forms and no others: a word spelled apart (micro-amps, micro
 # amps), a bare `ua` after a space and an escape (\u00b5A) pass, and a
@@ -38,10 +35,6 @@ greek=$'\xce\xbc'   # U+03BC GREEK SMALL LETTER MU
 pat="${mu}A|${greek}A|(^|[^[:alpha:]])uA([^[:alpha:]]|$)|[0-9]ua([^[:alpha:]]|$)|_ua([^[:alnum:]]|$)|_UA([^[:alnum:]]|$)|[Mm]icroamp"
 
 readme=crates/gresil/README.md
-allowed=(
-  'microamps, u32 microseconds) — no floating point, no allocator in the'
-  "~200 ${greek}A dead zone moves the membrane exactly zero — recorded, tested,"
-)
 
 set +e
 hits=$(git grep --no-color -I -n -E -e "$pat" -- . \
@@ -55,7 +48,6 @@ if [ "$rc" -gt 1 ]; then
   exit 2
 fi
 
-declare -A seen=()
 n=0
 notes=0
 while IFS= read -r line || [ -n "$line" ]; do
@@ -65,25 +57,14 @@ while IFS= read -r line || [ -n "$line" ]; do
     '## '*) notes=0 ;;
   esac
   [ "$notes" = 1 ] && continue
-  for a in "${allowed[@]}"; do
-    if [ "$line" = "$a" ]; then
-      seen[$a]=1
-      continue 2
-    fi
-  done
   if [[ $line =~ $pat ]]; then
     hits+="${hits:+$'\n'}$readme:$n:$line"
   fi
 done < "$readme"
 
-gone=
-for a in "${allowed[@]}"; do
-  [ -n "${seen[$a]:-}" ] || gone+="${gone:+$'\n'}$readme: allowed line not found: $a"
-done
-
-if [ -n "$hits" ] || [ -n "$gone" ]; then
-  [ -z "$hits" ] || { echo "the current written in microamps (pA is the unit):"; echo "$hits"; }
-  [ -z "$gone" ] || { echo "an allowed line is gone; drop it from tools/units.sh:"; echo "$gone"; }
+if [ -n "$hits" ]; then
+  echo "the current written in microamps (pA is the unit):"
+  echo "$hits"
   exit 1
 fi
 echo "the current in pA: no other spelling in the tracked files outside the frozen places"

@@ -47,8 +47,7 @@ $ firmware/esp32c3/stranger.sh run your_graph.nir
 One command converts the graph in pure Rust, builds and flashes the
 firmware, replays your graph and fourteen frozen traces, and diffs every
 row the board prints against the host's. The last line is the verdict.
-So far the board has run an snnTorch graph; norse and rockpool files
-convert, but have not run on the board yet.
+So far the board has run an snnTorch graph.
 
 No board? `firmware/esp32c3/stranger.sh build your_graph.nir` stops
 after the build and writes the host's trace.

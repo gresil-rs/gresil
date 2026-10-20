@@ -1136,9 +1136,9 @@ pub enum NirUnits {
     /// absmax, the substrate's firing rule `v ≥ threshold`, a refractory
     /// period of 1 ms. No numeric-parity claim.
     Native,
-    /// The simulation-unit convention of snnTorch, norse and rockpool,
-    /// after `gresil-nir2json --sim-units` has read the potentials and
-    /// `r`. A Linear weight `w` keeps its true scale,
+    /// The simulation-unit convention of snnTorch, after
+    /// `gresil-nir2json --sim-units` has read the potentials and `r`. A
+    /// Linear weight `w` keeps its true scale,
     /// [`SIM_CURRENT_QUANTA`] current quanta per unit, and a weight
     /// whose quanta pass ±32,767 is refused
     /// ([`NirError::WeightOutOfRange`]). A current summed in one step,
