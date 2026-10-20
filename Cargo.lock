@@ -1757,7 +1757,7 @@ dependencies = [
 
 [[package]]
 name = "gresil"
-version = "0.1.0-alpha.8"
+version = "0.1.0-alpha.9"
 dependencies = [
  "heapless",
  "proptest",
@@ -1774,7 +1774,7 @@ dependencies = [
 
 [[package]]
 name = "gresil-scope"
-version = "0.1.0-alpha.8"
+version = "0.1.0-alpha.9"
 dependencies = [
  "gresil",
  "slint",
@@ -3073,7 +3073,7 @@ dependencies = [
 
 [[package]]
 name = "neuralos-rt"
-version = "0.1.0-alpha.8"
+version = "0.1.0-alpha.9"
 dependencies = [
  "gresil",
  "hdf5",

@@ -55,8 +55,8 @@ pass; verification method in parentheses):
 
 ### 1. The substrate (now — the active front)
 
-`neuralos-snn` on crates.io (`0.1.0-alpha.8`, release notes in
-`docs/releases/v0.1.0-alpha.8.md`; `gresil` from alpha.9):
+`gresil` on crates.io (`neuralos-snn` until alpha.8; release notes in
+`docs/releases/`):
 `no_std`, i16 fixed-point,
 LIF + full pairwise STDP (in the tree behind the `unstable-stdp`
 feature, off by default) + 4 topologies + CSR sparse matrix + AVX2 kernel

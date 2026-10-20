@@ -248,4 +248,4 @@ not byte-stable across runs, so the committed emission is pinned by its
 sha in PROVENANCE.md; the exporter's edge order follows Python's hash
 seed, and under `PYTHONHASHSEED=0` a second run writes the same bytes).
 
-[`gresil`]: https://crates.io/crates/neuralos-snn
+[`gresil`]: https://crates.io/crates/gresil

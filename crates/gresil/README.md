@@ -5,8 +5,8 @@
 > AVX2 batch kernel, and, behind unstable features, pairwise STDP, the
 > ternary bridge codecs and the freezer.
 
-Published on crates.io as `neuralos-snn` `0.1.0-alpha.8`, as `gresil`
-from alpha.9 (AGPL-3.0-or-later).
+Published on crates.io as `gresil` from 0.1.0-alpha.9; alpha.8 and
+earlier as `neuralos-snn` (AGPL-3.0-or-later).
 
 ## What this crate is
 
@@ -193,6 +193,21 @@ ternary SNN↔LLM bridge on this substrate lives in the workspace's
   `i2_s` layout helpers); introspection accessors and builders stay pub —
   see the alpha.3 audit record in the repo's `ISA.md`.
 - SIMD gate runs in CI; the batch kernel is documented mV-grid-only.
+
+## Since alpha.8 (the alpha.9 notes)
+
+- **The crate is `gresil`**, which `neuralos-snn` was: `use gresil::`
+  where you wrote `use neuralos_snn::`.
+- **The pub walk** (what stops being public before 0.1.0 promises the
+  surface): the root keeps ten names, the neuron and the synapse have no
+  public field, each refusal returns the variant of its rule, the
+  current is named in pA (the older notes below say μA for the same
+  numbers), STDP and the closed bridge chapter sit behind unstable
+  features, and a network does not learn unless asked.
+- **NIR** imports at true scale, a two-layer graph builds, and a
+  stranger's `.nir` reaches the ESP32-C3 in one command.
+- Every break with its fix, by module, and the board's figures:
+  [the release notes](https://gitea.com/gresil-rs/gresil/releases/tag/v0.1.0-alpha.9).
 
 ## Since alpha.7 (the alpha.8 notes)
 
@@ -412,8 +427,10 @@ ternary SNN↔LLM bridge on this substrate lives in the workspace's
 
 ## Status
 
-**`0.1.0-alpha.8` is live on crates.io, as `neuralos-snn`**:
-`FixedNetwork`, a network in
+**`0.1.0-alpha.9` is live on crates.io, the first release named
+`gresil`** (alpha.8 and earlier: `neuralos-snn`): the pub walk (see
+"Since alpha.8"). Alpha.8 (2026-09-14T20:37:43Z from 6f03e1b,
+registry-verified, as `neuralos-snn`): `FixedNetwork`, a network in
 arrays, replays every plasticity-off trace bit for bit on the ESP32-C3
 and under QEMU `riscv64gc`, with no panic path in its step, proven at
 link time; the traces; the spike ring out of the neuron; the MSRV
