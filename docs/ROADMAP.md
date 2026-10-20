@@ -94,8 +94,9 @@ Strict order — nothing new opens until the rung above is 100%.
 1. ✅ QEMU `riscv64gc`, reproducible path (2026-08-21: both legs green —
    bare-metal none-elf gate + full suite under linux-user musl;
    `evidence/qemu-riscv-gate/`)
-2. ✅ `gresil` executing in that environment (Leg A 175/175 cited
-   checks; Leg B 195/195 real tests incl. transmission trio + Leg-C pins)
+2. ✅ `gresil` executing in that environment (Leg A's cited checks and
+   Leg B's full suite, the transmission trio and the Leg-C pins among
+   them; each run's counts in `evidence/qemu-riscv-gate/README.md`)
 3. ✅ Documentation of what is truly `no_std`-portable vs host-only
    (`network`/`csr`/`stats` are std-gated and ran in Leg B's linux-user
    posture; Leg A's no_std surface is the six core modules — recorded in

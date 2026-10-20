@@ -154,7 +154,10 @@ pub extern "C" fn rust_main() -> ! {
         Uart,
         "gresil Leg A: bare-metal riscv64gc-unknown-none-elf, QEMU virt, no allocator"
     );
-    let _ = writeln!(Uart, "cited asserts: values mirrored from crates/gresil unit tests");
+    let _ = writeln!(
+        Uart,
+        "cited asserts: values mirrored from crates/gresil unit tests"
+    );
     lif_checks();
     synapse_checks();
     bridge_checks();
@@ -176,7 +179,12 @@ pub extern "C" fn rust_main() -> ! {
 }
 
 const TRACE_TAGS: [&str; 6] = [
-    "step1=-67", "step2=-65", "step3=-63", "step4=-61", "step5=-59", "step6=-57",
+    "step1=-67",
+    "step2=-65",
+    "step3=-63",
+    "step4=-61",
+    "step5=-59",
+    "step6=-57",
 ];
 
 fn lif_checks() {
@@ -248,11 +256,7 @@ fn lif_checks() {
     let _ = n.integrate_and_fire(0, 1000, 1000);
     n.decay_adaptation_current();
     n.decay_adaptation_current();
-    ck(
-        "lif::adaptation_decay 3->2",
-        n.adaptation_current_pa(),
-        2,
-    );
+    ck("lif::adaptation_decay 3->2", n.adaptation_current_pa(), 2);
     n.decay_adaptation_current();
     ck("lif::adaptation_decay 2->1", n.adaptation_current_pa(), 1);
     n.decay_adaptation_current();
@@ -372,9 +376,9 @@ fn synapse_checks() {
 }
 
 const REAL_Q2_0_FIRST_BLOCK: [u8; 34] = [
-    0xC8, 0x24, 0x14, 0x44, 0x45, 0x1A, 0x18, 0x68, 0x68, 0x61, 0x8A, 0xA8, 0x91, 0x66, 0x45,
-    0x42, 0x91, 0x80, 0x11, 0x62, 0x18, 0x11, 0x29, 0x48, 0x61, 0x00, 0x1A, 0x94, 0x81, 0x24,
-    0x54, 0x0A, 0x86, 0x84,
+    0xC8, 0x24, 0x14, 0x44, 0x45, 0x1A, 0x18, 0x68, 0x68, 0x61, 0x8A, 0xA8, 0x91, 0x66, 0x45, 0x42,
+    0x91, 0x80, 0x11, 0x62, 0x18, 0x11, 0x29, 0x48, 0x61, 0x00, 0x1A, 0x94, 0x81, 0x24, 0x54, 0x0A,
+    0x86, 0x84,
 ];
 
 fn bridge_checks() {
@@ -418,11 +422,7 @@ fn bridge_checks() {
         got_scale,
         scale_bits,
     );
-    ck_slice(
-        "bridge::i2_s_known_vector decode trits",
-        &back,
-        &trits,
-    );
+    ck_slice("bridge::i2_s_known_vector decode trits", &back, &trits);
 
     let pat = [
         Trit::One,
@@ -495,11 +495,13 @@ fn bridge_checks() {
         decode_q2_0(&REAL_Q2_0_FIRST_BLOCK, &mut trits, &mut scales).is_ok(),
     );
     ck("bridge::q2_0_real_artifact scale", scales[0], 0x24C8);
-    let census = trits.iter().fold((0_i32, 0_i32, 0_i32), |(p, z, m), t| match t {
-        Trit::One => (p + 1, z, m),
-        Trit::Zero => (p, z + 1, m),
-        Trit::MinusOne => (p, z, m + 1),
-    });
+    let census = trits
+        .iter()
+        .fold((0_i32, 0_i32, 0_i32), |(p, z, m), t| match t {
+            Trit::One => (p + 1, z, m),
+            Trit::Zero => (p, z + 1, m),
+            Trit::MinusOne => (p, z, m + 1),
+        });
     ck("bridge::q2_0_real_artifact census", census, (37, 43, 48));
     let mut back = [0_u8; 34];
     ck_bool(
@@ -717,11 +719,7 @@ fn kernel_checks() {
     let mut out = [0_i16; 3];
     let scale = absmax_normalize_q15(&vals, &mut out).unwrap_or(u16::MAX);
     ck("kernel::absmax_i16_min scale", scale, 32_768);
-    ck_slice(
-        "kernel::absmax_i16_min out",
-        &out,
-        &[-32_767, 0, 32_766],
-    );
+    ck_slice("kernel::absmax_i16_min out", &out, &[-32_767, 0, 32_766]);
 
     let mut out = [7_i16; 3];
     let scale = absmax_normalize_q15(&[0, 0, 0], &mut out).unwrap_or(u16::MAX);
@@ -739,11 +737,7 @@ fn kernel_checks() {
         "kernel::matvec_known_vector runs",
         ternary_matvec(&packed, &a, 2, &mut out).is_ok(),
     );
-    ck_slice(
-        "kernel::matvec_known_vector out",
-        &out,
-        &[800, -6207],
-    );
+    ck_slice("kernel::matvec_known_vector out", &out, &[800, -6207]);
 }
 
 fn nir_checks() {
@@ -850,8 +844,8 @@ fn nir_checks() {
         "nir::quantize_linear same-tensor same-scale",
         lin2.scale == lin.scale,
     );
-    let lin3 =
-        quantize_linear(&[32767.0, -16384.0, 0.0], 1, 3, &mut arena, 0).unwrap_or_else(|_| lin_sentinel());
+    let lin3 = quantize_linear(&[32767.0, -16384.0, 0.0], 1, 3, &mut arena, 0)
+        .unwrap_or_else(|_| lin_sentinel());
     ck("nir::quantize_linear exact scale", lin3.scale, 1.0);
     ck("nir::quantize_linear exact err", lin3.max_abs_err, 0.0);
     ck_slice(
@@ -870,7 +864,8 @@ fn nir_checks() {
         &arena[..4],
         &[0, 0, 0, 0],
     );
-    let lin2 = quantize_linear(&[3.0, -3.0, 1.0], 1, 3, &mut arena, 0).unwrap_or_else(|_| lin_sentinel());
+    let lin2 =
+        quantize_linear(&[3.0, -3.0, 1.0], 1, 3, &mut arena, 0).unwrap_or_else(|_| lin_sentinel());
     ck_bool(
         "nir::quantize_linear full_scale not zero",
         !lin2.zero_tensor,
@@ -894,6 +889,16 @@ fn nir_checks() {
             "nir::denormal_absmax_is_loud",
             tag,
             quantize_linear(&[v], 1, 1, &mut arena, 0),
+            Err(NirError::BadNumber("weight")),
+        );
+    }
+
+    for &(v, tag) in [(f64::MAX, "+f64::MAX"), (-f64::MAX, "-f64::MAX")].iter() {
+        let mut arena = [0_i16; 4];
+        ck_s(
+            "nir::f64_max_absmax_is_loud",
+            tag,
+            quantize_linear(&[1.0, v], 1, 2, &mut arena, 0),
             Err(NirError::BadNumber("weight")),
         );
     }

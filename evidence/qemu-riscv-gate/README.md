@@ -135,6 +135,16 @@ prints its index 3 lower from `[ 41]` to `[ 42]` and 6 lower from
 `[ 46]` on, with its name and its value as recorded, and the last line
 counts `checks: 169`.
 
+Since round 76 leg A runs 171 checks. The two new ones, `[162]` and
+`[163]`, follow the denormal checks and cite
+`quantize_linear_f64_max_absmax_is_loud`: a Linear weight of
+`f64::MAX`, then of `-f64::MAX`, beside a 1.0 is refused with
+`BadNumber("weight")`. The eight checks after them,
+`nir::rejects_loudly`, print their index 2 higher, `[164]` to `[171]`,
+with their names and their values as recorded, and the last line
+counts `checks: 171`. Since the same round `main.rs` is in rustfmt's
+shape, which moved no printed line.
+
 ## Leg B — user-mode, the REAL suite (the wire crosses)
 
 Full workspace test suite of the crate — NOT a subset — built static
