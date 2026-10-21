@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Step-5 readout aggregator — the mechanical verdict table (PREREG §5).
 //!
 //! Two modes:

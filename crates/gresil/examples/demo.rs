@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! gresil — SNN Showcase Demo
 //!
 //! Creates a balanced E/I spiking neural network, runs a simulation, and prints

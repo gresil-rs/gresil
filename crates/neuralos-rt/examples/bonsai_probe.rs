@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Stage 4, session 1 probe: point the Stage-2 codecs at a REAL Bonsai
 //! model file. The evidence this prints is ISC-21/22's falsifier run:
 //!

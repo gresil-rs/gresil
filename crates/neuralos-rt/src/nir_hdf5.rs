@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! NIR HDF5 container (NIR slice 2, feature `hdf5`) — the reference's
 //! own `.nir` file format, read through the structured-entry seam.
 //!

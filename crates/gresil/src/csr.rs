@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Compressed Sparse Row (CSR) synapse storage — O(1) per-presynaptic
 //! iteration, forward + reverse.
 //!

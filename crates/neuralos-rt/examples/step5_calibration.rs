@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Step-5 CALIBRATION — the lesion/graft positive control
 //! (`evidence/step5-calibration/PREREG.md` is the spec — its current draft;
 //! this file is its instrument).

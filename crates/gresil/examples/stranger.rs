@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! A stranger's graph, stepped on the host: the std program of the
 //! starter set (`freeze` writes the same graph for a board, and `board`
 //! steps it there).

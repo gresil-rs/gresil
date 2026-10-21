@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Mechanical delta table: baseline vs patched judge logs.
 //!
 //! Rust port of `tools/delta.py` (deleted after byte-compatibility

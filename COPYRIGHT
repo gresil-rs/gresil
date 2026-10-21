@@ -1,0 +1,36 @@
+gresil: spiking neural networks in no_std Rust, i16 fixed point, for
+microcontrollers.
+
+Copyright (C) 2026 philo-the-dendron
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public
+License along with this program, in the file LICENSE. If not, see
+<https://www.gnu.org/licenses/>.
+
+This notice covers every file in this repository but those named
+below. Commits up to 55070d7, before the rename to gresil, are
+authored under the git name "philodendron", the same person. The
+repository was NeuralOS v2, at gitea.com/Caramoussin/NeuralOs-v2,
+until it moved to gresil-rs/gresil on 2026-10-18.
+
+Under another license: the eight files that
+crates/gresil-nir2json/tests/fixtures/community/PROVENANCE.md lists as
+copied from the NIR repository (https://github.com/neuromorphs/NIR),
+under that repository's BSD 3-Clause license, whose text is
+LICENSE-NIR in the same folder. Made from one of these files, under
+the same license: the conversion
+crates/gresil/tests/nir_fixtures/two_lif_neurons_sim.json, with a copy
+of LICENSE-NIR beside it, and the two_lif_neurons module of
+crates/gresil/tests/traces/frozen.rs, frozen from that conversion.
+
+Contact: the issue tracker at https://gitea.com/gresil-rs/gresil

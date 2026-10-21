@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! SIMD-accelerated batch LIF integration (AVX2, `x86_64`).
 //!
 //! Ported from v0.1 `libneuralos_before_bridge_removal/src/core/simd_vectorization.rs`,

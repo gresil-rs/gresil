@@ -6,6 +6,36 @@ library's frozen traces replayed over serial, then a neuron that blinks
 the LED. The board's record, every capture and pin, is
 [`evidence/esp32c3-bringup/README.md`](../../evidence/esp32c3-bringup/README.md).
 
+## Before the first run
+
+Run these from the clone, so that rustup applies them to the toolchain
+`rust-toolchain.toml` pins: the chip's target, the `llvm-tools`
+component (`build.sh` reads the `.text` with its `llvm-objcopy`) and
+espflash 4.
+
+```bash
+rustup target add riscv32imc-unknown-none-elf
+rustup component add llvm-tools
+cargo install espflash --locked --version '^4'
+```
+
+On Linux the board's port belongs to a group, often `dialout`
+(`ls -l /dev/ttyACM0` names it). Join it, then run through `sg`, which
+takes the group at once, with no new login:
+
+```bash
+sudo usermod -aG dialout $USER
+sg dialout -c "firmware/esp32c3/stranger.sh run <graph.nir>"
+```
+
+Not a `setfacl` on the port: the C3 enumerates again at each reset, and
+the ACL is gone. `stranger.sh run` checks the port before it builds.
+
+Each flash prints espflash's warning
+`Monitor options were provided, but --monitor/-M flag isn't set`. It is
+expected: espflash prints it whenever it flashes without `--monitor`,
+as `stranger.sh` and the commands below do.
+
 ## Your graph on the chip: one command
 
 ```bash
@@ -88,5 +118,4 @@ python3 tools/esp32c3_capture.py /dev/ttyACM0 20 board.log
 python3 tools/esp32c3_trace_diff.py board.log
 ```
 
-Needs, on the pinned toolchain, the `riscv32imc-unknown-none-elf`
-target and the `llvm-tools` component; espflash 4 for the board.
+It needs what § Before the first run installs.

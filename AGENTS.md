@@ -17,7 +17,7 @@ scoping work. Shipping order: `docs/ROADMAP.md`. History:
 | Repo | Role |
 |---|---|
 | `gresil` (here) | **Active.** Edit this one. Workspace builds clean. |
-| `NeuralOS` (sibling dir) | **Archive** of v0.1 — manifest-broken, READ-ONLY. Mine it for real code (the audit indexed what's worth porting in its `AGENTS.md` + our `docs/AUDIT_PORT_TABLE.md`). Don't build it, don't edit it. |
+| `NeuralOS` (sibling dir) | **Archive** of v0.1 — manifest-broken, READ-ONLY. Mine it for real code (the audit indexed what's worth porting in its `AGENTS.md`; our port table of it is in git history, `docs/AUDIT_PORT_TABLE.md` at `f738036`). Don't build it, don't edit it. |
 
 If `cargo` ever errors with `multiple workspace roots`, you're in the
 archive, not here. `cd` back to this repo.

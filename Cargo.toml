@@ -23,7 +23,7 @@ edition = "2021"
 # the commit that needs it (ISA round 30).
 rust-version = "1.92"
 license = "AGPL-3.0-or-later"
-authors = ["Caramoussin"]
+authors = ["philo-the-dendron"]
 repository = "https://gitea.com/gresil-rs/gresil"
 keywords = ["neural-network", "spiking", "snn", "no_std", "riscv"]
 categories = ["science", "embedded", "no-std"]

@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Q1_0 compute on top of the container — the model-side math surface
 //! (Stage 4, session 2).
 //!

@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! A frozen graph stepped without std: the board half of a program of
 //! the starter set, whose host half is `freeze`.
 //!

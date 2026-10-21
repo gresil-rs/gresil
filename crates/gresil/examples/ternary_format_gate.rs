@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Ternary-bridge gate — Stage 2: the format bridge.
 //!
 //! Question: can we round-trip a ternary tensor through the byte layouts of

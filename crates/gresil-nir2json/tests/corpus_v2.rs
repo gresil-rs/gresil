@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Corpus v2 — the amended spike-gate battery (ISA 2026-08-23).
 //!
 //! a. f32 cast-down twins: the tool widens to f64 internally; oracle =

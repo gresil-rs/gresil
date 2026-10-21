@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Framework-agnostic SNN sim-runner core for the gresil visualizer.
 //!
 //! Holds a [`SpikingNeuralNetwork`] and a rolling spike raster (ring buffer).

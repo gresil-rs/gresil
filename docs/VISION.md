@@ -63,11 +63,13 @@ feature, off by default) + 4 topologies + CSR sparse matrix + AVX2 kernel
 + the ternary bridge codecs (`i2_s`/`q1_0`/`q2_0`) + shared ternary
 matmul (both behind `unstable-bridge`, off by default) + live synaptic
 transmission (the session-F fix) + NIR
-import/export (JSON container; HDF5 `.nir` IO via `neuralos-rt`) +
-general four-kind graph assembly — any reference-emitted
-Input/Linear/LIF/Output graph builds and fires on the substrate
-(`build_network`, the ratified EDGE_PULSE_QUANTA edge contract,
-`nir_assembly_gate` 6/6).
+import/export (JSON container; HDF5 `.nir` IO via `neuralos-rt`, read
+in pure Rust by `gresil-nir2json`) + general four-kind graph assembly —
+any reference-emitted Input/Linear/LIF/Output graph builds and fires on
+the substrate (`build_network`, the ratified EDGE_PULSE_QUANTA edge
+contract, `nir_assembly_gate` 6/6). A converted snnTorch graph replays
+snnTorch's spike trains, each miss named and pinned (the converter's
+parity test, PR #49 and PR #51).
 
 **Near-term — the starved original list, first-class again:** NIR
 import/export **DONE through general graph assembly** (2026-08-22,

@@ -18,7 +18,7 @@
 #   - docs/releases/, the release notes, frozen at publish as those
 #     version notes are; a draft names a published version's fields as
 #     that version spelled them;
-#   - three lines of that README, allowed by their exact text until
+#   - two lines of that README, allowed by their exact text until
 #     alpha.9's publish round changes them. An allowed line that is gone
 #     is red too, so the commit that changes it drops it here;
 #   - this file, which names what it looks for.
@@ -40,7 +40,6 @@ pat="${mu}A|${greek}A|(^|[^[:alpha:]])uA([^[:alpha:]]|$)|[0-9]ua([^[:alpha:]]|$)
 readme=crates/gresil/README.md
 allowed=(
   'microamps, u32 microseconds) — no floating point, no allocator in the'
-  "One LIF neuron on the centi-mV grid, driven by a constant 160 ${greek}A at a"
   "~200 ${greek}A dead zone moves the membrane exactly zero — recorded, tested,"
 )
 

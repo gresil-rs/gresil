@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Unstable: behind `unstable-bridge`.
 //! Stage 2 of the ternary bridge: the **format bridge** (see `docs/VISION.md`
 //! and `docs/TERNARY_FORMAT.md`).

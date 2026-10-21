@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! The trace cases and their writer, shared by `examples/trace.rs` (which
 //! writes the files) and `tests/traces.rs` (which compares them). No
 //! library code: a case is a network built through the public API plus a

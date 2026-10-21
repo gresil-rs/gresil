@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! NIR — the Neuromorphic Intermediate Representation, slice 1:
 //! import (JSON container) + honest export for the node subset the
 //! substrate can honor exactly: **`Input`, `Linear`, `LIF`, `Output`**.

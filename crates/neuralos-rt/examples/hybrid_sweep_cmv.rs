@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Session E stage 1c — THE FINER-RULER SWEEP: same amplitude grid, same
 //! nets, same instrument as stage 1 — on the CENTI-MILLIVOLT grid.
 //!

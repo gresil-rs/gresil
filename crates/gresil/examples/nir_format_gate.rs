@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! NIR format gate (Phase 1 / R7, slice 1) — the import/export gate
 //! over the REFERENCE-emitted fixtures, in the family style of the
 //! repository's `ternary_format_gate`: test vectors derived from the

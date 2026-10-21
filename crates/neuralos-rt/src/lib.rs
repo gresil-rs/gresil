@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! NeuralOS ternary-LLM runtime — Stage 4 of the ternary bridge.
 //!
 //! The goal (see `docs/VISION.md`): load and run Bonsai-style `Q1_0`

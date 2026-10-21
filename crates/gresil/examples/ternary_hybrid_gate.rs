@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Ternary-bridge gate — Stage 3: the shared kernel + hybrid net.
 //!
 //! Question: does the union compose — can an SNN layer and a dense

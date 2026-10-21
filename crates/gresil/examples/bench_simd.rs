@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! bench_simd — measure AVX2 vs scalar batch LIF throughput on THIS CPU.
 //!
 //! Run: `cargo run --example bench_simd --features simd --release`

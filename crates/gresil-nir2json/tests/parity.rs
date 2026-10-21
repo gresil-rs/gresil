@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Parity with snnTorch, spike train for spike train. Each graph in
 //! `fixtures/parity/` is snnTorch 1.0's own export, and `reference.json`
 //! holds snnTorch's own spikes for each run of it: zero reset, 0.1 ms

@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! NIR HDF5 assembly gate (R18 P4) — the cross-container leg of the
 //! general-assembly slice, in the family style of `nir_hdf5_gate`:
 //! the reference's own `.nir` emissions of the MERGE graph, read in

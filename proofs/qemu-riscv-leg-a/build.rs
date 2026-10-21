@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Link with link.x, in this directory.
 //
 // Done here, not as `rustflags` in .cargo/config.toml: a RUSTFLAGS

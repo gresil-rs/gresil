@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Stage 4, session 4 — THE GATE: tokenize → generate → judge.
 //!
 //! Greedy (deterministic) decode through the full stack on the real

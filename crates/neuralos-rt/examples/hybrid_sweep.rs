@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Session E stage 1 — THE AMPLITUDE SWEEP: at what drive amplitude do the
 //! pretrained weights begin to shape firing?
 //!

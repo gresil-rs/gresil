@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! The CLI: `gresil-nir2json [--sim-units] [--dt µs] [--freeze <out.rs>
 //! [--steps N] [--input v1,v2,…] [--drive <file>]] <input.nir>
 //! <output.json>`.

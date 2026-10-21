@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 philo-the-dendron
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! The constructors' rules, case by case: each case is run here against
 //! the rule the docs state, written in this file apart from the library.
 //! A case a rule refuses is refused under that rule's name; every other
