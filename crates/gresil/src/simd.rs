@@ -38,9 +38,10 @@
 //!
 //! The AVX2 kernel replaces `/1000` with `÷1024` — the standard fixed-point
 //! fast-division approximation, ~2.4% error (`1024/1000`). What makes that
-//! biologically irrelevant is the grid, not the noise floor: on the default mV
-//! grid a steady current below ~200 pA at rest moves the membrane by exactly
-//! zero forever ([`crate::lif_neuron`] § the dead zone), so a ≤2 mV
+//! biologically irrelevant is the grid, not the noise floor: on the mV grid,
+//! at a 1 ms step, a steady current at rest below ~200 pA for an excitatory
+//! neuron, ~100 pA for an inhibitory one, moves the membrane by exactly zero
+//! forever ([`crate::lif_neuron`] § the dead zone), so a ≤2 mV
 //! approximation sits inside the grid's own blindness. The older phrasing here
 //! compared a millivolt error against the default noise amplitude of the time,
 //! ±5 pA, which are different units and not comparable. The scalar reference
@@ -315,8 +316,8 @@
 //!
 //! # Grid limitation — mV only
 //!
-//! The batch kernel (and its scalar reference) operate on the **default mV
-//! grid only**: the reference clamps to `−100..50` and ignores
+//! The batch kernel (and its scalar reference) operate on the **mV grid
+//! only**: the reference clamps to `−100..50` and ignores
 //! [`crate::VoltageResolution`] scale (`integrate_lif_batch_scalar`, below). A
 //! centi-mV consumer would get silently wrong membranes. Until the kernel
 //! takes a scale parameter, do not route `CentiMillivolt` state through it (no

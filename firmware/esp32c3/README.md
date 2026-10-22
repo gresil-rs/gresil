@@ -111,7 +111,7 @@ shorter compare.
 ## The default firmware
 
 ```bash
-firmware/esp32c3/build.sh          # release, remapped, gated; prints the shas
+firmware/esp32c3/build.sh          # release, remapped, gated; prints the shas, writes the notices beside the ELF
 firmware/esp32c3/build.sh clippy
 espflash flash --port /dev/ttyACM0 firmware/esp32c3/target/riscv32imc-unknown-none-elf/release/gresil-esp32c3
 python3 tools/esp32c3_capture.py /dev/ttyACM0 20 board.log

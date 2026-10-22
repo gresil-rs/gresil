@@ -693,7 +693,7 @@ dependencies = [
 
 [[package]]
 name = "gresil"
-version = "0.1.0-alpha.8"
+version = "0.1.0-alpha.9"
 
 [[package]]
 name = "gresil-esp32c3"

@@ -1,0 +1,15 @@
+# cargo-deny's license check of the converter's graph, gresil-nir2json,
+# the one release binary of this workspace: its crates' licenses, each
+# allowed and none more, so a run warns of nothing. Run by hand before
+# a release (AGENTS.md § Commands), never in CI:
+#   cargo deny --manifest-path crates/gresil-nir2json/Cargo.toml --offline -t x86_64-unknown-linux-musl check licenses
+# cargo-deny takes the first deny.toml it finds from the manifest's
+# folder upward, so the member's manifest takes this one; the root's
+# would take gresil-scope's graph in. The firmware is its own
+# workspace, with its own file, firmware/esp32c3/deny.toml.
+[graph]
+exclude-dev = true
+
+[licenses]
+allow = ["MIT", "Apache-2.0", "Zlib", "Unlicense", "0BSD", "AGPL-3.0-or-later"]
+confidence-threshold = 0.9

@@ -62,9 +62,9 @@ or grab a prebuilt static binary from the releases (linux-x86_64).
 - **Parameter conventions (the honest wall + the exact bridge):** the
   substrate quantizes **biological-scale** LIF parameters — membrane
   potentials on the mV grid within **[−100, +50] mV**, `r ∈ [1, 65535]
-  MΩ`. The wider ecosystem's mainstream exports (snnTorch, norse,
-  rockpool defaults) carry the **simulation-unit convention**:
-  `r ≈ 1–24 Ω`, dimensionless voltages — and the wall is **double**:
+  MΩ`. snnTorch's exports and the NIR paper's LIF files carry the
+  **simulation-unit convention**: dimensionless voltages, and
+  `r ≈ 1–24 Ω` in the paper's files — and the wall is **double**:
   `r` refuses first, the voltages (e.g. `v_th 0.1` read as 0.1 V =
   100 mV) right behind it. snnTorch's LIF is dimensionless
   (β/threshold, no R), so no snnTorch export carries a biological `r`.
@@ -107,8 +107,9 @@ or grab a prebuilt static binary from the releases (linux-x86_64).
   `r ≥ 1 MΩ` beside sim `r`) transform every `r` of the node — and
   refuse loudly via the r ceiling (a bio 5 MΩ becomes 5×10⁶·V MΩ),
   never silent corruption.
-  Linear-only graphs (encoders, readout heads) convert cleanly from
-  any emitter, no flag needed.
+  snnTorch's Linear-only graphs (encoders, readout heads) convert with
+  no flag needed when no layer has a bias; a bias makes snnTorch write
+  the layer as an `Affine` (below).
 - **Affine** (`y = W·x + b`, snnTorch's export of a biased `nn.Linear`,
   PyTorch's default): under `--sim-units` the converter rewrites it. `W`
   becomes a Linear under the Affine's name, and a bias not all zero an
@@ -193,7 +194,11 @@ module needs only `core` and `gresil`, so it compiles `no_std`.
 
 ## Build (the release artifact)
 
-The prebuilt binary on the Gitea release is this, nothing more:
+The Gitea release carries the prebuilt binary with its third-party
+notices, `LICENSE` and the Rust toolchain's notices of the standard
+library, `rust-<version>-COPYRIGHT-library.html`; the script writes the
+notices and that file beside the binary in `dist/`. The binary is this,
+nothing more:
 
 ```bash
 rustup target add x86_64-unknown-linux-musl          # once
@@ -243,4 +248,4 @@ not byte-stable across runs, so the committed emission is pinned by its
 sha in PROVENANCE.md; the exporter's edge order follows Python's hash
 seed, and under `PYTHONHASHSEED=0` a second run writes the same bytes).
 
-[`gresil`]: https://crates.io/crates/neuralos-snn
+[`gresil`]: https://crates.io/crates/gresil

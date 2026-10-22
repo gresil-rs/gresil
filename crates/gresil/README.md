@@ -5,17 +5,19 @@
 > AVX2 batch kernel, and, behind unstable features, pairwise STDP, the
 > ternary bridge codecs and the freezer.
 
-Published on crates.io as `neuralos-snn` `0.1.0-alpha.8`, as `gresil`
-from alpha.9 (AGPL-3.0-or-later).
+Published on crates.io as `gresil` from 0.1.0-alpha.9; alpha.8 and
+earlier as `neuralos-snn` (AGPL-3.0-or-later).
 
 ## What this crate is
 
-A spiking-neural-network **substrate**: the neuron/synapse/network core
-you can run bare-metal. Integer-only hot path (i16 millivolts, i16
-microamps, u32 microseconds) — no floating point, no allocator in the
-core, `no_std` by default. Designed for FPU-less edge targets
-(ESP32-C3, `HiFive`, QEMU `riscv64gc`) and validated against the IEEE 2025
-"Full-Integer SNN Inference with RISC-V ISA" design axis.
+A spiking-neural-network **substrate**: the neuron/synapse/network
+core you can run bare-metal. Integer-only hot path (an i16 membrane on
+the mV or centi-mV grid, an i16 current in pA, u32 microseconds at the
+neuron; the networks keep a `u64` clock) — no floating point, no
+allocator in the core, `no_std` by default. Designed for FPU-less edge
+targets (ESP32-C3, `HiFive`, QEMU `riscv64gc`) and validated against
+the IEEE 2025 "Full-Integer SNN Inference with RISC-V ISA" design
+axis.
 
 ## Quick start
 
@@ -25,12 +27,7 @@ the asserts are what the board prints over serial: `147 spikes, first
 spike step 55`. Those come from the firmware's burst arm, where
 simulated time advances exactly 1 ms a step, so the board and the host
 agree spike for spike — the captures are in
-`evidence/esp32c3-bringup/README.md`. The firmware's real-time loop is a
-second arm, paced by the wall clock. Its neuron has the constructor's
-noise, 0, as the burst arm's does, so its first spike is step 55 as well,
-and only the microseconds it prints vary between runs (the version notes
-below, written while the neuron still had noise, print a loop's first
-spike at step 56). The assert here is the burst's 55.
+`evidence/esp32c3-bringup/README.md`.
 
 ```rust
 use gresil::{LIFNeuron, NeuronType, VoltageResolution};
@@ -63,6 +60,13 @@ assert_eq!(first_spike_step, Some(55));
 Every item in it is `no_std`, so the same code runs on the host and on
 the chip.
 
+The firmware's real-time loop is a second arm, paced by the wall clock.
+Its neuron has the constructor's noise, 0, as the burst arm's does, so
+its first spike is step 55 as well, and only the microseconds it prints
+vary between runs (the version notes below, written while the neuron
+still had noise, print a loop's first spike at step 56). The assert here
+is the burst's 55.
+
 ## Modules
 
 Every item's home is its module; the crate root re-exports only the
@@ -85,13 +89,15 @@ each name by its shortest public path.
 
 ## The voltage grid story
 
-`delta_v = dt_over_tau · (leak + R·I·s/1000) / 1000` truncates to whole
-quanta, `s` the grid's scale (1 on mV, 100 on centi-mV). On the default
-mV grid a steady sub-threshold current inside the
-~200 μA dead zone moves the membrane exactly zero — recorded, tested,
-and the reason `VoltageResolution::CentiMillivolt` exists (100× finer
-dead zone, same i16, bit-identical arithmetic shape). The mV default
-keeps every historically recorded result bit-exact.
+`delta_v = dt_over_tau · (leak + R·I·s/1000) / 1000` truncates to
+whole quanta, `s` the grid's scale (1 on mV, 100 on centi-mV). On the
+mV grid, which `SpikingNeuralNetwork::new` builds on, a steady
+sub-threshold current at rest inside the dead zone (at a 1 ms step,
+~200 pA for its excitatory neurons, ~100 pA for its inhibitory ones)
+moves the membrane exactly zero — recorded, tested, and the reason
+`VoltageResolution::CentiMillivolt` exists (100× finer dead zone, same
+i16, bit-identical arithmetic shape). The network's mV grid keeps
+every historically recorded result bit-exact.
 
 ## Features
 
@@ -101,8 +107,11 @@ keeps every historically recorded result bit-exact.
 - `unstable-stdp` — STDP: `STDPRule`, `Synapse::update_weight`,
   `SpikingNeuralNetwork::set_plasticity_enabled`,
   `SpikingNeuralNetwork::stochastic_ternary_step`,
-  `trit::stochastic_ternary_flip` and `trit::STOCHASTIC_FLIP_RATE`.
-  Works with and without `std`.
+  `trit::stochastic_ternary_flip`, `trit::STOCHASTIC_FLIP_RATE`, and
+  STDP's instruments: `Synapse`'s `min_weight()`, `max_weight()`,
+  `raw_stdp_delta()` and `absorbed_delta()`, and `NetworkStats`'
+  `plasticity_events` and three `stdp_pairs_*`. Works with and without
+  `std`.
 - `unstable-bridge` — the closed ternary bridge chapter: the `bridge`
   codecs (`i2_s`, `q1_0`, `q2_0`) and the `kernel` matvec. Works with
   and without `std`.
@@ -116,8 +125,8 @@ change or go in a minor release. It is outside the semver promise, and
 the rest of the crate is inside it. A default build does not learn: a
 network starts with plasticity off, and only `set_plasticity_enabled`,
 behind `unstable-stdp`, turns it on. The getter `plasticity_enabled()`
-and the STDP counter fields are stable; without the feature they read
-`false` and 0.
+is stable and reads `false` without the feature; STDP's instruments
+are behind it.
 
 Without `std` the crate builds `no_std` (neurons, the spike recorder,
 synapses, the fixed network, the trace rows, trit, nir, and with
@@ -184,6 +193,21 @@ ternary SNN↔LLM bridge on this substrate lives in the workspace's
   `i2_s` layout helpers); introspection accessors and builders stay pub —
   see the alpha.3 audit record in the repo's `ISA.md`.
 - SIMD gate runs in CI; the batch kernel is documented mV-grid-only.
+
+## Since alpha.8 (the alpha.9 notes)
+
+- **The crate is `gresil`**, which `neuralos-snn` was: `use gresil::`
+  where you wrote `use neuralos_snn::`.
+- **The pub walk** (what stops being public before 0.1.0 promises the
+  surface): the root keeps ten names, the neuron and the synapse have no
+  public field, each refusal returns the variant of its rule, the
+  current is named in pA (the older notes below say μA for the same
+  numbers), STDP and the closed bridge chapter sit behind unstable
+  features, and a network does not learn unless asked.
+- **NIR** imports at true scale, a two-layer graph builds, and a
+  stranger's `.nir` reaches the ESP32-C3 in one command.
+- Every break with its fix, by module, and the board's figures:
+  [the release notes](https://gitea.com/gresil-rs/gresil/releases/tag/v0.1.0-alpha.9).
 
 ## Since alpha.7 (the alpha.8 notes)
 
@@ -403,8 +427,10 @@ ternary SNN↔LLM bridge on this substrate lives in the workspace's
 
 ## Status
 
-**`0.1.0-alpha.8` is live on crates.io, as `neuralos-snn`**:
-`FixedNetwork`, a network in
+**`0.1.0-alpha.9` is live on crates.io, the first release named
+`gresil`** (alpha.8 and earlier: `neuralos-snn`): the pub walk (see
+"Since alpha.8"). Alpha.8 (2026-09-14T20:37:43Z from 6f03e1b,
+registry-verified, as `neuralos-snn`): `FixedNetwork`, a network in
 arrays, replays every plasticity-off trace bit for bit on the ESP32-C3
 and under QEMU `riscv64gc`, with no panic path in its step, proven at
 link time; the traces; the spike ring out of the neuron; the MSRV
@@ -439,4 +465,5 @@ the schema pinned to `neuromorphs/NIR@7883c3c`.
 
 ## License
 
-AGPL-3.0-or-later — see the workspace root `LICENSE`.
+AGPL-3.0-or-later. The notice is `COPYRIGHT`, the license text
+`LICENSE`; both ship in the package.

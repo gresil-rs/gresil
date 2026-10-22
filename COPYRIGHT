@@ -17,11 +17,12 @@ You should have received a copy of the GNU Affero General Public
 License along with this program, in the file LICENSE. If not, see
 <https://www.gnu.org/licenses/>.
 
-This notice covers every file in this repository but those named
-below. Commits up to 55070d7, before the rename to gresil, are
-authored under the git name "philodendron", the same person. The
-repository was NeuralOS v2, at gitea.com/Caramoussin/NeuralOs-v2,
-until it moved to gresil-rs/gresil on 2026-10-18.
+This notice covers every file in this repository but the license texts
+themselves and those named below. Commits up to 55070d7, before the
+rename to gresil, are authored under the git name "philodendron", the
+same person. The repository was NeuralOS v2, at
+gitea.com/Caramoussin/NeuralOs-v2, until it moved to gresil-rs/gresil
+on 2026-10-18.
 
 Under another license: the eight files that
 crates/gresil-nir2json/tests/fixtures/community/PROVENANCE.md lists as

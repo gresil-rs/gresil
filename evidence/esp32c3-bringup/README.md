@@ -44,9 +44,10 @@ low), red LED is power. Host: the laptop, espflash 4.5.0, Rust 1.92.0
 | `board-r52-head.log` | the tenth entry (ISA round 52, 2026-09-28): the default firmware at head, the two NIR witnesses of its replay in simulation units at 0.1 ms, built by `build.sh` on 1.98.1 in the main clone (ELF `dad40393…`), 20 s after reset (§ Tenth entry) |
 | `board-r61-head.log` | the eleventh entry (ISA round 61, 2026-10-07): the default firmware at head, its neuron built silent and the networks' clock a `u64`, built by `build.sh` on 1.98.1 in the main clone (ELF `ad5dc163…`), 20 s after reset (§ Eleventh entry) |
 | `board-r67-head.log` | the twelfth entry (ISA round 67, 2026-10-13): the default firmware at head, its neuron without its capacitance, built by `build.sh` on 1.98.1 in the main clone at `0182042` (ELF `49e0830a…`), 20 s after reset (§ Twelfth entry) |
+| `board-r76-tip.log` | the thirteenth entry (ISA round 76, 2026-10-21): the default firmware at the stamp PR's tip, the library at `0.1.0-alpha.9`, built by `build.sh` on 1.98.1 in the main clone at `8bff222` (ELF `7834eb64…`), 20 s after reset (§ Thirteenth entry) |
 | `SHA256SUMS` | pins the logs and this README |
 | `../../tools/esp32c3_capture.py` | the capture tool (reset + read from one process) |
-| `../../tools/esp32c3_trace_diff.py` | the replay diff: every plasticity-off trace of `crates/neuralos-snn/tests/traces/` against its case in a capture, one line per case (§ Sixth entry) |
+| `../../tools/esp32c3_trace_diff.py` | the replay diff: every plasticity-off trace of `crates/gresil/tests/traces/` against its case in a capture, one line per case (§ Sixth entry) |
 | `../../firmware/esp32c3/` | the firmware crate; the ELF is rebuildable, not committed |
 | `../../proofs/spike-path-bench/` | the host bench harness (standalone crate) |
 
@@ -1180,12 +1181,77 @@ read out and written back, on-chip MD5 `582b942d…` equal to the
 read-out's), and a capture of that image reads round 52's burst figures
 to 1 µs.
 
+## Thirteenth entry: round 76, the stamp's tip (2026-10-21)
+
+Same SuperMini (MAC `70:af:09:07:f6:3c`, esp32c3 revision v0.4, as
+`espflash board-info` read them), same port, same tool, 20 s after
+reset, the ELF built and flashed from the main clone. Why this entry
+exists: alpha.9's stamp reads the board twice, on the PR's tip before
+the merge and on the merge commit before the tag (ruled 2026-10-20),
+both built in the main clone, since a `.text` compares at one path
+(§ Release asset); this is the first. Since round 67 the firmware's
+sources moved in names alone (round 74's rename: the crate, its path to
+the library, the banner; round 75's two SPDX lines), and the stamp
+bumps the library to `0.1.0-alpha.9`; no trace moved.
+
+`8bff222` is commit 4 as first pushed. The one rewrite after it changed
+its tree in `tools/notices.sh` alone, and `build.sh` at the new commit
+4, `973d554`, gives the same `.text` (ISA round 76).
+
+Head: `build.sh` at `8bff222` on 1.98.1 in the main clone,
+`GRESIL_GRAPH` unset; the commit that adds this entry changes
+`evidence/` and alpha.9's notes alone, so these are its sources: ELF
+`7834eb64…`, `.text` `5dae1f91…` and 150,102 B, the pin appended as
+"round 76, the stamp's tip" (§ Rebuild + run); the gate 0 hits, the
+trim-paths canary still unstable on 1.98.1 (exit 101); `main`'s frame
+`0x3e0`, round 67's. Against round 67's ELF (`49e0830a…`), `llvm-nm`
+reads the same 272 code symbols (271 names, round 67's count) at the
+same sizes and in the same order but one: the panic handler,
+`rust_begin_unwind` (116 B), placed three functions earlier;
+`.rodata` is 4 B shorter, the banner's name.
+Flashed from the head's ELF, `board-r76-tip.log`, 53,274 bytes, the
+second of three captures: the first, right after the flash, overlaps
+the run the flash started and was dropped, and the third reads the
+same figures to 1 µs. Every figure below is from after the `rst:`
+line; the before column is round 67's head, the last capture on record.
+
+| Measurement | Round 67 (head) | Round 76 (the stamp's tip) |
+|---|---|---|
+| Burst, pinned arm | 15,045 µs → 1,504 ns/step | 15,044 µs → 1,504 ns/step |
+| Burst, free arm | 2,939 µs → 293 ns/step | 2,938 µs → 293 ns/step |
+| Burst spikes, first spike step, checksum, both neuron arms | 147, 55, `8cd1e63b` | 147, 55, `8cd1e63b` |
+| Burst, network arm (8 neurons, 6 synapses a step) | 141,438 µs → 14,143 ns/step | 141,435 µs → 14,143 ns/step |
+| Network arm: spikes, first spike step, checksum | 3,377, 5, `7e700ee1` | 3,377, 5, `7e700ee1` |
+| `main`'s frame, from the prologue | 992 B | 992 B |
+| Stack high-water mark, of `.stack` | 1,368 of 316,316 B | 1,368 of 316,316 B |
+| `.stack` free at the mark | 314,948 B | 314,948 B |
+| First spike, real-time loop | step 55, 55,158 µs | step 55, 55,157 µs |
+| Spikes after the reset | 288 in 20 s | 288 in 20 s |
+| Replay diff, last line | `14 cases, 0 red` | `14 cases, 0 red` |
+
+The gates hold.
+`python3 tools/esp32c3_trace_diff.py evidence/esp32c3-bringup/board-r76-tip.log`
+reads the fourteen plasticity-off cases identical and ends
+`14 cases, 0 red`; the stamp moves no trace. Both neuron arms fold to
+`8cd1e63b`, 147 spikes from step 55, and the network arm to
+`7e700ee1`, 3,377 spikes from step 5, round 67's figures each; the
+real-time loop's first spikes land on steps 55, 123, 191 and every 68
+steps on, as round 67's did. The banner reads `gresil-esp32c3` where
+round 67's read `neuralos-esp32c3`.
+
+The rest is reported, not gated: each burst within 3 µs of round 67's,
+the stack's mark and `main`'s frame the same; not read further. The
+board held round 52's image before the flash (on-chip MD5 `582b942d…`,
+read first) and was given it back after: the 4 MB read out before round
+67's flash, written back, its on-chip MD5 `582b942d…` again; a capture
+of it reads round 52's burst figures to 1 µs.
+
 ## Rebuild + run (from the repo root; board on /dev/ttyACM0)
 
 ```bash
 firmware/esp32c3/build.sh                    # since round 26: cargo build --release --locked under rustc's path remap, then the personal-string gate, the ELF and .text shas, the trim-paths canary (tools/remap.sh); the two pins below were built by the bare cargo line the script wraps
 sha256sum firmware/esp32c3/target/riscv32imc-unknown-none-elf/release/gresil-esp32c3
-#   every pin below is an ELF named neuralos-esp32c3, built before the rename
+#   every pin below up to round 67's is an ELF named neuralos-esp32c3, built before the rename
 #   102af8c6374766f290777b4e760a60318a0496f387fbb6a3b534200f3ebd5aed  at 427b6cb (release profile, lto fat)
 #   e26e174999804ce43163f5c2f1cf3113f480a9cdb84148bfc7fedc00da425ebb  at 820d81a (same profile; the alpha.6 spine, second entry)
 espflash board-info --port /dev/ttyACM0
@@ -1224,6 +1290,7 @@ llvm-objcopy -O binary --only-section=.text <ELF> text.bin && sha256sum text.bin
 #   768a1957e7103b69c8cda65b01ddd03f30d916e85b5da7c3aa74eb7aa8a621fb  round 52, the witnesses at 0.1 ms (build.sh on 1.98.1, main clone, NEURALOS_GRAPH unset, from the sources of the commit that adds this line)
 #   3a9eb352b4ad8b392ad6044a7671cba93d760ce39990cd3d816cd360870ca87c  round 61, the noise default and the clock (build.sh on 1.98.1, main clone, NEURALOS_GRAPH unset, from the sources of the commit that adds this line)
 #   b6c2d09d6d350ae49fb7e174f4823b1e86c63be8422834977c12d259dd71a334  round 67, the neuron without its capacitance (build.sh at 0182042 on 1.98.1, main clone, NEURALOS_GRAPH unset: the sources of the commit that adds this line, which changes evidence/ alone)
+#   5dae1f91fb14a67e83169e68444287816b71f37c88e5e0938461ae8dee19b475  round 76, the stamp's tip (build.sh at 8bff222 on 1.98.1, main clone, GRESIL_GRAPH unset: the sources of the commit that adds this line, which changes evidence/ and alpha.9's notes alone)
 ```
 
 The third pin is the second one rebuilt by `build.sh` (round 26,
@@ -1275,22 +1342,39 @@ library whose neuron is built silent and whose networks' clock is a
 fifteenth's firmware sources under round 65's names and unit and this
 round's two comments, on a library whose neuron has no capacitance,
 which moves the `.text` on its own (§ Twelfth entry); round 65's two
-moves, which this list never pinned, are in it too.
+moves, which this list never pinned, are in it too. The seventeenth is
+round 76's, built at `8bff222`, whose sources are those of the commit
+that adds it: the sixteenth's firmware sources under round 74's names
+and round 75's two SPDX lines, on the library at `0.1.0-alpha.9`; the
+same 272 code symbols at the same sizes, one placed three functions
+earlier (§ Thirteenth entry).
 
 ### Release asset (the procedure since round 26)
 
-A firmware asset on a Gitea release is built by `build.sh` at the
-tagged commit (the descriptor stamp is that commit's time), copied
-from the target dir into `firmware/esp32c3/dist/` under the alpha.6
-name pattern
+A release's files are staged in one folder, `dist/<tag>/` at the repo
+root (gitignored), with nothing else in it; since round 76
+`firmware/esp32c3/dist/` is no longer a staging place, and the ELFs
+already in it stay. The firmware is built by `build.sh` at the tagged
+commit (the descriptor stamp is that commit's time) and copied from
+the target dir under the alpha.6 name pattern
 `gresil-esp32c3-<fw>-snn-<lib>-riscv32imc-unknown-none-elf.elf`
 (alpha.6 to alpha.8 shipped it as `neuralos-esp32c3-…`, the package's
-name before the rename),
-listed in `dist/SHA256SUMS`, uploaded with that file, downloaded back,
-checked with `sha256sum -c`, and gated once more on the download:
+name before the rename), with the third-party notices `build.sh`
+writes beside it, `THIRD-PARTY-NOTICES-gresil-esp32c3.txt`
+(`tools/notices.sh`). Beside them: the converter and its notices, from
+`crates/gresil-nir2json/dist/` (its README § Build); the root's
+`LICENSE`; `rust-<version>-COPYRIGHT-library.html`, the toolchain's
+notices of the standard library, which both notices files name; and
+one `SHA256SUMS` over the others. Each notices file passes the two
+greps of the gate `tools/notices.sh` runs on its output before the
+upload. Each file is uploaded, downloaded back and checked with
+`sha256sum -c`, and the downloads are gated once more, the binaries by
+the remap's gate and the notices files by the same two greps:
 
 ```bash
-(source tools/remap.sh && remap_env >/dev/null && remap_gate <downloaded.elf>)
+(source tools/remap.sh && remap_env >/dev/null && remap_gate <downloaded binary>)
+grep -n -E -i -e "$(cat .githooks/personal-pattern)" <notices file>   # no line
+grep -n -E '(^|[[:space:](<"=,;:])(/|~/)[A-Za-z0-9._-]' <notices file>  # no line: no word is a path
 ```
 
 No scrub: the remap is what the alpha.6 release's § Scrub did by hand,
@@ -1303,11 +1387,15 @@ the ring's bounds check embeds the source path in rodata, and a
 rebuild of 820d81a from a 72-byte-longer path moved 45 `addi` address
 immediates in `.text` by exactly 72 and nothing else (verified by
 diffing the two `main` listings). That sentence describes the bare
-line; under the script's remap the four source roots become fixed
-aliases, so the third pin is expected from any clone path, home or
-cargo home (the ELF sha still moves: the descriptor stamp is the
-commit date, and the symbol-name hashes follow the package path). A
-different ELF sha with the same log lines is not a finding; a
+line; under the script's remap no path string reaches the ELF, and
+`.text` still follows the clone path: the firmware is its own
+workspace, and cargo hashes `crates/gresil`, outside that workspace's
+root, by its absolute path, so a pin compares at its own path, the
+main clone's (`tools/remap.sh`, ISA round 44; measured again
+2026-10-20: one tree gave one `.text` at five paths, its bumped twin
+three values at five). The ELF sha moves as well: the descriptor stamp
+is the commit date, and the symbol-name hashes follow the package
+path. A different ELF sha with the same log lines is not a finding; a
 different `.text` with the same log lines is one to read. Reproducing
 `boot-no-descriptor.log` means flashing an ELF built from 3525492 with
 `--ignore-app-descriptor`; `factory-empty-flash.log` needs a blank
