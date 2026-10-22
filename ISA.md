@@ -4,9 +4,9 @@ slug: 20260815-125500_neuralos-v2
 project: NeuralOS v2
 phase: complete
 progress: 88/88
-head: "main@691bb70 (PR #73 merged 2026-10-22 00:58 UTC: round 76, tier 1, the stamp: both binaries' notices and `COPYRIGHT`'s clause, leg A's two items, the crate README in pA, the bump to 0.1.0-alpha.9 and `neuralos-snn`'s pointer, the board's run on the tip; mirror synced, tags identical, branch deleted) · tree == published, alpha.9 stamped 2026-10-22 (tag object `afa4ea8c` on `691bb70`, Gitea release 978574, crates.io 03:12:25Z, the pointer 03:23:31Z; `docs/releases/v0.1.0-alpha.9.md` § Stamped); the fifteen checks hold; next, three sittings and the converter PR, then `0.1.0-rc.1` · wrote-from: work/alpha9-record, round 77 (tier 2, alpha.9's record: the stamp's record, the runs of record, the H2 export's rebuild line, `crates/neuralos-snn/` deleted, the local loop in CI's color, the close-out), not pushed · open(session): the figure check and the per-commit loop green on each commit before the first push, then the push, the seven `(pull_request)` contexts green in the full listing, the two pre-autopsy tags by name and the merge, each on the principal's word · next-work: ROADMAP § Practical next moves"
+head: "main@691bb70 (PR #73 merged 2026-10-22 00:58 UTC: round 76, tier 1, the stamp: both binaries' notices and `COPYRIGHT`'s clause, leg A's two items, the crate README in pA, the bump to 0.1.0-alpha.9 and `neuralos-snn`'s pointer, the board's run on the tip; mirror synced, tags identical, branch deleted) · tree == published, alpha.9 stamped 2026-10-22 (tag object `afa4ea8c` on `691bb70`, Gitea release 978574, crates.io 03:12:25Z, the pointer 03:23:31Z; `docs/releases/v0.1.0-alpha.9.md` § Stamped); the fifteen checks hold; next, three sittings and the converter PR, then `0.1.0-rc.1` · wrote-from: work/alpha9-record, round 77 (tier 2, alpha.9's record: the runs of record, § Stamped and § Files, the H2 export's rebuild line, `crates/neuralos-snn/` deleted, the local loop in CI's color; built in scratch on `691bb70`, five commits and this record, rebuilt on the review's findings; its figures: 184 checks by script, the rest read by hand) · open(session): the per-commit loop on the six, then the push, the seven `(pull_request)` contexts green in the full listing, the two pre-autopsy tags by name and the merge, each on the principal's word · next-work: ROADMAP § Practical next moves"
 started: 2026-08-15T12:55:00Z
-updated: 2026-10-21T22:39:42Z
+updated: 2026-10-22T19:07:25Z
 principal_stated_goal: "Session I: the null-ladder adjudication — BRANCH B (unattributed perturbation); P5 on infrastructure + method"
 ---
 
@@ -10723,3 +10723,36 @@ follows the clone path; no gate reads `--nir`; a caret requirement on
 **Open**: the color fix's check, the push, CI, the merge and § 9, each
 on the principal's word. **Guards.** 1: appended, head refreshed; 2: no
 frozen file or verdict moves; 3: no outreach before rc.1.
+
+## Close-out (round 77 — alpha.9's record: the runs of record, § Stamped and § Files, the H2 export's rebuild line, the pointer deleted, the loop in CI's color; tier 2 — 2026-10-22)
+
+Five commits and this: `a206dbd` the four runs of record in `evidence/`;
+`9536641` § Stamped and § Files, the head line, RESEARCH_LOG and
+ROADMAP's check 13, items 1 and 2 and § 0.1.0's pointer to item 3;
+`61f162a` the H2 export's rebuild line; `01403b0` the pointer deleted;
+`00cc084` the local loop in CI's color. **Rulings** (philo, 2026-10-22):
+the record its own PR; one fresh review and a figure check; the H2 line
+in docs only; the pre-autopsy tags pushed before the merge; the notes'
+opening says the stamp. **Review**, one: two blocking, both in
+`9536641`; six cosmetic; seven record-only. **Runs of record**, at
+`691bb70` before the tag: leg A 171 checks; leg B 391 passed, 24
+doctests among them; the replay and the board on the release's ELF, each
+`14 cases, 0 red`; the NIR mutation loop's million at seed 1792633114,
+121,006 imported and 53,879 built; cargo deny, licenses ok on both; the
+surface equal as multisets in its four configurations; the docs on
+docs.rs's nightly, `1a2c4797e`, exit 0, no warning. **Measured**, before
+this commit: the figure check, 184 checks green against git, both
+forges, the Gitea and crates.io APIs, docs.rs and the bank, eight
+planted faults red; leg A and the replay again in a scratch clone, the
+same bytes. **Record-only**: the tagger is philo-the-dendron, where the
+six annotated tags before it on the forges say philodendron; a tag's
+page answers 200 before its release; a release asset answers 303, so a
+download takes `curl -L`; the dry run reads the index once before
+packaging, which `cargo package` does not, read as a name check (not
+confirmed in cargo's source); the pointer has no `rust_version`; docs.rs
+built both on the docs row's nightly; an eighth TODO line at round 76's
+merge, ruled after its record, which counts seven. **Open**: the
+per-commit loop on the six, then the push, CI, the two tags and the
+merge, each on the principal's word. **Guards.** 1: appended, head
+refreshed; 2: no frozen file or verdict moves; 3: no outreach before
+rc.1.
