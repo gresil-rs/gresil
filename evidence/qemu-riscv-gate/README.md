@@ -41,12 +41,15 @@ bare-metal. No libc overclaim in either direction.
 |---|---|
 | `leg-a.log` | Leg A run transcript — 175/175 cited checks, raster, `LEG A PASS`, `qemu_exit=0` |
 | `leg-a-alpha8.log` | Leg A re-run at the alpha.8 stamp (2026-09-14, `main@6f03e1b`), the same harness: 175/175 cited checks, `LEG A PASS`; two header lines prepended at PR G (§ Leg A) |
+| `leg-a-alpha9.log` | Leg A re-run at the alpha.9 stamp (2026-10-22, `main@691bb70`), the same harness: 171 cited checks, `LEG A PASS`; its two header lines the run's own (§ Leg A) |
 | `leg-b.log` | Leg B full-suite run — 187 unit + 8 integration = 195/195 (matches host count), `cargo_test_exit=0`, wall clock |
+| `leg-b-alpha9.log` | Leg B re-run at the alpha.9 stamp (2026-10-22, `main@691bb70`): the full suite with its doctests, 391 passed, 0 failed, exit 0 (§ Leg B) |
 | `replay-alpha8.log` | the trace replay (round 33, 2026-09-14): the twelve plasticity-off traces stepped by `FixedNetwork` on bare-metal riscv64gc, as `proofs/qemu-trace-replay/build.sh` captured them from the UART; identical to the tree's files by `tools/esp32c3_trace_diff.py` (§ The trace replay) |
 | `replay-alpha9-g.log` | the trace replay re-run at PR G (round 34, 2026-09-14): the fourteen plasticity-off traces, the two D8 witnesses among them, every row written by the library's `neuralos_snn::fixed::row`; identical to the tree's files, `14 cases, 0 red` (§ The trace replay) |
 | `replay-r52.log` | the trace replay re-run at round 52 (NIR parity's first PR, 2026-09-28): the fourteen plasticity-off traces, the two D8 witnesses in simulation units at 0.1 ms; identical to the tree's files, `14 cases, 0 red` (§ The trace replay) |
 | `replay-r61.log` | the trace replay re-run at round 61 (the noise default and the clock, 2026-10-07): the fourteen plasticity-off traces, `one-neuron-board` without noise; identical to the tree's files, `14 cases, 0 red` (§ The trace replay) |
-| `SHA256SUMS` | pins the seven logs and this README |
+| `replay-alpha9.log` | the trace replay re-run at the alpha.9 stamp (2026-10-22, `main@691bb70`): the fourteen plasticity-off traces; identical to the tree's files, `14 cases, 0 red` (§ The trace replay) |
+| `SHA256SUMS` | pins the ten logs and this README |
 | `../../proofs/qemu-riscv-leg-a/` | the committed, rebuildable Leg A harness crate (standalone workspace; repo workspace untouched) |
 | `../../proofs/qemu-trace-replay/` | the trace replay's crate (standalone workspace, like Leg A's) and its `build.sh` |
 
@@ -145,6 +148,17 @@ with their names and their values as recorded, and the last line
 counts `checks: 171`. Since the same round `main.rs` is in rustfmt's
 shape, which moved no printed line.
 
+Re-run at the alpha.9 stamp (2026-10-22, `main@691bb70`),
+`leg-a-alpha9.log` is 171 checks, 0 failed, `LEG A PASS`, on QEMU
+10.2.1 (`qemu-system-riscv64`), exit 0. Against `leg-a-alpha8.log`,
+the check numbers set aside, it differs in the crate's name in its
+banner and the line after it (round 74's rename), and where this
+section says leg A moved: the four check names and the four raster
+labels in pA, round 67's six checks out, round 76's two in, and the
+count. Its two header lines are the run's own, `# date:` its start and
+`# commit:`, in `leg-a-alpha8.log`'s form; a run of the same code in a
+scratch clone prints the same UART bytes.
+
 ## Leg B — user-mode, the REAL suite (the wire crosses)
 
 Full workspace test suite of the crate — NOT a subset — built static
@@ -157,14 +171,16 @@ CARGO_TARGET_RISCV64GC_UNKNOWN_LINUX_MUSL_LINKER=rust-lld \
 CARGO_TARGET_RISCV64GC_UNKNOWN_LINUX_MUSL_RUSTFLAGS="-C link-self-contained=yes -C target-feature=+crt-static" \
 RUSTDOCFLAGS="-C link-self-contained=yes -C target-feature=+crt-static" \
   cargo test -p gresil --features unstable-stdp --target riscv64gc-unknown-linux-musl
-# gate: exit 0; 187 + 8 = 195 passed, 0 failed; ~14 s wall under TCG
+# gate: exit 0, 0 failed; at the alpha.9 stamp 391 passed, 367 tests and
+# 24 doctests, 172.6 s wall under TCG with the build; the first run's
+# 187 + 8 = 195 took ~14 s
 # `--features unstable-stdp` since PR L (2026-09-19): STDP is behind it, and
 # without the flag the suite runs with the STDP tests compiled out. The
-# recorded run had no flag to give; Leg B was not re-run at PR L.
+# first run had no flag to give; Leg B was not re-run at PR L.
 # `RUSTDOCFLAGS` since round 72 (2026-10-17): cargo builds the doctests for
 # the target too, and rustdoc takes its flags from RUSTDOCFLAGS, never from
 # the target's RUSTFLAGS, so without it every doctest fails to link
-# (`unable to find library -lgcc_s`, then `-lc`). The recorded run had no
+# (`unable to find library -lgcc_s`, then `-lc`). The first run had no
 # doctest to link.
 ```
 
@@ -178,6 +194,16 @@ pins, and the CSR pins (`sparse_matrix_iter_returns_added_synapses`,
 std-gated, so it crossed here, not in Leg A). Doctests: the crate has
 0 (reported `0 passed`, trivially clean). Threads under qemu-user+musl
 behaved; `--test-threads=1` was not needed.
+
+Re-run at the alpha.9 stamp (2026-10-22, `main@691bb70`),
+`leg-b-alpha9.log` is the command above on QEMU 10.2.1 user-mode, by
+binfmt (`/usr/bin/qemu-riscv64`): exit 0, 391 passed, 367 tests in
+seven binaries and 24 doctests, 0 failed, 0 ignored; 172.6 s in all,
+the build 45.87 s, the load 0.72 at the start. `nir_fixtures`, whose
+mutation loop has 60 s for its 10,000 cases, finished in 45.30 s.
+Since round 72 the run links the doctests too; the first run's crate
+had none. Its two header lines, `# date:` and `# commit:`, are the
+run's own, as `leg-a-alpha9.log`'s are.
 
 ## Verdicts of record
 
@@ -241,8 +267,17 @@ that case alone, 131 of its 147 rows between lines 158 and 299, and
 nowhere else; `replay-r52.log` stays as pinned, the capture of round
 52's tree.
 
+Re-run at the alpha.9 stamp (2026-10-22, `main@691bb70`),
+`replay-alpha9.log` is the fourteen cases, 0 red, on QEMU 10.2.1
+(1,512 lines, 41,749 bytes, the same bytes as a run of the same code
+in a scratch clone). Against `replay-r61.log` it differs in the two D8
+witness cases alone, 143 lines of `snntorch-two-layer` and 45 of
+`two-lif-neurons`, their headers equal: round 65 moved those two
+traces (`f25b26f`, the adaptation switch, off in simulation units).
+`replay-r61.log` stays as pinned, the capture of round 61's tree.
+
 ```bash
 rustup target add riscv64gc-unknown-none-elf
 proofs/qemu-trace-replay/build.sh      # the capture into its target/replay.log, the diff, the verdict
-cmp proofs/qemu-trace-replay/target/replay.log evidence/qemu-riscv-gate/replay-r61.log   # at the tree that added it; replay-r52.log at round 52's, replay-alpha9-g.log at round 34's, replay-alpha8.log at round 33's
+cmp proofs/qemu-trace-replay/target/replay.log evidence/qemu-riscv-gate/replay-alpha9.log   # at the tree that added it; replay-r61.log at round 61's, replay-r52.log at round 52's, replay-alpha9-g.log at round 34's, replay-alpha8.log at round 33's
 ```

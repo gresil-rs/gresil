@@ -1,0 +1,183 @@
+# date: 2026-10-22T01:53:42Z
+# commit: 691bb7046f43694d07890ed30facb9acd2279a9b
+gresil Leg A: bare-metal riscv64gc-unknown-none-elf, QEMU virt, no allocator
+cited asserts: values mirrored from crates/gresil unit tests
+ok [  1] lif::millivolt_trace_is_pinned_to_the_historical_arithmetic step1=-67
+ok [  2] lif::millivolt_trace_is_pinned_to_the_historical_arithmetic step1=-67
+ok [  3] lif::millivolt_trace_is_pinned_to_the_historical_arithmetic step2=-65
+ok [  4] lif::millivolt_trace_is_pinned_to_the_historical_arithmetic step2=-65
+ok [  5] lif::millivolt_trace_is_pinned_to_the_historical_arithmetic step3=-63
+ok [  6] lif::millivolt_trace_is_pinned_to_the_historical_arithmetic step3=-63
+ok [  7] lif::millivolt_trace_is_pinned_to_the_historical_arithmetic step4=-61
+ok [  8] lif::millivolt_trace_is_pinned_to_the_historical_arithmetic step4=-61
+ok [  9] lif::millivolt_trace_is_pinned_to_the_historical_arithmetic step5=-59
+ok [ 10] lif::millivolt_trace_is_pinned_to_the_historical_arithmetic step5=-59
+ok [ 11] lif::millivolt_trace_is_pinned_to_the_historical_arithmetic step6=-57
+ok [ 12] lif::millivolt_trace_is_pinned_to_the_historical_arithmetic step6=-57
+ok [ 13] lif::millivolt_trace step7 spikes 
+ok [ 14] lif::millivolt_trace step7 reset 
+ok [ 15] lif::the_dead_zone_12pa_pair mV 
+ok [ 16] lif::the_dead_zone_12pa_pair centi 
+ok [ 17] lif::leak_convergence from below 
+ok [ 18] lif::leak_convergence from above 
+ok [ 19] lif::leak_convergence stays at rest 
+ok [ 20] lif::adaptation_decay 3->2 
+ok [ 21] lif::adaptation_decay 2->1 
+ok [ 22] lif::adaptation_decay 1->0 
+ok [ 23] lif::adaptation_decay floor 0 
+ok [ 24] lif::spike_adds_two_quanta spiked 
+ok [ 25] lif::spike_adds_two_quanta +2 
+ok [ 26] lif::centi_mode membrane 
+ok [ 27] lif::centi_mode resting 
+ok [ 28] lif::centi_mode threshold 
+ok [ 29] lif::centi_mode reset 
+ok [ 30] lif::centi_mode clamp at scaled floor 
+ok [ 31] lif::rectification sticks at -59 
+ok [ 32] lif::rectification stays stuck 
+ok [ 33] lif::rectification +12pa ratchets 
+ok [ 34] lif::rectification -12pa absorbed 
+ok [ 35] synapse::default_params pre 
+ok [ 36] synapse::default_params post 
+ok [ 37] synapse::default_params weight 
+ok [ 38] synapse::default_params max 
+ok [ 39] synapse::default_params min 
+ok [ 40] synapse::negative_weight max 
+ok [ 41] synapse::negative_weight min 
+ok [ 42] synapse::self_connection_rejected 
+ok [ 43] synapse::stdp_zero_at_zero_dt 
+ok [ 44] synapse::stdp_zero_outside_window dt=-200000 
+ok [ 45] synapse::stdp_zero_outside_window dt=+200000 
+ok [ 46] synapse::weight_clamped_at_bounds max 
+ok [ 47] synapse::weight_clamped_at_bounds min 
+ok [ 48] bridge::i2_s_known_vector written 
+ok [ 49] bridge::i2_s_known_vector bytes 
+ok [ 50] bridge::i2_s_known_vector decode scale 
+ok [ 51] bridge::i2_s_known_vector decode trits 
+ok [ 52] bridge::q1_0_known_vector decodes 
+ok [ 53] bridge::q1_0_known_vector scale 
+ok [ 54] bridge::q1_0_known_vector trits 
+ok [ 55] bridge::q2_0_known_vector decodes 
+ok [ 56] bridge::q2_0_known_vector scale 
+ok [ 57] bridge::q2_0_known_vector trits 
+ok [ 58] bridge::q2_0_block_geometry Q2_0_BLOCK 
+ok [ 59] bridge::q2_0_block_geometry len(128) 
+ok [ 60] bridge::q2_0_block_geometry len(2560) 
+ok [ 61] bridge::q2_0_block_geometry len(384) 
+ok [ 62] bridge::q2_0_real_artifact decodes 
+ok [ 63] bridge::q2_0_real_artifact scale 
+ok [ 64] bridge::q2_0_real_artifact census 
+ok [ 65] bridge::q2_0_real_artifact encodes 
+ok [ 66] bridge::q2_0_real_artifact byte identity 
+ok [ 67] bridge::half_known_vectors f32 +0
+ok [ 68] bridge::half_known_vectors milli +0
+ok [ 69] bridge::half_known_vectors f32 -0
+ok [ 70] bridge::half_known_vectors milli -0
+ok [ 71] bridge::half_known_vectors f32 1.0
+ok [ 72] bridge::half_known_vectors milli 1.0
+ok [ 73] bridge::half_known_vectors f32 0.5
+ok [ 74] bridge::half_known_vectors milli 0.5
+ok [ 75] bridge::half_known_vectors f32 -2.0
+ok [ 76] bridge::half_known_vectors milli -2.0
+ok [ 77] bridge::half_known_vectors f32 4.0
+ok [ 78] bridge::half_known_vectors milli 4.0
+ok [ 79] bridge::half_known_vectors f32 max-finite
+ok [ 80] bridge::half_known_vectors milli max-finite
+ok [ 81] bridge::half_known_vectors f32 max-subnormal
+ok [ 82] bridge::half_known_vectors milli max-subnormal
+ok [ 83] bridge::half_known_vectors f32 min-normal
+ok [ 84] bridge::half_known_vectors milli min-normal
+ok [ 85] bridge::half_known_vectors f32 +inf
+ok [ 86] bridge::half_known_vectors milli +inf
+ok [ 87] bridge::half_known_vectors f32 -inf
+ok [ 88] bridge::half_known_vectors milli -inf
+ok [ 89] bridge::half_known_vectors f32 NaN
+ok [ 90] bridge::half_known_vectors milli NaN
+ok [ 91] bridge::wire_gamma 24 
+ok [ 92] bridge::wire_gamma 0 
+ok [ 93] bridge::wire_gamma 125 
+ok [ 94] bridge::wire_gamma fp16-max 
+ok [ 95] bridge::wire_gamma -40000 
+ok [ 96] bridge::wire_gamma -40000000 
+ok [ 97] bridge::wire_gamma -5 
+ok [ 98] bridge::scale_constant_is_pinned 
+ok [ 99] bridge::repack encodes 
+ok [100] bridge::repack repacks 
+ok [101] bridge::repack_known_vector order 
+ok [102] trit::from_weight_boundaries 62 
+ok [103] trit::from_weight_boundaries 63 
+ok [104] trit::from_weight_boundaries -62 
+ok [105] trit::from_weight_boundaries -63 
+ok [106] trit::from_weight_boundaries 125 
+ok [107] trit::from_weight_boundaries -125 
+ok [108] trit::from_weight_boundaries 0 
+ok [109] trit::odd_gamma 2@5 
+ok [110] trit::odd_gamma 3@5 
+ok [111] trit::tensor_scale [10,15] 
+ok [112] trit::tensor_scale [10,14] 
+ok [113] trit::project 130 
+ok [114] trit::project 60 
+ok [115] trit::project -200 
+ok [116] trit::flip draw0 -g ltp 
+ok [117] trit::flip draw0 0 ltp 
+ok [118] trit::flip draw0 +g ltp saturate 
+ok [119] trit::flip draw0 +g ltd 
+ok [120] trit::flip draw0 0 ltd 
+ok [121] trit::flip draw0 -g ltd saturate 
+ok [122] trit::flip draw_max_never_flips 
+ok [123] kernel::pack_known_vector len 
+ok [124] kernel::pack_known_vector byte 
+ok [125] kernel::pack_known_vector round-trip 
+ok [126] kernel::absmax_known_vector scale 
+ok [127] kernel::absmax_known_vector out 
+ok [128] kernel::absmax_i16_min scale 
+ok [129] kernel::absmax_i16_min out 
+ok [130] kernel::absmax_zero_vector scale 
+ok [131] kernel::absmax_zero_vector out 
+ok [132] kernel::matvec_known_vector runs 
+ok [133] kernel::matvec_known_vector out 
+ok [134] nir::lif_hard_failures tau=0 
+ok [135] nir::lif_hard_failures tau<0 
+ok [136] nir::lif_hard_failures r=0 
+ok [137] nir::lif_hard_failures threshold-zero 
+ok [138] nir::lif_hard_failures tau<dt 
+ok [139] nir::lif_hard_failures threshold out of range 
+ok [140] nir::lif_hard_failures centi threshold_q 
+ok [141] nir::round_half_away r one-ulp-below-half 
+ok [142] nir::quantize_linear dyadic shape 
+ok [143] nir::quantize_linear dyadic scale
+ok [144] nir::quantize_linear dyadic arena 
+ok [145] nir::quantize_linear dyadic bounded loss 
+ok [146] nir::quantize_linear offset 3 
+ok [147] nir::quantize_linear offset arena 
+ok [148] nir::quantize_linear same-tensor same-scale 
+ok [149] nir::quantize_linear exact scale 
+ok [150] nir::quantize_linear exact err 
+ok [151] nir::quantize_linear exact arena 
+ok [152] nir::quantize_linear zero_tensor 
+ok [153] nir::quantize_linear zero scale 
+ok [154] nir::quantize_linear zero err 
+ok [155] nir::quantize_linear zero arena 
+ok [156] nir::quantize_linear full_scale not zero 
+ok [157] nir::quantize_linear full_scale absmax 
+ok [158] nir::quantize_linear full_scale arena 
+ok [159] nir::denormal_absmax_is_loud 5e-324
+ok [160] nir::denormal_absmax_is_loud 1e-320
+ok [161] nir::denormal_absmax_is_loud 2.47e-321
+ok [162] nir::f64_max_absmax_is_loud +f64::MAX
+ok [163] nir::f64_max_absmax_is_loud -f64::MAX
+ok [164] nir::rejects_loudly non-finite NaN
+ok [165] nir::rejects_loudly non-finite +inf
+ok [166] nir::rejects_loudly non-finite -inf
+ok [167] nir::rejects_loudly len mismatch 
+ok [168] nir::rejects_loudly zero rows 
+ok [169] nir::rejects_loudly zero cols 
+ok [170] nir::rejects_loudly arena overflow 
+ok [171] nir::rejects_loudly offset overflow 
+raster: 4 LIFNeurons x 40 steps x 1ms (neuron-level; network.rs is std-gated — the network wire is Leg B)
+n0 mV  +600pA ......|............|............|.......
+n1 mV  +300pA ........................................
+n2 cmV +300pA (same drive as n1, finer ruler) .............|.....................|....
+n3 cmV  +12pA ........................................
+---
+checks: 171  failed: 0
+LEG A PASS
