@@ -119,9 +119,18 @@ session-h2 README pin `71f2518a…`):
 
 ```bash
 cargo run -p neuralos-rt --release --example hybrid_invivo -- \
-  models/Ternary-Bonsai-4B-Q2_0.gguf export
+  --h2-compat models/Ternary-Bonsai-4B-Q2_0.gguf export
 # corpus is NOT argv — the pinned corpus (evidence/corpus_readme_pinned.txt,
 # sha 18fb5452…, first 2000 tokens, single truncated pass) is baked in.
+# --h2-compat: H2's milli-domain drive; since 8561603 (2026-08-28)
+# the default drive is norm-unit, and `export` without the flag
+# refuses before the model loads. As printed the export cannot
+# finish since 4e71176 (2026-08-24): it writes the three checkpoints
+# under their banked names, then harness::assert_unbanked refuses
+# the final file, models/Ternary-Bonsai-4B-Q2_0-invivo.gguf, by
+# name, and the run exits with 101. Round 67 (ISA) ran it from a
+# copy whose final file takes another name; the four files it wrote
+# matched the pins.
 ```
 
 | File | Size (B) | SHA-256 |
