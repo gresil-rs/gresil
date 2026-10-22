@@ -45,6 +45,7 @@ low), red LED is power. Host: the laptop, espflash 4.5.0, Rust 1.92.0
 | `board-r61-head.log` | the eleventh entry (ISA round 61, 2026-10-07): the default firmware at head, its neuron built silent and the networks' clock a `u64`, built by `build.sh` on 1.98.1 in the main clone (ELF `ad5dc163…`), 20 s after reset (§ Eleventh entry) |
 | `board-r67-head.log` | the twelfth entry (ISA round 67, 2026-10-13): the default firmware at head, its neuron without its capacitance, built by `build.sh` on 1.98.1 in the main clone at `0182042` (ELF `49e0830a…`), 20 s after reset (§ Twelfth entry) |
 | `board-r76-tip.log` | the thirteenth entry (ISA round 76, 2026-10-21): the default firmware at the stamp PR's tip, the library at `0.1.0-alpha.9`, built by `build.sh` on 1.98.1 in the main clone at `8bff222` (ELF `7834eb64…`), 20 s after reset (§ Thirteenth entry) |
+| `board-r76-merge.log` | the fourteenth entry (ISA round 77, 2026-10-22): the default firmware at PR #73's merge commit, the tagged commit, built by `build.sh` on 1.98.1 in the main clone at `691bb70` (ELF `608a202a…`, the release's), 20 s after reset (§ Fourteenth entry) |
 | `SHA256SUMS` | pins the logs and this README |
 | `../../tools/esp32c3_capture.py` | the capture tool (reset + read from one process) |
 | `../../tools/esp32c3_trace_diff.py` | the replay diff: every plasticity-off trace of `crates/gresil/tests/traces/` against its case in a capture, one line per case (§ Sixth entry) |
@@ -1246,6 +1247,41 @@ read first) and was given it back after: the 4 MB read out before round
 67's flash, written back, its on-chip MD5 `582b942d…` again; a capture
 of it reads round 52's burst figures to 1 µs.
 
+## Fourteenth entry: alpha.9's tag, the merge commit (2026-10-22)
+
+Same SuperMini (MAC `70:af:09:07:f6:3c`, esp32c3 revision v0.4, as
+`espflash board-info` read them), same port, same tool, 20 s after
+reset, the ELF built and flashed from the main clone. Why this entry
+exists: it is the second of alpha.9's two board runs (§ Thirteenth
+entry), the merge commit's ELF read before the tag. `691bb70` merged PR
+#73 with the tree of its last commit, whose firmware sources are the
+thirteenth entry's.
+
+Head: `build.sh` at `691bb70` on 1.98.1 in the main clone,
+`GRESIL_GRAPH` unset: ELF `608a202a…`, 300,024 B, the one the Gitea
+release carries, its descriptor stamped with the merge's time
+(`SOURCE_DATE_EPOCH` 1792630698), so its sha is not the tip's;
+`.text` `5dae1f91…`, the thirteenth entry's pin, appended again as
+"alpha.9's tag" (§ Rebuild + run); the gate 0 hits, the trim-paths
+canary still unstable on 1.98.1 (exit 101). Flashed from that ELF,
+`board-r76-merge.log`, 53,274 bytes, the second of three captures: the
+first overlaps the run the flash started and was dropped, and the third
+reads the same figures to 1 µs.
+
+The gates hold.
+`python3 tools/esp32c3_trace_diff.py evidence/esp32c3-bringup/board-r76-merge.log`
+reads the fourteen plasticity-off cases identical and ends
+`14 cases, 0 red`. After the `rst:` line the capture equals
+`board-r76-tip.log`, the thirteenth entry's, but for the saved PC, two
+bursts 1 µs apart (free 2,939 µs, network 141,434 µs) and the real-time
+loop's stamps, which follow the wall clock: its 288 spikes land on the
+same steps.
+
+The board held round 52's image before the flash (on-chip MD5
+`582b942d…`, read first) and was given it back after, its on-chip MD5
+`582b942d…` again; a capture of it reads round 52's burst figures to
+1 µs.
+
 ## Rebuild + run (from the repo root; board on /dev/ttyACM0)
 
 ```bash
@@ -1291,6 +1327,7 @@ llvm-objcopy -O binary --only-section=.text <ELF> text.bin && sha256sum text.bin
 #   3a9eb352b4ad8b392ad6044a7671cba93d760ce39990cd3d816cd360870ca87c  round 61, the noise default and the clock (build.sh on 1.98.1, main clone, NEURALOS_GRAPH unset, from the sources of the commit that adds this line)
 #   b6c2d09d6d350ae49fb7e174f4823b1e86c63be8422834977c12d259dd71a334  round 67, the neuron without its capacitance (build.sh at 0182042 on 1.98.1, main clone, NEURALOS_GRAPH unset: the sources of the commit that adds this line, which changes evidence/ alone)
 #   5dae1f91fb14a67e83169e68444287816b71f37c88e5e0938461ae8dee19b475  round 76, the stamp's tip (build.sh at 8bff222 on 1.98.1, main clone, GRESIL_GRAPH unset: the sources of the commit that adds this line, which changes evidence/ and alpha.9's notes alone)
+#   5dae1f91fb14a67e83169e68444287816b71f37c88e5e0938461ae8dee19b475  alpha.9's tag, the merge commit (build.sh at 691bb70 on 1.98.1, main clone, GRESIL_GRAPH unset: the thirteenth entry's firmware sources; round 76's .text, unmoved)
 ```
 
 The third pin is the second one rebuilt by `build.sh` (round 26,
@@ -1347,7 +1384,9 @@ round 76's, built at `8bff222`, whose sources are those of the commit
 that adds it: the sixteenth's firmware sources under round 74's names
 and round 75's two SPDX lines, on the library at `0.1.0-alpha.9`; the
 same 272 code symbols at the same sizes, one placed three functions
-earlier (§ Thirteenth entry).
+earlier (§ Thirteenth entry). The eighteenth is the merge commit's,
+built at `691bb70`, the tagged commit, whose firmware sources are the
+seventeenth's: the same `.text` (§ Fourteenth entry).
 
 ### Release asset (the procedure since round 26)
 

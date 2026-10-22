@@ -22,8 +22,9 @@
 `.nir` file runs heapless and panic-free on the ESP32-C3, bit for bit
 with the host.
 
-0.1.0 is tagged when the fifteen checks below hold, not on a date. A
-stranger can run each one. This list is their one home; a tick names
+0.1.0 is tagged when the fifteen checks below hold, not on a date, and
+only at the end of the road § Practical next moves, item 3, sets. A
+stranger can run each check. This list is their one home; a tick names
 the PR that made the check hold, as of this tree.
 
 1. [x] Traces from today's network; CI replays them on host, QEMU at release. (Host: CI, PR B, #26. QEMU: PR F, #30, `proofs/qemu-trace-replay/`, the twelve plasticity-off traces bit for bit; PR G, #31, the fourteen, through the library's row writer.)
@@ -38,7 +39,7 @@ the PR that made the check hold, as of this tree.
 10. [x] The README's first example is a real doctest; `missing_docs` on. (PR J, #34: § Quick start is the board's own neuron, asserting the 147 spikes and the first spike's index 55 the C3 prints; § Usage sketch compiles too; `missing_docs` on with 53 fields documented.)
 11. [x] Rustdoc states rounding, saturation, reset, leak, step order, the one-step delay. (PR K, #36: `LIFNeuron::integrate_and_fire` § Semantics and `SpikingNeuralNetwork::step` § Order, each sentence a doctest or a named test, the pulse a refractory `post` drops among them; `cargo doc -D warnings` is a gate. Reworded from "delay is the edge's": no edge carries a delay in this code.)
 12. [x] The default build forbids `unsafe` (only `simd` has it). (PR J, #34: the library forbids `unsafe_code` with the feature off and denies it with the feature on, `pub mod simd` carrying the one `allow`; both falsifiers in the commit.)
-13. [x] Grep gate on release texts: no "golden", "conformance", "successor", Lava. (Ticked at a stamp, by the grep in that release draft's § Procedure: alpha.8 stamp, 0 hits.)
+13. [x] Grep gate on release texts: no "golden", "conformance", "successor", Lava. (Ticked at a stamp, by the grep in that release draft's § Procedure: alpha.8 and alpha.9 stamps, 0 hits.)
 14. [x] Zero runtime dependencies (`cargo tree -e normal`) at each release. (PR F, #30: `cargo tree -e normal -p gresil` prints the crate alone, with `std` and without.)
 15. [x] A converted snnTorch graph replays snnTorch's spike trains, each miss named and pinned by the parity test. (PR #49: the parity test; PR #51: a model snnTorch trained, in its set.)
 
@@ -129,36 +130,9 @@ displace substrate + lab bench + gated research.
 The chapter, not the history. Closed work lives in `ISA.md` and the
 records it names in `evidence/INDEX.md`. Four lines, in order:
 
-1. **NIR, the reach.** `--sim-units` imports at true scale, with NIR's
-   firing rule and the exporter's step (round 52); the JSON marks its
-   units, and `--freeze` takes a drive of runs and prints the library's
-   report (round 53); `Affine`, PyTorch's default bias, converts as a
-   Linear and a bias input of its own, and an input reads in
-   thousandths (round 54). The converter's parity test, with a model
-   snnTorch trained among its graphs, is the front door's evidence, its
-   misses named. The reach is in before the front door.
-2. **alpha.9: the pub walk.** What stops being public before the
-   crate's surface is promised: paths and re-exports, `LIFNeuron`'s
-   fields, the rest of the field walk; the noise default (a neuron has
-   none, a topology builder gives its neurons 5 pA), the networks' clock
-   (a `u64`), the refusals (one `Error` variant per rule), the divisor's
-   range (1 to 32,767), the cap of 65,535 neurons, one grid per network,
-   a connectivity or rewiring probability from 0 to 1, a step that sorts
-   the synapses added since the last sort, with no public sort, a
-   membrane the network's step can move, the current named in pA, one
-   neuron constructor that names its type and grid, `LIFNeuron`'s
-   fields behind fifteen getters and the chain, adaptation a switch per
-   neuron, a neuron at rest in its place at `from_neurons`, one word
-   for the std network's clock and step, `time_us()` and `dt_us`,
-   `Synapse`'s fields behind getters, the three no computation read
-   gone, `Spike`, `NetworkStats` and `FixedSynapse` not exhaustive,
-   STDP's counters and bounds behind its feature, a neuron with no
-   capacitance, ten `nir` structs and four `NirError` variants not
-   exhaustive, with a blank for the four structs a caller fills, NIR
-   import options that name their step and grid, and a `NirError` that
-   owns the names it reports are in. The starter set closes the walk:
-   four examples a stranger copies, which CI builds and tests. Then the
-   stamp.
+1. **NIR, the reach.** Done in alpha.9 (ISA rounds 52 to 54).
+2. **alpha.9: the pub walk.** Done: stamped 2026-10-22
+   (`docs/releases/v0.1.0-alpha.9.md` § Stamped).
 3. **0.1.0-rc.1, then 0.1.0.** After alpha.9, three sittings: the frozen
    format, the error surface, the topology RNG; the converter PR lands
    before the rc. Then `0.1.0-rc.1`, which the outreach waits for. 0.1.0

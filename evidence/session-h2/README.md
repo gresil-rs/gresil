@@ -26,9 +26,18 @@ record. p0/p1/p4 quiet (0 flips).
 #    run.log verdict lines re-pinned byte-identical in r4-closeout
 #    via PLAIN mode, ~21,065 s, export tier deliberately not run):
 cargo run -p neuralos-rt --release --example hybrid_invivo -- \
-  models/Ternary-Bonsai-4B-Q2_0.gguf export
+  --h2-compat models/Ternary-Bonsai-4B-Q2_0.gguf export
 # → run.log numbers + models/Ternary-Bonsai-4B-Q2_0-invivo.gguf
 #   (sha 71f2518a…) + ck{400,800,1200} checkpoints.
+# --h2-compat: H2's milli-domain drive; since 8561603 (2026-08-28)
+#   the default drive is norm-unit, and `export` without the flag
+#   refuses before the model loads. As printed the export cannot
+#   finish since 4e71176 (2026-08-24): it writes the three checkpoints
+#   under their banked names, then harness::assert_unbanked refuses
+#   the final file, models/Ternary-Bonsai-4B-Q2_0-invivo.gguf, by
+#   name, and the run exits with 101. Round 67 (ISA) ran it from a
+#   copy whose final file takes another name; the four files it wrote
+#   matched the pins.
 
 # 2) Judge legs (fork pinned at 9ca265a + the NEURALOS_DUMP patch):
 bash tools/build_fork.sh

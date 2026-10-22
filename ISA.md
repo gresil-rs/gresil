@@ -4,9 +4,9 @@ slug: 20260815-125500_neuralos-v2
 project: NeuralOS v2
 phase: complete
 progress: 88/88
-head: "main@5ace908 (PR #72 merged 2026-10-21 19:24 UTC: round 75, tier 1, the front door: the README the canvas drew, its assets and their two scripts, the scope's GIF; the copyright notice, NIR's license beside its files and SPDX headers on 84 files; the quick start's units; the board's page and the friend test's fixes; the fifteenth check, ticked by PR #49 and PR #51, and its sweep; mirror synced, tags identical, branch deleted) · alpha.8 stamped 2026-09-14 (`docs/releases/v0.1.0-alpha.8.md` § Stamped); the tree is ahead of it by rounds 34 to 75 (D8, the spiking Linear edge; `trace::row`, and the freezer behind `unstable-freeze`; `nir2json --freeze`; the firmware's stranger slot and `stranger.sh`, check 7; capacity, the bar `44·N + 6·S ≤ 262,144` measured at its two corners on the C3, check 8; the README's first example a doctest with `missing_docs` on and the default build forbidding `unsafe`, checks 10 and 12; the `audit` job scanning the firmware's own lock, which ticks no check; `integrate_and_fire` § Semantics and the step's § Order with the one-step delay, check 11; STDP behind `unstable-stdp` and plasticity off at construction, check 9; the membrane average the mean of all neurons; the CSR agreeing with the synapse list; the frozen file built by constructors; the error types' 0.1.0 shape; the public enums' 0.1.0 shape; what stops being public; § Practical next moves the chapter, which ticks no check; the closed bridge chapter behind `unstable-bridge`, which ticks no check; the root and the paths, with `simd` on the exact `i64` factor, which ticks no check; the batch by name, `simd` on a `LIFBatch` and checked off x86, which ticks no check; NIR at true scale under `--sim-units`, with its parity test against snnTorch, which ticks no check; the converter surface, the units mark and `--drive` with the report, which ticks no check; Affine under `--sim-units` and the input in thousandths, with a trained model in the parity set, which ticks no check; the mutation pass and the close-out check, which ticks no check; the import's memory with the weights, which ticks no check; the NIR round trip, C and an object's own keys, which ticks no check; the NIR mutation loop, which ticks no check; the NIR overflow fix, which ticks no check; the `.nir` file fix, which ticks no check; the networks' clock and the noise default, which ticks no check; the refusals, which ticks no check; the constructor holes, which ticks no check; the stale CSR, which ticks no check; the 17 fields, which ticks no check; the cosmetics at step 6's end, which ticks no check; step 7, which ticks no check; the NIR sitting, which ticks no check; the goal programs, which ticks no check; the docs say what the code does, which ticks no check; the crate as shipped, which ticks no check; alpha.9's notes and the dry runs, which ticks no check; round 70's cosmetic list, which ticks no check; the rename to gresil, which ticks no check; the front door, which ticks no check), alpha.9 open; the fifteen checks hold, and 0.1.0 is the principal's call · wrote-from: work/stamp, round 76 (tier 1, the stamp: the notices of both binaries, written by `tools/notices.sh` and checked by `cargo deny`, and `COPYRIGHT`'s clause; leg A's rustfmt and f64's largest; the crate README in pA and its STDP lines; seven lines that claimed emitters the tests do not measure, narrowed; the bump to alpha.9 with its six lockfiles, `neuralos-snn`'s pointer and the notes' last rows; built in scratch on PR #72's head, four commits and the record, rebuilt four times, on the two reviews, on three checks, on a Python-side council and on build 4's review; on the stamp day rebuilt on PR #72's merge, tree for tree, then the board's run on the tip, `14 cases, 0 red`, its commit and this record, both rebuilt once on the fresh read; then the series rebuilt once on CI's first run, commit 1's listing without color) · open(session): each on the principal's word: the helper's check of the color fix, the push, CI and the merge, then alpha.9's § Procedure · next-work: ROADMAP § Practical next moves"
+head: "main@691bb70 (PR #73 merged 2026-10-22 00:58 UTC: round 76, tier 1, the stamp: both binaries' notices and `COPYRIGHT`'s clause, leg A's two items, the crate README in pA, the bump to 0.1.0-alpha.9 and `neuralos-snn`'s pointer, the board's run on the tip; mirror synced, tags identical, branch deleted) · tree == published, alpha.9 stamped 2026-10-22 (tag object `afa4ea8c` on `691bb70`, Gitea release 978574, crates.io 03:12:25Z, the pointer 03:23:31Z; `docs/releases/v0.1.0-alpha.9.md` § Stamped); the fifteen checks hold; next, three sittings and the converter PR, then `0.1.0-rc.1` · wrote-from: work/alpha9-record, round 77 (tier 2, alpha.9's record: the runs of record, § Stamped and § Files, the H2 export's rebuild line, `crates/neuralos-snn/` deleted, the local loop in CI's color; built in scratch on `691bb70`, five commits and this record, rebuilt on the review's findings; its figures: 184 checks by script, the rest read by hand) · open(session): the per-commit loop on the six, then the push, the seven `(pull_request)` contexts green in the full listing, the two pre-autopsy tags by name and the merge, each on the principal's word · next-work: ROADMAP § Practical next moves"
 started: 2026-08-15T12:55:00Z
-updated: 2026-10-21T22:39:42Z
+updated: 2026-10-22T19:07:25Z
 principal_stated_goal: "Session I: the null-ladder adjudication — BRANCH B (unattributed perturbation); P5 on infrastructure + method"
 ---
 
@@ -10723,3 +10723,36 @@ follows the clone path; no gate reads `--nir`; a caret requirement on
 **Open**: the color fix's check, the push, CI, the merge and § 9, each
 on the principal's word. **Guards.** 1: appended, head refreshed; 2: no
 frozen file or verdict moves; 3: no outreach before rc.1.
+
+## Close-out (round 77 — alpha.9's record: the runs of record, § Stamped and § Files, the H2 export's rebuild line, the pointer deleted, the loop in CI's color; tier 2 — 2026-10-22)
+
+Five commits and this: `a206dbd` the four runs of record in `evidence/`;
+`9536641` § Stamped and § Files, the head line, RESEARCH_LOG and
+ROADMAP's check 13, items 1 and 2 and § 0.1.0's pointer to item 3;
+`61f162a` the H2 export's rebuild line; `01403b0` the pointer deleted;
+`00cc084` the local loop in CI's color. **Rulings** (philo, 2026-10-22):
+the record its own PR; one fresh review and a figure check; the H2 line
+in docs only; the pre-autopsy tags pushed before the merge; the notes'
+opening says the stamp. **Review**, one: two blocking, both in
+`9536641`; six cosmetic; seven record-only. **Runs of record**, at
+`691bb70` before the tag: leg A 171 checks; leg B 391 passed, 24
+doctests among them; the replay and the board on the release's ELF, each
+`14 cases, 0 red`; the NIR mutation loop's million at seed 1792633114,
+121,006 imported and 53,879 built; cargo deny, licenses ok on both; the
+surface equal as multisets in its four configurations; the docs on
+docs.rs's nightly, `1a2c4797e`, exit 0, no warning. **Measured**, before
+this commit: the figure check, 184 checks green against git, both
+forges, the Gitea and crates.io APIs, docs.rs and the bank, eight
+planted faults red; leg A and the replay again in a scratch clone, the
+same bytes. **Record-only**: the tagger is philo-the-dendron, where the
+six annotated tags before it on the forges say philodendron; a tag's
+page answers 200 before its release; a release asset answers 303, so a
+download takes `curl -L`; the dry run reads the index once before
+packaging, which `cargo package` does not, read as a name check (not
+confirmed in cargo's source); the pointer has no `rust_version`; docs.rs
+built both on the docs row's nightly; an eighth TODO line at round 76's
+merge, ruled after its record, which counts seven. **Open**: the
+per-commit loop on the six, then the push, CI, the two tags and the
+merge, each on the principal's word. **Guards.** 1: appended, head
+refreshed; 2: no frozen file or verdict moves; 3: no outreach before
+rc.1.

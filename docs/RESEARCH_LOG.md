@@ -1151,3 +1151,23 @@ scanned before the upload, not after, and the release texts passed the
 check-13 grep: 0 hits both.
 Record: ISA round-34 close-out, `docs/releases/v0.1.0-alpha.8.md`
 § Stamped.
+
+## 2026-10-22 — alpha.9 stamped: tag, release, crates.io
+
+`gresil 0.1.0-alpha.9` reached crates.io at 03:12:25Z, from `691bb70`,
+the merge of round 76 (PR #73): the library's first release under its
+new name, with the pub walk, which settled what stops being public
+before 0.1.0 promises the surface; NIR at true scale, a converted
+snnTorch graph replaying snnTorch's spike trains, each miss named; and
+the starter set of four examples. `neuralos-snn 0.1.0-alpha.9`, a
+pointer with no code, followed at 03:23:31Z. The tag `v0.1.0-alpha.9`
+is on that commit, and the Gitea release on it carries the board
+firmware and the `.nir` converter as a static musl binary, each with
+its third-party notices, beside the license and the standard library's
+notices; the four releases before it got their binaries' notices the
+same night. On the tagged tree, before the tag, the board read the
+release's ELF, `14 cases, 0 red`; leg A passed its 171 checks, leg B
+its 391 tests and the trace replay under QEMU its fourteen cases; the
+NIR mutation loop ran its million cases.
+Record: ISA round-77 close-out, `docs/releases/v0.1.0-alpha.9.md`
+§ Stamped.
