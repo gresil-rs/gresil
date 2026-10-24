@@ -155,7 +155,7 @@ sidecar:
   run the currents its numbers give, one after the other. The library's
   freezer writes it (`gresil::fixed::freeze::module`), the one
   that writes the library's own frozen traces.
-- **`<out>.trace`**, that drive on the host in `neuralos-trace v1`: the
+- **`<out>.trace`**, that drive on the host in `gresil-trace v1`: the
   header line, then one row per step, the spikes and every membrane,
   written by `gresil::trace::row`, the row writer the firmware
   uses. The host steps the library's std network with plasticity off,

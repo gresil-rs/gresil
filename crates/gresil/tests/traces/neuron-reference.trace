@@ -1,4 +1,4 @@
-# neuralos-trace v1 case=neuron-reference kind=reference n=1 dt_us=1000 res=cmV plasticity=off divisor=10 steps=150 rows=all
+# gresil-trace v1 case=neuron-reference kind=reference n=1 dt_us=1000 res=cmV plasticity=off divisor=10 steps=150 rows=all
 0 0 |  | -6920
 1 1000 |  | -6844
 2 2000 |  | -6772

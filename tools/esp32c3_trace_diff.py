@@ -4,7 +4,7 @@
 The firmware (firmware/esp32c3/src/main.rs) replays every frozen case of
 crates/gresil/tests/traces/frozen.rs: each prints its trace's
 header line, then its rows, and the replay ends with one line,
-`# neuralos-trace end`. This script takes the frozen set from the files
+`# gresil-trace end`. This script takes the frozen set from the files
 themselves (every trace whose header says plasticity=off), splits the
 log at the headers, drops carriage returns, and compares each case with
 its file line for line: one line per case, exit 1 on any difference. A
@@ -13,6 +13,13 @@ line after the last case is a difference too: a capture cut off is red,
 not a shorter compare. Any capture with the headers and the end line
 reads the same way, the C3's or QEMU's (proofs/qemu-trace-replay/, the
 same replay on riscv64gc).
+
+Through alpha.9 the format's name was `neuralos-trace` (crates/gresil/
+src/trace.rs, the module doc), and what was written then carries it:
+a line that opens with `# neuralos-trace ` compares as if it opened
+with `# gresil-trace `, in a header line and in the end line, so the
+captures banked under evidence/ read as they did. A difference prints
+the lines as the files hold them.
 
 `--trace FILE`, repeatable, adds a trace from outside the tree to the
 set: a stranger's graph in the firmware's slot (firmware/esp32c3/
@@ -32,8 +39,9 @@ import sys
 from pathlib import Path
 
 TRACES = Path(__file__).resolve().parent.parent / "crates/gresil/tests/traces"
-HEAD = "# neuralos-trace v1 case="
-END = "# neuralos-trace end"
+HEAD = "# gresil-trace v1 case="
+END = "# gresil-trace end"
+OLD = "# neuralos-trace "
 USAGE = "usage: tools/esp32c3_trace_diff.py [--trace FILE]... LOG"
 
 
@@ -43,6 +51,11 @@ def lines_of(text):
     if lines and lines[-1] == "":
         lines.pop()
     return lines
+
+
+def canon(line):
+    """A line under the format's name: `# neuralos-trace ` read as `# gresil-trace `."""
+    return "# gresil-trace " + line[len(OLD):] if line.startswith(OLD) else line
 
 
 def usage(why):
@@ -72,9 +85,9 @@ def main():
     for path in sorted(TRACES.glob("*.trace")):
         lines = lines_of(path.read_text())
         if lines and " plasticity=off " in lines[0]:
-            if lines[0] in cases:
-                return usage(f"{path.stem} and {cases[lines[0]][0]} share one header: {lines[0]}")
-            cases[lines[0]] = (path.stem, lines)
+            if canon(lines[0]) in cases:
+                return usage(f"{path.stem} and {cases[canon(lines[0])][0]} share one header: {lines[0]}")
+            cases[canon(lines[0])] = (path.stem, lines)
     if not cases:
         print(f"no plasticity-off trace in {TRACES}", file=sys.stderr)
         return 1
@@ -83,21 +96,21 @@ def main():
             lines = lines_of(path.read_text())
         except (OSError, UnicodeDecodeError) as e:
             return usage(f"--trace {path}: {e}")
-        if not lines or not lines[0].startswith(HEAD) or " plasticity=off " not in lines[0]:
+        if not lines or not canon(lines[0]).startswith(HEAD) or " plasticity=off " not in lines[0]:
             return usage(f"--trace {path}: not a plasticity-off trace header")
-        if lines[0] in cases:
-            return usage(f"--trace {path}: its header is already in the set ({cases[lines[0]][0]})")
-        cases[lines[0]] = (f"{path.stem} (given)", lines)
+        if canon(lines[0]) in cases:
+            return usage(f"--trace {path}: its header is already in the set ({cases[canon(lines[0])][0]})")
+        cases[canon(lines[0])] = (f"{path.stem} (given)", lines)
 
-    heads = [i for i, line in enumerate(log) if line.startswith(HEAD)]
-    ends = [i for i, line in enumerate(log) if line == END]
+    heads = [i for i, line in enumerate(log) if canon(line).startswith(HEAD)]
+    ends = [i for i, line in enumerate(log) if canon(line) == END]
     red = 0
     for i in heads:
-        if log[i] not in cases:
+        if canon(log[i]) not in cases:
             print(f"log line {i + 1}: a header outside the frozen set: {log[i]}")
             red += 1
     for header, (name, want) in cases.items():
-        at = [i for i in heads if log[i] == header]
+        at = [i for i in heads if canon(log[i]) == header]
         if len(at) != 1:
             where = "missing from the log" if not at else f"{len(at)} times in the log"
             print(f"{name}: {where}")
@@ -106,11 +119,11 @@ def main():
         start = at[0]
         stop = min((i for i in heads + ends if i > start), default=len(log))
         have = log[start:stop]
-        if have == want:
+        if list(map(canon, have)) == list(map(canon, want)):
             print(f"{name}: identical, {len(want) - 1} rows")
             continue
         n = next(
-            (k for k, (a, b) in enumerate(zip(want, have)) if a != b),
+            (k for k, (a, b) in enumerate(zip(want, have)) if canon(a) != canon(b)),
             min(len(want), len(have)),
         )
         file_line = want[n] if n < len(want) else "<end>"

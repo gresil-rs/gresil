@@ -1,4 +1,4 @@
-# neuralos-trace v1 case=one-neuron-board kind=regression n=1 dt_us=1000 res=cmV plasticity=off divisor=10 steps=10000 rows=spikes
+# gresil-trace v1 case=one-neuron-board kind=regression n=1 dt_us=1000 res=cmV plasticity=off divisor=10 steps=10000 rows=spikes
 55 55000 | 0 | -8000
 123 123000 | 0 | -8000
 191 191000 | 0 | -8000

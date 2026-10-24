@@ -4,8 +4,9 @@
   uv run --no-project --with fonttools==4.60.1 python3 tools/gresil_logo.py \
       crates/gresil/tests/traces/feedforward-8.trace docs/assets
 
-Reads a neuralos-trace v1 file, takes the spike column, and draws the
-raster as a dot field (lit = spiked, unlit = faint). The wordmark and
+Reads a trace file, gresil-trace v1 (neuralos-trace v1 through alpha.9;
+the name is not read), takes the spike column, and draws the raster as
+a dot field (lit = spiked, unlit = faint). The wordmark and
 the tagline are IBM Plex Sans converted to path outlines with
 fontTools, so the SVG needs no font. The accent on the é is a raster
 dot in the accent colour, the one dot that fell out of the field.

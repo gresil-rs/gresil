@@ -1,4 +1,4 @@
-# neuralos-trace v1 case=chain-3 kind=regression n=3 dt_us=1000 res=cmV plasticity=off divisor=1 steps=100 rows=all
+# gresil-trace v1 case=chain-3 kind=regression n=3 dt_us=1000 res=cmV plasticity=off divisor=1 steps=100 rows=all
 0 0 |  | -6700 -7000 -7000
 1 1000 |  | -6415 -7000 -7000
 2 2000 |  | -6145 -7000 -7000

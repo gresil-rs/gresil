@@ -363,7 +363,7 @@ mod tests {
             "    pub const DT_US: u32 = 500;\n",
             "    pub const STEPS: u32 = 3;\n",
             "    pub const SPIKES_ONLY: bool = true;\n",
-            "    pub const HEADER: &str = \"# neuralos-trace v1 case=two-quiet kind=stranger n=2 \
+            "    pub const HEADER: &str = \"# gresil-trace v1 case=two-quiet kind=stranger n=2 \
              dt_us=500 res=cmV plasticity=off divisor=10 steps=3 rows=spikes\";\n",
         ] {
             assert!(text.contains(line), "{line:?} in {text}");

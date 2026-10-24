@@ -6,7 +6,7 @@
 //! drive, and a row is what `step()` returned and `neurons()` after it.
 //!
 //! One file per case in this directory, in the library's format,
-//! `neuralos-trace v1` (`gresil::trace`'s module doc); the board
+//! `gresil-trace v1` (`gresil::trace`'s module doc); the board
 //! case keeps its spiking steps only, 147 rows of 10,000 steps. Where a
 //! case keeps the noise, it is the neuron's own LFSR, seeded by id and
 //! time, so every case is a pure function of this file.

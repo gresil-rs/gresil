@@ -1,4 +1,4 @@
-# neuralos-trace v1 case=plasticity-on kind=regression n=2 dt_us=1000 res=cmV plasticity=on divisor=1 steps=150 rows=all
+# gresil-trace v1 case=plasticity-on kind=regression n=2 dt_us=1000 res=cmV plasticity=on divisor=1 steps=150 rows=all
 0 0 |  | -6700 -6900
 1 1000 |  | -6415 -6805
 2 2000 |  | -6145 -6715

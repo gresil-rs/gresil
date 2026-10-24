@@ -6,7 +6,7 @@ pub mod stranger {
     pub const DT_US: u32 = 100;
     pub const STEPS: u32 = 100;
     pub const SPIKES_ONLY: bool = false;
-    pub const HEADER: &str = "# neuralos-trace v1 case=stranger kind=stranger n=2 dt_us=100 res=cmV plasticity=off divisor=10 steps=100 rows=all";
+    pub const HEADER: &str = "# gresil-trace v1 case=stranger kind=stranger n=2 dt_us=100 res=cmV plasticity=off divisor=10 steps=100 rows=all";
     pub const NEURONS: [LIFNeuron; N] = [
         LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::CentiMillivolt).with_resting_potential(0).with_threshold(1001).with_reset_potential(0).with_tau_membrane_us(5000).with_refractory_period_us(0).with_resistance_mohm(500).with_noise_amplitude_pa(0).with_adaptation_enabled(false),
         LIFNeuron::new(1, NeuronType::Excitatory, VoltageResolution::CentiMillivolt).with_resting_potential(0).with_threshold(1001).with_reset_potential(0).with_tau_membrane_us(5000).with_refractory_period_us(0).with_resistance_mohm(500).with_noise_amplitude_pa(0).with_adaptation_enabled(false),

@@ -1,4 +1,4 @@
-# neuralos-trace v1 case=two-lif-neurons kind=regression n=2 dt_us=100 res=cmV plasticity=off divisor=10 steps=150 rows=all
+# gresil-trace v1 case=two-lif-neurons kind=regression n=2 dt_us=100 res=cmV plasticity=off divisor=10 steps=150 rows=all
 0 0 | 0 | 0 0
 1 100 |  | 22 1
 2 200 |  | 43 1

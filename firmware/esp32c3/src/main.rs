@@ -31,7 +31,7 @@
 //!    line, then its rows through the library's writer
 //!    (`gresil::trace::row`) into `esp_println::Printer`; then, in
 //!    a build that names a stranger's graph, that graph the same way; then
-//!    one end line, `# neuralos-trace end`.
+//!    one end line, `# gresil-trace end`.
 //!    `tools/esp32c3_trace_diff.py` diffs a capture against
 //!    `tests/traces/`, and against the stranger's trace with `--trace`.
 //!    Then the mark, one line outside every case, `stack: <mark> of
@@ -464,7 +464,7 @@ fn main() -> ! {
         stranger_net = FixedNetwork::new(c::NEURONS, c::SYNAPSES, c::DT_US);
         replay_rows!(c, stranger_net, stranger_fired);
     }
-    println!("# neuralos-trace end");
+    println!("# gresil-trace end");
 
     //    The mark: the stack's high-water since the paint, one line after
     //    the end line, outside every case, so the diff never reads it.
