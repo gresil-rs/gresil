@@ -4,9 +4,9 @@ slug: 20260815-125500_neuralos-v2
 project: NeuralOS v2
 phase: complete
 progress: 88/88
-head: "main@691bb70 (PR #73 merged 2026-10-22 00:58 UTC: round 76, tier 1, the stamp: both binaries' notices and `COPYRIGHT`'s clause, leg A's two items, the crate README in pA, the bump to 0.1.0-alpha.9 and `neuralos-snn`'s pointer, the board's run on the tip; mirror synced, tags identical, branch deleted) · tree == published, alpha.9 stamped 2026-10-22 (tag object `afa4ea8c` on `691bb70`, Gitea release 978574, crates.io 03:12:25Z, the pointer 03:23:31Z; `docs/releases/v0.1.0-alpha.9.md` § Stamped); the fifteen checks hold; next, three sittings and the converter PR, then `0.1.0-rc.1` · wrote-from: work/alpha9-record, round 77 (tier 2, alpha.9's record: the runs of record, § Stamped and § Files, the H2 export's rebuild line, `crates/neuralos-snn/` deleted, the local loop in CI's color; built in scratch on `691bb70`, five commits and this record, rebuilt on the review's findings; its figures: 184 checks by script, the rest read by hand) · open(session): the per-commit loop on the six, then the push, the seven `(pull_request)` contexts green in the full listing, the two pre-autopsy tags by name and the merge, each on the principal's word · next-work: ROADMAP § Practical next moves"
+head: "main@80215b9 (PR #74 merged 2026-10-22 22:18 UTC: round 77, tier 2, alpha.9's record: the runs of record, § Stamped and § Files, the H2 export's rebuild line, `crates/neuralos-snn/` deleted, the local loop in CI's color; mirror synced, tags identical, branch deleted) · the library and the converter as published, alpha.9 stamped 2026-10-22 (`docs/releases/v0.1.0-alpha.9.md` § Stamped); the fifteen checks hold; the frozen-format sitting ruled 2026-10-24; next, its three PRs, the error-surface sitting, the topology RNG and the converter PR, then `0.1.0-rc.1` · wrote-from: work/format-names, round 78 (tier 2, the names PR: the trace format `gresil-trace v1`, `STEP_REVISION`, the freezer's reachable refusals, the start at rest, the JSON key's label; built in scratch on `80215b9`, three commits and this record) · open(session): the board round at the landing and its evidence commit, the per-commit loop on the four, then the push, the seven `(pull_request)` contexts green in the full listing and the merge, each on the principal's word · next-work: ROADMAP § Practical next moves"
 started: 2026-08-15T12:55:00Z
-updated: 2026-10-22T19:07:25Z
+updated: 2026-10-24T18:59:36Z
 principal_stated_goal: "Session I: the null-ladder adjudication — BRANCH B (unattributed perturbation); P5 on infrastructure + method"
 ---
 
@@ -10756,3 +10756,36 @@ per-commit loop on the six, then the push, CI, the two tags and the
 merge, each on the principal's word. **Guards.** 1: appended, head
 refreshed; 2: no frozen file or verdict moves; 3: no outreach before
 rc.1.
+
+## Close-out (round 78 — the names PR: the trace format `gresil-trace v1`, `STEP_REVISION`, the freezer's reachable refusals, the start at rest, the JSON key's label; tier 2 — 2026-10-24)
+
+Three commits and this: `2effb7b` the trace format `gresil-trace v1`,
+its end line too, BREAKING; `7497e71` `STEP_REVISION`, 1, asserted by
+each frozen module; `da79a6f` the three doc sentences; this. **Rulings**
+(philo, 2026-10-24): the frozen-format sitting's Calls 2, 3 and 5 (a)
+and 6 (b); the brief's A (a), the board before the merge, and B (a), two
+word changes; the review's nine items. **Review**, one: no blocking;
+seven cosmetic, six folded and one riding the board tools PR, whose Rust
+diff tests the old-name cases, untested at `main` too; eight
+record-only. **Measured**, before this commit: the loop on the three,
+green; the board's diff the same at `main` and at the tip on the 18
+banked captures, 13 board and 5 QEMU; the 14 SVGs of `docs/assets/` byte
+for byte; GUARD 2's nine outputs as at `main` but the clock and the
+export's name, red under rounding; the QEMU replay 14 cases, 0 red, as
+at `main` but its 15 name lines; the firmware's `.text` moved at
+`2effb7b` alone, a canary red; revision 2 refused with E0080; four
+refusals reached from outside. **The pass**: 5 mutants run or read, 4
+caught, 1 unviable (`STEP_REVISION` 2: the tree's own frozen modules
+refuse it); no blind line. **Moved**: the 15 traces' headers,
+`frozen.rs`, `graph.rs`, the `.text`; no row. **Counts**: with the three
+features, unit tests 402 to 403 and doctests 24 to 26. **Record-only**:
+the readers read the old name at a line's start, the library's trace
+test the new name only, a narrow reading of Call 6; a scratch path's
+`.text` is not the main clone's; three `canon` calls and the emitted
+revision are equivalent mutants today; no check ties a moved spike to a
+raise before the snapshot PR's pin; a module frozen from now on needs a
+library with `STEP_REVISION`; the freezer takes a drive whose runs do
+not sum to `steps`, as before this PR. **Open**: the board round at the
+landing, its evidence commit, the push, CI and the merge, each on the
+principal's word. **Guards.** 1: appended, head refreshed; 2: the closed
+chapter's outputs as at `main`; 3: no outreach before rc.1.
