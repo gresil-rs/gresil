@@ -49,7 +49,8 @@ bare-metal. No libc overclaim in either direction.
 | `replay-r52.log` | the trace replay re-run at round 52 (NIR parity's first PR, 2026-09-28): the fourteen plasticity-off traces, the two D8 witnesses in simulation units at 0.1 ms; identical to the tree's files, `14 cases, 0 red` (§ The trace replay) |
 | `replay-r61.log` | the trace replay re-run at round 61 (the noise default and the clock, 2026-10-07): the fourteen plasticity-off traces, `one-neuron-board` without noise; identical to the tree's files, `14 cases, 0 red` (§ The trace replay) |
 | `replay-alpha9.log` | the trace replay re-run at the alpha.9 stamp (2026-10-22, `main@691bb70`): the fourteen plasticity-off traces; identical to the tree's files, `14 cases, 0 red` (§ The trace replay) |
-| `SHA256SUMS` | pins the ten logs and this README |
+| `replay-r78.log` | the trace replay re-run at round 78 (the trace format's name, 2026-10-24, the names PR at `cafc3b6`): the fourteen plasticity-off traces under the name `gresil-trace v1`, the end line too; identical to the tree's files, `14 cases, 0 red` (§ The trace replay) |
+| `SHA256SUMS` | pins the eleven logs and this README |
 | `../../proofs/qemu-riscv-leg-a/` | the committed, rebuildable Leg A harness crate (standalone workspace; repo workspace untouched) |
 | `../../proofs/qemu-trace-replay/` | the trace replay's crate (standalone workspace, like Leg A's) and its `build.sh` |
 
@@ -276,8 +277,17 @@ witness cases alone, 143 lines of `snntorch-two-layer` and 45 of
 traces (`f25b26f`, the adaptation switch, off in simulation units).
 `replay-r61.log` stays as pinned, the capture of round 61's tree.
 
+Re-run at round 78 (the trace format's name, 2026-10-24, the names PR
+at `cafc3b6`), `replay-r78.log` is the fourteen cases, 0 red, on QEMU
+10.2.1 (1,512 lines, 41,719 bytes, the same bytes as a run of the same
+code in a scratch clone). Against `replay-alpha9.log` it differs in its
+fifteen name lines alone, the fourteen headers and the end line, which
+read `gresil-trace` where they read `neuralos-trace`; read with the old
+name as the new, the two are the same bytes. `replay-alpha9.log` stays
+as pinned, the capture of alpha.9's tree.
+
 ```bash
 rustup target add riscv64gc-unknown-none-elf
 proofs/qemu-trace-replay/build.sh      # the capture into its target/replay.log, the diff, the verdict
-cmp proofs/qemu-trace-replay/target/replay.log evidence/qemu-riscv-gate/replay-alpha9.log   # at the tree that added it; replay-r61.log at round 61's, replay-r52.log at round 52's, replay-alpha9-g.log at round 34's, replay-alpha8.log at round 33's
+cmp proofs/qemu-trace-replay/target/replay.log evidence/qemu-riscv-gate/replay-r78.log   # at the tree that added it; replay-alpha9.log at alpha.9's, replay-r61.log at round 61's, replay-r52.log at round 52's, replay-alpha9-g.log at round 34's, replay-alpha8.log at round 33's
 ```
