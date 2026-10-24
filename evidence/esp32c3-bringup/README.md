@@ -46,6 +46,7 @@ low), red LED is power. Host: the laptop, espflash 4.5.0, Rust 1.92.0
 | `board-r67-head.log` | the twelfth entry (ISA round 67, 2026-10-13): the default firmware at head, its neuron without its capacitance, built by `build.sh` on 1.98.1 in the main clone at `0182042` (ELF `49e0830a…`), 20 s after reset (§ Twelfth entry) |
 | `board-r76-tip.log` | the thirteenth entry (ISA round 76, 2026-10-21): the default firmware at the stamp PR's tip, the library at `0.1.0-alpha.9`, built by `build.sh` on 1.98.1 in the main clone at `8bff222` (ELF `7834eb64…`), 20 s after reset (§ Thirteenth entry) |
 | `board-r76-merge.log` | the fourteenth entry (ISA round 77, 2026-10-22): the default firmware at PR #73's merge commit, the tagged commit, built by `build.sh` on 1.98.1 in the main clone at `691bb70` (ELF `608a202a…`, the release's), 20 s after reset (§ Fourteenth entry) |
+| `board-r78-head.log` | the fifteenth entry (ISA round 78, 2026-10-24): the default firmware at the names PR's head, the trace format named `gresil-trace v1`, built by `build.sh` on 1.98.1 in the main clone at `cafc3b6` (ELF `729a0a32…`), 20 s after reset (§ Fifteenth entry) |
 | `SHA256SUMS` | pins the logs and this README |
 | `../../tools/esp32c3_capture.py` | the capture tool (reset + read from one process) |
 | `../../tools/esp32c3_trace_diff.py` | the replay diff: every plasticity-off trace of `crates/gresil/tests/traces/` against its case in a capture, one line per case (§ Sixth entry) |
@@ -1282,6 +1283,69 @@ The board held round 52's image before the flash (on-chip MD5
 `582b942d…` again; a capture of it reads round 52's burst figures to
 1 µs.
 
+## Fifteenth entry: round 78, the trace format's name (2026-10-24)
+
+Same SuperMini (MAC `70:af:09:07:f6:3c`, esp32c3 revision v0.4, as
+`espflash board-info` read them), same port, same tool, 20 s after
+reset, the ELF built and flashed from the main clone. Why this entry
+exists: round 78 names the trace format `gresil-trace v1`, where it was
+`neuralos-trace v1`, and that moves the firmware's `.text`, so the board
+reads the PR's head before the merge. The firmware prints its end line
+as `# gresil-trace end`, and the frozen cases it compiles in carry the
+new name in their headers and assert `STEP_REVISION`; no row moves. Its
+own sources change in that end line and its doc.
+
+Head: `build.sh` at `cafc3b6` on 1.98.1 in the main clone,
+`GRESIL_GRAPH` unset; the commit that adds this entry changes
+`evidence/` alone, so these are its sources: ELF `729a0a32…`, `.text`
+`1a157bef…` and 150,102 B, the pin appended as "round 78, the trace
+format's name" (§ Rebuild + run); the gate 0 hits, the trim-paths
+canary still unstable on 1.98.1 (exit 101); `main`'s frame `0x3e0`,
+alpha.9's. Against alpha.9's tag's ELF (`608a202a…`, § Fourteenth
+entry), `llvm-nm` reads the same 272 code symbols (225 named, 47 local
+labels) at the same sizes and in the same order; `.rodata` is 36 B
+shorter, and its fifteen strings that name the format, the fourteen
+headers and the end line, read `gresil-trace`. At a scratch path the
+same sources read the same `.text`, the same symbols in the same order;
+that ELF differs from this one in `.strtab` alone, the symbol names'
+hashes, which follow the clone's path. Flashed from the head's ELF,
+`board-r78-head.log`, 53,210 bytes, the second of three captures: the
+first, right after the flash, overlaps the run the flash started and
+was dropped, and the third reads the same figures to 1 µs. Every figure
+below is from after the `rst:` line; the before column is alpha.9's
+tag, the last capture on record.
+
+| Measurement | alpha.9's tag | Round 78 (head) |
+|---|---|---|
+| Burst, pinned arm | 15,044 µs → 1,504 ns/step | 15,044 µs → 1,504 ns/step |
+| Burst, free arm | 2,939 µs → 293 ns/step | 2,938 µs → 293 ns/step |
+| Burst spikes, first spike step, checksum, both neuron arms | 147, 55, `8cd1e63b` | 147, 55, `8cd1e63b` |
+| Burst, network arm (8 neurons, 6 synapses a step) | 141,434 µs → 14,143 ns/step | 141,434 µs → 14,143 ns/step |
+| Network arm: spikes, first spike step, checksum | 3,377, 5, `7e700ee1` | 3,377, 5, `7e700ee1` |
+| `main`'s frame, from the prologue | 992 B | 992 B |
+| Stack high-water mark, of `.stack` | 1,368 of 316,316 B | 1,368 of 316,316 B |
+| `.stack` free at the mark | 314,948 B | 314,948 B |
+| First spike, real-time loop | step 55, 55,162 µs | step 55, 55,156 µs |
+| Spikes after the reset | 288 in 20 s | 288 in 20 s |
+| Replay diff, last line | `14 cases, 0 red` | `14 cases, 0 red` |
+
+The gates hold.
+`python3 tools/esp32c3_trace_diff.py evidence/esp32c3-bringup/board-r78-head.log`
+reads the fourteen plasticity-off cases identical and ends
+`14 cases, 0 red`; the capture's fourteen headers and its end line read
+`gresil-trace`, and none of its lines reads `neuralos-trace`. Both
+neuron arms fold to `8cd1e63b`, 147 spikes from step 55, and the network
+arm to `7e700ee1`, 3,377 spikes from step 5, alpha.9's figures each;
+the real-time loop's first spikes land on steps 55, 123, 191 and every
+68 steps on, as alpha.9's did.
+
+The rest is reported, not gated: each burst within 1 µs of alpha.9's
+tag's, the stack's mark and `main`'s frame the same; not read further.
+The board held round 52's image before the flash (on-chip MD5
+`582b942d…`, read first) and was given it back after, its on-chip MD5
+`582b942d…` again; a capture of it reads round 52's burst figures to
+1 µs.
+
 ## Rebuild + run (from the repo root; board on /dev/ttyACM0)
 
 ```bash
@@ -1328,6 +1392,7 @@ llvm-objcopy -O binary --only-section=.text <ELF> text.bin && sha256sum text.bin
 #   b6c2d09d6d350ae49fb7e174f4823b1e86c63be8422834977c12d259dd71a334  round 67, the neuron without its capacitance (build.sh at 0182042 on 1.98.1, main clone, NEURALOS_GRAPH unset: the sources of the commit that adds this line, which changes evidence/ alone)
 #   5dae1f91fb14a67e83169e68444287816b71f37c88e5e0938461ae8dee19b475  round 76, the stamp's tip (build.sh at 8bff222 on 1.98.1, main clone, GRESIL_GRAPH unset: the sources of the commit that adds this line, which changes evidence/ and alpha.9's notes alone)
 #   5dae1f91fb14a67e83169e68444287816b71f37c88e5e0938461ae8dee19b475  alpha.9's tag, the merge commit (build.sh at 691bb70 on 1.98.1, main clone, GRESIL_GRAPH unset: the thirteenth entry's firmware sources; round 76's .text, unmoved)
+#   1a157befc6cc2946265633916cb1ea21b8ef89884a12a91980d05e783ce27418  round 78, the trace format's name (build.sh at cafc3b6 on 1.98.1, main clone, GRESIL_GRAPH unset: the sources of the commit that adds this line, which changes evidence/ alone)
 ```
 
 The third pin is the second one rebuilt by `build.sh` (round 26,
@@ -1386,7 +1451,13 @@ and round 75's two SPDX lines, on the library at `0.1.0-alpha.9`; the
 same 272 code symbols at the same sizes, one placed three functions
 earlier (§ Thirteenth entry). The eighteenth is the merge commit's,
 built at `691bb70`, the tagged commit, whose firmware sources are the
-seventeenth's: the same `.text` (§ Fourteenth entry).
+seventeenth's: the same `.text` (§ Fourteenth entry). The nineteenth is
+round 78's, built at `cafc3b6`, whose sources are those of the commit
+that adds it: the eighteenth's firmware sources with the trace format's
+new name in their end line, and the frozen cases under the new name,
+each asserting `STEP_REVISION`; the same 272 code symbols at the same
+sizes and in the same order, the fifteen name strings of `.rodata` two
+letters shorter each (§ Fifteenth entry).
 
 ### Release asset (the procedure since round 26)
 

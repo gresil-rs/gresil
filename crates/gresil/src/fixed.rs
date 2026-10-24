@@ -19,7 +19,7 @@
 //! `tests/traces.rs` on every plasticity-off trace.
 //!
 //! A frozen network's rows go through [`trace::row`](crate::trace::row),
-//! the one writer of a `neuralos-trace v1` row: the trace tests on the
+//! the one writer of a `gresil-trace v1` row: the trace tests on the
 //! host, the ESP32-C3 firmware and the QEMU replay. `freeze` (`std`,
 //! behind `unstable-freeze`) writes the arrays themselves as Rust source.
 //!

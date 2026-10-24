@@ -1,4 +1,4 @@
-# neuralos-trace v1 case=feedforward-8 kind=regression n=8 dt_us=1000 res=cmV plasticity=off divisor=1 steps=150 rows=all
+# gresil-trace v1 case=feedforward-8 kind=regression n=8 dt_us=1000 res=cmV plasticity=off divisor=1 steps=150 rows=all
 0 0 |  | -6703 -6700 -6703 -6926 -6929 -6926 -6806 -6801
 1 1000 |  | -6419 -6414 -6419 -6855 -6860 -6855 -6629 -6620
 2 2000 |  | -6149 -6142 -6149 -6787 -6793 -6787 -6468 -6455

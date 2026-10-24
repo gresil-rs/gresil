@@ -35,9 +35,11 @@ const PREAMBLE: &str = "\
 // trace keeps spiking steps only, the trace's header line verbatim, the
 // neurons as built, each one a constructor call and one setter per
 // parameter (every parameter written, default or not), the synapses in
-// the CSR order, and the drive as runs of equal steps, (count,
-// currents). plasticity-on is not here: a FixedNetwork has no
-// plasticity.
+// the CSR order, and the drive as runs of equal steps, (count, currents).
+// Each module first asserts the step revision it was written for
+// (gresil::STEP_REVISION), so a library whose step has moved its spikes
+// since refuses it at compile time. plasticity-on is not here: a
+// FixedNetwork has no plasticity.
 //
 // Included by #[path] with #[rustfmt::skip] on the `mod frozen;` line, so
 // rustfmt leaves it as written: by tests/traces.rs, and by firmware, since
@@ -56,7 +58,10 @@ pub fn preamble() -> &'static str {
     PREAMBLE
 }
 
-/// One `pub mod` for the trace `case`, its last newline included: `N`,
+/// One `pub mod` for the trace `case`, its last newline included: its
+/// `use` line and a compile-time assert of the
+/// [`STEP_REVISION`](crate::STEP_REVISION) it is written for (a library
+/// whose step has moved its spikes since refuses the file); then `N`,
 /// `S`, `DT_US`, `STEPS`, `SPIKES_ONLY`, `HEADER` (the trace's header
 /// line, [`trace::header`]'s), `NEURONS` (one constructor call and one
 /// setter per parameter each, every parameter written, at rest),
@@ -75,20 +80,23 @@ pub fn preamble() -> &'static str {
 ///
 /// # Panics
 ///
-/// On what a frozen file cannot hold, each message naming the case:
-/// plasticity on, since a `FixedNetwork` has none; a clock that is not
-/// at 0, since the file starts at 0 and writes no state; neurons on two
-/// grids, which no public constructor builds (`from_neurons` refuses
-/// them), and a `case` that is empty or holds anything but lowercase
-/// ASCII letters, digits and `-`, both of which the header line
-/// refuses; a run of `drive` that does not hold one current per neuron;
-/// a neuron that is not at rest (the assert in `neuron_chain` carries
-/// the reasons it cannot fire on the stranger path); and a neuron whose
-/// `id` is not its position, since the id is what a `FixedNetwork`
-/// indexes it by and what seeds its noise; `from_neurons` refuses both,
-/// so only a network the crate's own tests write reaches them. And when
-/// the chain written for a neuron does not rebuild it, which is this
-/// module's own defect and not the caller's.
+/// On what a frozen file cannot hold, each message naming the case. A
+/// caller outside this crate reaches four: plasticity on, since a
+/// `FixedNetwork` has none (the setter that turns it on is behind
+/// `unstable-stdp`); a clock that is not at 0, since the file starts at
+/// 0 and writes no state; a `case` that is empty or holds anything but
+/// lowercase ASCII letters, digits and `-`, which the header line
+/// refuses; and a run of `drive` that does not hold one current per
+/// neuron.
+///
+/// Three more refuse what `from_neurons` refuses first, so only a
+/// network the crate's own tests write reaches them: neurons on two
+/// grids, which the header line refuses too; a neuron that is not at
+/// rest (the assert in `neuron_chain` carries the reasons it cannot fire
+/// on the stranger path); and a neuron whose `id` is not its position,
+/// since the id is what a `FixedNetwork` indexes it by and what seeds
+/// its noise. And it panics when the chain written for a neuron does not
+/// rebuild it, which is this module's own defect and not the caller's.
 #[must_use]
 pub fn module(
     net: &SpikingNeuralNetwork,
@@ -129,7 +137,11 @@ pub fn module(
         "{case}: one current per neuron in every run of the drive"
     );
     let mut out = format!("pub mod {name} {{\n");
-    out.push_str("    use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};\n\n");
+    out.push_str("    use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};\n");
+    out.push_str(&format!(
+        "    const _: () = assert!(gresil::STEP_REVISION == {});\n\n",
+        crate::STEP_REVISION
+    ));
     out.push_str(&format!("    pub const N: usize = {};\n", neurons.len()));
     out.push_str(&format!("    pub const S: usize = {};\n", synapses.len()));
     out.push_str(&format!("    pub const DT_US: u32 = {dt_us};\n"));
@@ -363,11 +375,37 @@ mod tests {
             "    pub const DT_US: u32 = 500;\n",
             "    pub const STEPS: u32 = 3;\n",
             "    pub const SPIKES_ONLY: bool = true;\n",
-            "    pub const HEADER: &str = \"# neuralos-trace v1 case=two-quiet kind=stranger n=2 \
+            "    pub const HEADER: &str = \"# gresil-trace v1 case=two-quiet kind=stranger n=2 \
              dt_us=500 res=cmV plasticity=off divisor=10 steps=3 rows=spikes\";\n",
         ] {
             assert!(text.contains(line), "{line:?} in {text}");
         }
+    }
+
+    /// The `use` line, then the assert of the revision the module is
+    /// written for, then a blank line: the library's own, read when the
+    /// file compiles.
+    #[test]
+    fn the_module_asserts_its_step_revision_after_its_use_line() {
+        let text = module(
+            &two(),
+            "two-quiet",
+            Kind::Stranger,
+            3,
+            Rows::Spikes,
+            &silent(),
+        );
+        let mut lines = text.lines().skip(1);
+        assert_eq!(
+            lines.next(),
+            Some("    use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};")
+        );
+        let assert = format!(
+            "    const _: () = assert!(gresil::STEP_REVISION == {});",
+            crate::STEP_REVISION
+        );
+        assert_eq!(lines.next(), Some(assert.as_str()));
+        assert_eq!(lines.next(), Some(""));
     }
 
     /// `tail` names each case's module as `module` does.

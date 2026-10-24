@@ -141,21 +141,22 @@ sidecar:
 
 - **`<out.rs>`**, one `pub mod` named after the file's stem (lowercased,
   anything but a letter, digit or `_` made `_`; a letter or `_` first,
-  not a Rust keyword): `N` neurons and `S` synapses as the arrays a
-  `gresil::FixedNetwork<N, S>` steps, the time step, the run, the
-  trace's header line (`kind=stranger`), and `DRIVE`, one run of
-  `--steps` steps (default 150) of the currents the graph's own encoder
-  gives for `--input`: one number per feature of the graph's own inputs,
-  in Input order, with at most three decimals, a sign allowed (`0.5`,
-  `-.25`, `+2`; read in thousandths of a unit), default 1 for every
-  feature. Each bias input the conversion added is the converter's: 0
-  before its start and 1 from it, a run split where one starts inside
-  it. `--drive <file>` gives runs instead, one a line, a step count and
-  then the numbers (`10 0.5,0`; blank lines and `#` lines skipped), each
-  run the currents its numbers give, one after the other. The library's
-  freezer writes it (`gresil::fixed::freeze::module`), the one
-  that writes the library's own frozen traces.
-- **`<out>.trace`**, that drive on the host in `neuralos-trace v1`: the
+  not a Rust keyword): the step revision it is written for, asserted at
+  compile time (`gresil::STEP_REVISION`), `N` neurons and `S` synapses
+  as the arrays a `gresil::FixedNetwork<N, S>` steps, the time step, the
+  run, the trace's header line (`kind=stranger`), and `DRIVE`, one run
+  of `--steps` steps (default 150) of the currents the graph's own
+  encoder gives for `--input`: one number per feature of the graph's own
+  inputs, in Input order, with at most three decimals, a sign allowed
+  (`0.5`, `-.25`, `+2`; read in thousandths of a unit), default 1 for
+  every feature. Each bias input the conversion added is the
+  converter's: 0 before its start and 1 from it, a run split where one
+  starts inside it. `--drive <file>` gives runs instead, one a line, a
+  step count and then the numbers (`10 0.5,0`; blank lines and `#` lines
+  skipped), each run the currents its numbers give, one after the other.
+  The library's freezer writes it (`gresil::fixed::freeze::module`), the
+  one that writes the library's own frozen traces.
+- **`<out>.trace`**, that drive on the host in `gresil-trace v1`: the
   header line, then one row per step, the spikes and every membrane,
   written by `gresil::trace::row`, the row writer the firmware
   uses. The host steps the library's std network with plasticity off,

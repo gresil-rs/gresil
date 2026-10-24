@@ -1,4 +1,4 @@
-# neuralos-trace v1 case=snntorch-two-layer kind=regression n=2 dt_us=100 res=cmV plasticity=off divisor=10 steps=150 rows=all
+# gresil-trace v1 case=snntorch-two-layer kind=regression n=2 dt_us=100 res=cmV plasticity=off divisor=10 steps=150 rows=all
 0 0 |  | 1000 0
 1 100 | 0 | 0 0
 2 200 |  | 1000 1000

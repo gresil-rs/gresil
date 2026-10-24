@@ -7,9 +7,11 @@
 // trace keeps spiking steps only, the trace's header line verbatim, the
 // neurons as built, each one a constructor call and one setter per
 // parameter (every parameter written, default or not), the synapses in
-// the CSR order, and the drive as runs of equal steps, (count,
-// currents). plasticity-on is not here: a FixedNetwork has no
-// plasticity.
+// the CSR order, and the drive as runs of equal steps, (count, currents).
+// Each module first asserts the step revision it was written for
+// (gresil::STEP_REVISION), so a library whose step has moved its spikes
+// since refuses it at compile time. plasticity-on is not here: a
+// FixedNetwork has no plasticity.
 //
 // Included by #[path] with #[rustfmt::skip] on the `mod frozen;` line, so
 // rustfmt leaves it as written: by tests/traces.rs, and by firmware, since
@@ -19,13 +21,14 @@
 
 pub mod neuron_reference {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 1;
     pub const S: usize = 0;
     pub const DT_US: u32 = 1000;
     pub const STEPS: u32 = 150;
     pub const SPIKES_ONLY: bool = false;
-    pub const HEADER: &str = "# neuralos-trace v1 case=neuron-reference kind=reference n=1 dt_us=1000 res=cmV plasticity=off divisor=10 steps=150 rows=all";
+    pub const HEADER: &str = "# gresil-trace v1 case=neuron-reference kind=reference n=1 dt_us=1000 res=cmV plasticity=off divisor=10 steps=150 rows=all";
     pub const NEURONS: [LIFNeuron; N] = [
         LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::CentiMillivolt).with_resting_potential(-7000).with_threshold(32767).with_reset_potential(-8000).with_tau_membrane_us(20000).with_refractory_period_us(2000).with_resistance_mohm(100).with_noise_amplitude_pa(0).with_adaptation_enabled(true),
     ];
@@ -40,13 +43,14 @@ pub mod neuron_reference {
 
 pub mod one_neuron_board {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 1;
     pub const S: usize = 0;
     pub const DT_US: u32 = 1000;
     pub const STEPS: u32 = 10000;
     pub const SPIKES_ONLY: bool = true;
-    pub const HEADER: &str = "# neuralos-trace v1 case=one-neuron-board kind=regression n=1 dt_us=1000 res=cmV plasticity=off divisor=10 steps=10000 rows=spikes";
+    pub const HEADER: &str = "# gresil-trace v1 case=one-neuron-board kind=regression n=1 dt_us=1000 res=cmV plasticity=off divisor=10 steps=10000 rows=spikes";
     pub const NEURONS: [LIFNeuron; N] = [
         LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::CentiMillivolt).with_resting_potential(-7000).with_threshold(-5500).with_reset_potential(-8000).with_tau_membrane_us(20000).with_refractory_period_us(2000).with_resistance_mohm(100).with_noise_amplitude_pa(0).with_adaptation_enabled(true),
     ];
@@ -58,13 +62,14 @@ pub mod one_neuron_board {
 
 pub mod chain_3 {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 3;
     pub const S: usize = 2;
     pub const DT_US: u32 = 1000;
     pub const STEPS: u32 = 100;
     pub const SPIKES_ONLY: bool = false;
-    pub const HEADER: &str = "# neuralos-trace v1 case=chain-3 kind=regression n=3 dt_us=1000 res=cmV plasticity=off divisor=1 steps=100 rows=all";
+    pub const HEADER: &str = "# gresil-trace v1 case=chain-3 kind=regression n=3 dt_us=1000 res=cmV plasticity=off divisor=1 steps=100 rows=all";
     pub const NEURONS: [LIFNeuron; N] = [
         LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::CentiMillivolt).with_resting_potential(-7000).with_threshold(-5500).with_reset_potential(-8000).with_tau_membrane_us(20000).with_refractory_period_us(2000).with_resistance_mohm(100).with_noise_amplitude_pa(0).with_adaptation_enabled(true),
         LIFNeuron::new(1, NeuronType::Excitatory, VoltageResolution::CentiMillivolt).with_resting_potential(-7000).with_threshold(-5500).with_reset_potential(-8000).with_tau_membrane_us(20000).with_refractory_period_us(2000).with_resistance_mohm(100).with_noise_amplitude_pa(0).with_adaptation_enabled(true),
@@ -81,13 +86,14 @@ pub mod chain_3 {
 
 pub mod feedforward_8 {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 8;
     pub const S: usize = 6;
     pub const DT_US: u32 = 1000;
     pub const STEPS: u32 = 150;
     pub const SPIKES_ONLY: bool = false;
-    pub const HEADER: &str = "# neuralos-trace v1 case=feedforward-8 kind=regression n=8 dt_us=1000 res=cmV plasticity=off divisor=1 steps=150 rows=all";
+    pub const HEADER: &str = "# gresil-trace v1 case=feedforward-8 kind=regression n=8 dt_us=1000 res=cmV plasticity=off divisor=1 steps=150 rows=all";
     pub const NEURONS: [LIFNeuron; N] = [
         LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::CentiMillivolt).with_resting_potential(-7000).with_threshold(-5500).with_reset_potential(-8000).with_tau_membrane_us(20000).with_refractory_period_us(2000).with_resistance_mohm(100).with_noise_amplitude_pa(5).with_adaptation_enabled(true),
         LIFNeuron::new(1, NeuronType::Excitatory, VoltageResolution::CentiMillivolt).with_resting_potential(-7000).with_threshold(-5500).with_reset_potential(-8000).with_tau_membrane_us(20000).with_refractory_period_us(2000).with_resistance_mohm(100).with_noise_amplitude_pa(5).with_adaptation_enabled(true),
@@ -113,13 +119,14 @@ pub mod feedforward_8 {
 
 pub mod recurrent_transmission {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 2;
     pub const S: usize = 1;
     pub const DT_US: u32 = 1000;
     pub const STEPS: u32 = 30;
     pub const SPIKES_ONLY: bool = false;
-    pub const HEADER: &str = "# neuralos-trace v1 case=recurrent-transmission kind=regression n=2 dt_us=1000 res=mV plasticity=off divisor=10 steps=30 rows=all";
+    pub const HEADER: &str = "# gresil-trace v1 case=recurrent-transmission kind=regression n=2 dt_us=1000 res=mV plasticity=off divisor=10 steps=30 rows=all";
     pub const NEURONS: [LIFNeuron; N] = [
         LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt).with_resting_potential(-70).with_threshold(-55).with_reset_potential(-80).with_tau_membrane_us(20000).with_refractory_period_us(2000).with_resistance_mohm(100).with_noise_amplitude_pa(0).with_adaptation_enabled(true),
         LIFNeuron::new(1, NeuronType::Inhibitory, VoltageResolution::Millivolt).with_resting_potential(-70).with_threshold(-50).with_reset_potential(-80).with_tau_membrane_us(10000).with_refractory_period_us(2000).with_resistance_mohm(100).with_noise_amplitude_pa(0).with_adaptation_enabled(true),
@@ -135,13 +142,14 @@ pub mod recurrent_transmission {
 
 pub mod centi_mv_grid {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 2;
     pub const S: usize = 1;
     pub const DT_US: u32 = 1000;
     pub const STEPS: u32 = 30;
     pub const SPIKES_ONLY: bool = false;
-    pub const HEADER: &str = "# neuralos-trace v1 case=centi-mv-grid kind=regression n=2 dt_us=1000 res=cmV plasticity=off divisor=10 steps=30 rows=all";
+    pub const HEADER: &str = "# gresil-trace v1 case=centi-mv-grid kind=regression n=2 dt_us=1000 res=cmV plasticity=off divisor=10 steps=30 rows=all";
     pub const NEURONS: [LIFNeuron; N] = [
         LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::CentiMillivolt).with_resting_potential(-7000).with_threshold(-5500).with_reset_potential(-8000).with_tau_membrane_us(20000).with_refractory_period_us(2000).with_resistance_mohm(100).with_noise_amplitude_pa(0).with_adaptation_enabled(true),
         LIFNeuron::new(1, NeuronType::Inhibitory, VoltageResolution::CentiMillivolt).with_resting_potential(-7000).with_threshold(-5000).with_reset_potential(-8000).with_tau_membrane_us(10000).with_refractory_period_us(2000).with_resistance_mohm(100).with_noise_amplitude_pa(0).with_adaptation_enabled(true),
@@ -157,13 +165,14 @@ pub mod centi_mv_grid {
 
 pub mod inhibitory {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 2;
     pub const S: usize = 1;
     pub const DT_US: u32 = 1000;
     pub const STEPS: u32 = 100;
     pub const SPIKES_ONLY: bool = false;
-    pub const HEADER: &str = "# neuralos-trace v1 case=inhibitory kind=regression n=2 dt_us=1000 res=cmV plasticity=off divisor=10 steps=100 rows=all";
+    pub const HEADER: &str = "# gresil-trace v1 case=inhibitory kind=regression n=2 dt_us=1000 res=cmV plasticity=off divisor=10 steps=100 rows=all";
     pub const NEURONS: [LIFNeuron; N] = [
         LIFNeuron::new(0, NeuronType::Inhibitory, VoltageResolution::CentiMillivolt).with_resting_potential(-7000).with_threshold(-5000).with_reset_potential(-8000).with_tau_membrane_us(10000).with_refractory_period_us(2000).with_resistance_mohm(100).with_noise_amplitude_pa(0).with_adaptation_enabled(true),
         LIFNeuron::new(1, NeuronType::Excitatory, VoltageResolution::CentiMillivolt).with_resting_potential(-7000).with_threshold(-5500).with_reset_potential(-8000).with_tau_membrane_us(20000).with_refractory_period_us(2000).with_resistance_mohm(100).with_noise_amplitude_pa(0).with_adaptation_enabled(true),
@@ -178,13 +187,14 @@ pub mod inhibitory {
 
 pub mod refractory {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 1;
     pub const S: usize = 0;
     pub const DT_US: u32 = 1000;
     pub const STEPS: u32 = 40;
     pub const SPIKES_ONLY: bool = false;
-    pub const HEADER: &str = "# neuralos-trace v1 case=refractory kind=regression n=1 dt_us=1000 res=cmV plasticity=off divisor=10 steps=40 rows=all";
+    pub const HEADER: &str = "# gresil-trace v1 case=refractory kind=regression n=1 dt_us=1000 res=cmV plasticity=off divisor=10 steps=40 rows=all";
     pub const NEURONS: [LIFNeuron; N] = [
         LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::CentiMillivolt).with_resting_potential(-7000).with_threshold(-5500).with_reset_potential(-8000).with_tau_membrane_us(20000).with_refractory_period_us(2000).with_resistance_mohm(100).with_noise_amplitude_pa(0).with_adaptation_enabled(true),
     ];
@@ -196,13 +206,14 @@ pub mod refractory {
 
 pub mod plasticity_off {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 2;
     pub const S: usize = 1;
     pub const DT_US: u32 = 1000;
     pub const STEPS: u32 = 150;
     pub const SPIKES_ONLY: bool = false;
-    pub const HEADER: &str = "# neuralos-trace v1 case=plasticity-off kind=regression n=2 dt_us=1000 res=cmV plasticity=off divisor=1 steps=150 rows=all";
+    pub const HEADER: &str = "# gresil-trace v1 case=plasticity-off kind=regression n=2 dt_us=1000 res=cmV plasticity=off divisor=1 steps=150 rows=all";
     pub const NEURONS: [LIFNeuron; N] = [
         LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::CentiMillivolt).with_resting_potential(-7000).with_threshold(-5500).with_reset_potential(-8000).with_tau_membrane_us(20000).with_refractory_period_us(2000).with_resistance_mohm(100).with_noise_amplitude_pa(0).with_adaptation_enabled(true),
         LIFNeuron::new(1, NeuronType::Excitatory, VoltageResolution::CentiMillivolt).with_resting_potential(-7000).with_threshold(-5500).with_reset_potential(-8000).with_tau_membrane_us(20000).with_refractory_period_us(2000).with_resistance_mohm(100).with_noise_amplitude_pa(0).with_adaptation_enabled(true),
@@ -217,13 +228,14 @@ pub mod plasticity_off {
 
 pub mod saturation_floor_ceiling {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 1;
     pub const S: usize = 0;
     pub const DT_US: u32 = 1000;
     pub const STEPS: u32 = 100;
     pub const SPIKES_ONLY: bool = false;
-    pub const HEADER: &str = "# neuralos-trace v1 case=saturation-floor-ceiling kind=regression n=1 dt_us=1000 res=mV plasticity=off divisor=10 steps=100 rows=all";
+    pub const HEADER: &str = "# gresil-trace v1 case=saturation-floor-ceiling kind=regression n=1 dt_us=1000 res=mV plasticity=off divisor=10 steps=100 rows=all";
     pub const NEURONS: [LIFNeuron; N] = [
         LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt).with_resting_potential(-70).with_threshold(32767).with_reset_potential(-80).with_tau_membrane_us(20000).with_refractory_period_us(2000).with_resistance_mohm(100).with_noise_amplitude_pa(0).with_adaptation_enabled(true),
     ];
@@ -238,13 +250,14 @@ pub mod saturation_floor_ceiling {
 
 pub mod nir_chain_fixture {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 1;
     pub const S: usize = 0;
     pub const DT_US: u32 = 1000;
     pub const STEPS: u32 = 100;
     pub const SPIKES_ONLY: bool = false;
-    pub const HEADER: &str = "# neuralos-trace v1 case=nir-chain-fixture kind=regression n=1 dt_us=1000 res=mV plasticity=off divisor=10 steps=100 rows=all";
+    pub const HEADER: &str = "# gresil-trace v1 case=nir-chain-fixture kind=regression n=1 dt_us=1000 res=mV plasticity=off divisor=10 steps=100 rows=all";
     pub const NEURONS: [LIFNeuron; N] = [
         LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt).with_resting_potential(-70).with_threshold(-55).with_reset_potential(-80).with_tau_membrane_us(20000).with_refractory_period_us(1000).with_resistance_mohm(100).with_noise_amplitude_pa(0).with_adaptation_enabled(true),
     ];
@@ -256,13 +269,14 @@ pub mod nir_chain_fixture {
 
 pub mod ternary_weights {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 3;
     pub const S: usize = 3;
     pub const DT_US: u32 = 1000;
     pub const STEPS: u32 = 100;
     pub const SPIKES_ONLY: bool = false;
-    pub const HEADER: &str = "# neuralos-trace v1 case=ternary-weights kind=regression n=3 dt_us=1000 res=mV plasticity=off divisor=1 steps=100 rows=all";
+    pub const HEADER: &str = "# gresil-trace v1 case=ternary-weights kind=regression n=3 dt_us=1000 res=mV plasticity=off divisor=1 steps=100 rows=all";
     pub const NEURONS: [LIFNeuron; N] = [
         LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::Millivolt).with_resting_potential(-70).with_threshold(-55).with_reset_potential(-80).with_tau_membrane_us(20000).with_refractory_period_us(2000).with_resistance_mohm(100).with_noise_amplitude_pa(0).with_adaptation_enabled(true),
         LIFNeuron::new(1, NeuronType::Excitatory, VoltageResolution::Millivolt).with_resting_potential(-70).with_threshold(-55).with_reset_potential(-80).with_tau_membrane_us(20000).with_refractory_period_us(2000).with_resistance_mohm(100).with_noise_amplitude_pa(0).with_adaptation_enabled(true),
@@ -280,13 +294,14 @@ pub mod ternary_weights {
 
 pub mod snntorch_two_layer {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 2;
     pub const S: usize = 1;
     pub const DT_US: u32 = 100;
     pub const STEPS: u32 = 150;
     pub const SPIKES_ONLY: bool = false;
-    pub const HEADER: &str = "# neuralos-trace v1 case=snntorch-two-layer kind=regression n=2 dt_us=100 res=cmV plasticity=off divisor=10 steps=150 rows=all";
+    pub const HEADER: &str = "# gresil-trace v1 case=snntorch-two-layer kind=regression n=2 dt_us=100 res=cmV plasticity=off divisor=10 steps=150 rows=all";
     pub const NEURONS: [LIFNeuron; N] = [
         LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::CentiMillivolt).with_resting_potential(0).with_threshold(1001).with_reset_potential(0).with_tau_membrane_us(5000).with_refractory_period_us(0).with_resistance_mohm(500).with_noise_amplitude_pa(0).with_adaptation_enabled(false),
         LIFNeuron::new(1, NeuronType::Excitatory, VoltageResolution::CentiMillivolt).with_resting_potential(0).with_threshold(1001).with_reset_potential(0).with_tau_membrane_us(5000).with_refractory_period_us(0).with_resistance_mohm(500).with_noise_amplitude_pa(0).with_adaptation_enabled(false),
@@ -304,13 +319,14 @@ pub mod snntorch_two_layer {
 
 pub mod two_lif_neurons {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 2;
     pub const S: usize = 1;
     pub const DT_US: u32 = 100;
     pub const STEPS: u32 = 150;
     pub const SPIKES_ONLY: bool = false;
-    pub const HEADER: &str = "# neuralos-trace v1 case=two-lif-neurons kind=regression n=2 dt_us=100 res=cmV plasticity=off divisor=10 steps=150 rows=all";
+    pub const HEADER: &str = "# gresil-trace v1 case=two-lif-neurons kind=regression n=2 dt_us=100 res=cmV plasticity=off divisor=10 steps=150 rows=all";
     pub const NEURONS: [LIFNeuron; N] = [
         LIFNeuron::new(0, NeuronType::Excitatory, VoltageResolution::CentiMillivolt).with_resting_potential(1200).with_threshold(1001).with_reset_potential(0).with_tau_membrane_us(10000).with_refractory_period_us(0).with_resistance_mohm(10).with_noise_amplitude_pa(0).with_adaptation_enabled(false),
         LIFNeuron::new(1, NeuronType::Excitatory, VoltageResolution::CentiMillivolt).with_resting_potential(0).with_threshold(1001).with_reset_potential(0).with_tau_membrane_us(10000).with_refractory_period_us(0).with_resistance_mohm(1).with_noise_amplitude_pa(0).with_adaptation_enabled(false),

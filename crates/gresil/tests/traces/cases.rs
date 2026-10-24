@@ -6,7 +6,7 @@
 //! drive, and a row is what `step()` returned and `neurons()` after it.
 //!
 //! One file per case in this directory, in the library's format,
-//! `neuralos-trace v1` (`gresil::trace`'s module doc); the board
+//! `gresil-trace v1` (`gresil::trace`'s module doc); the board
 //! case keeps its spiking steps only, 147 rows of 10,000 steps. Where a
 //! case keeps the noise, it is the neuron's own LFSR, seeded by id and
 //! time, so every case is a pure function of this file.
@@ -83,13 +83,14 @@ pub fn frozen_path() -> PathBuf {
 }
 
 /// The text of `frozen.rs` (module doc): every plasticity-off case, built,
-/// as one module named after it (`-` becomes `_`) holding `N`, `S`,
-/// `DT_US`, `STEPS`, `SPIKES_ONLY`, `HEADER` (the trace's first line),
-/// `NEURONS` (one constructor call and one setter per parameter each, as
-/// built, before the first step), `SYNAPSES` (`FixedSynapse::from_network`:
-/// the CSR order) and `DRIVE` (runs of equal steps). Then
-/// `for_each_frozen!`, which applies a caller's macro to every module, so
-/// no list is kept by hand.
+/// as one module named after it (`-` becomes `_`) holding its `use` line,
+/// the assert of the step revision it is written for, `N`, `S`, `DT_US`,
+/// `STEPS`, `SPIKES_ONLY`, `HEADER` (the trace's first line), `NEURONS`
+/// (one constructor call and one setter per parameter each, as built,
+/// before the first step), `SYNAPSES` (`FixedSynapse::from_network`: the
+/// CSR order) and `DRIVE` (runs of equal steps). Then `for_each_frozen!`,
+/// which applies a caller's macro to every module, so no list is kept by
+/// hand.
 ///
 /// # Panics
 ///

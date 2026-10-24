@@ -1,4 +1,4 @@
-# neuralos-trace v1 case=saturation-floor-ceiling kind=regression n=1 dt_us=1000 res=mV plasticity=off divisor=10 steps=100 rows=all
+# gresil-trace v1 case=saturation-floor-ceiling kind=regression n=1 dt_us=1000 res=mV plasticity=off divisor=10 steps=100 rows=all
 0 0 |  | 50
 1 1000 |  | 50
 2 2000 |  | 50

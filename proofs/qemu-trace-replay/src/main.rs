@@ -4,7 +4,7 @@
 //! plasticity-off case of `crates/gresil/tests/traces/` stepped by
 //! `FixedNetwork`, its trace's header line and its rows printed over the
 //! UART by the library's writer, then one end line,
-//! `# neuralos-trace end`, then exit 0.
+//! `# gresil-trace end`, then exit 0.
 //!
 //! The replay is the firmware's (`firmware/esp32c3/src/main.rs`, step 3):
 //! `frozen.rs` by `#[path]` from the library's tests directory,
@@ -118,7 +118,7 @@ pub extern "C" fn rust_main() -> ! {
         }};
     }
     frozen::for_each_frozen!(replay);
-    let _ = writeln!(Uart, "# neuralos-trace end");
+    let _ = writeln!(Uart, "# gresil-trace end");
     poweroff(0x5555)
 }
 

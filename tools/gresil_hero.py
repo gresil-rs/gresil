@@ -32,12 +32,16 @@ MONO = TTFont(FONTS + "IBMPlexMono-Regular.ttf")
 def check(ok, why):   # never `assert`: `python -O` strips it, and this check is the point
     if not ok: sys.exit(f"gresil_hero: {why}")
 
-host = HOST.read_text().splitlines(); head = host[0]
-check(head.startswith("# neuralos-trace v1 case="), f"not a trace header: {head}")
+# The format's name through alpha.9, `neuralos-trace` (crates/gresil/src/trace.rs), reads as
+# `gresil-trace`: the board log of the command in docs/assets/README.md was banked before the rename.
+OLD = "# neuralos-trace "
+def canon(line): return "# gresil-trace " + line[len(OLD):] if line.startswith(OLD) else line
+host = [canon(l) for l in HOST.read_text().splitlines()]; head = host[0]
+check(head.startswith("# gresil-trace v1 case="), f"not a trace header: {head}")
 block, on = [], False
-for line in BOARD.read_text().replace("\r", "").splitlines():
+for line in map(canon, BOARD.read_text().replace("\r", "").splitlines()):
     if line == head: on = True
-    elif on and line.startswith("# neuralos-trace"): break
+    elif on and line.startswith("# gresil-trace"): break
     if on: block.append(line)
 check(block == host, f"the board's {len(block)} lines differ from the host's {len(host)}")
 meta = dict(kv.split("=") for kv in head.split() if "=" in kv)

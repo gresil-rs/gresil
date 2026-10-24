@@ -31,10 +31,11 @@ use gresil::lif_neuron::{MEMBRANE_MV_MAX, MEMBRANE_MV_MIN};
 use gresil::trace::{row, Kind, Rows};
 use gresil::{FixedNetwork, FixedSynapse};
 
-/// The format line's name and version as a reader expects it, checked on
-/// every header below; the library's own is private to
-/// `gresil::trace`.
-const FORMAT: &str = "neuralos-trace v1";
+/// The format line's name and version, checked on every header below:
+/// the name the library writes, whose own constant is private to
+/// `gresil::trace`. A reader also takes the name the format had through
+/// alpha.9 (that module's doc); a trace here never keeps it.
+const FORMAT: &str = "gresil-trace v1";
 
 /// The bench record of the firmware's neuron, `evidence/esp32c3-bringup/
 /// README.md`: the spike count, the first spike's step, and the wrapping

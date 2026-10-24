@@ -1226,7 +1226,7 @@ pub struct Frozen {
     /// One `pub mod`: the arrays a `FixedNetwork<N, S>` steps, written by
     /// the library's freezer (`gresil::fixed::freeze::module`).
     pub module: String,
-    /// `neuralos-trace v1`: the module's header line, then one row per
+    /// `gresil-trace v1`: the module's header line, then one row per
     /// step, each written by `gresil::trace::row`.
     pub trace: String,
     /// The network's neurons.

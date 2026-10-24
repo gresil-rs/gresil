@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: 2026 philo-the-dendron
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! `neuralos-trace v1`, the trace format: a network's run as text, a
+//! `gresil-trace v1`, the trace format: a network's run as text, a
 //! header line then one row per step, which a host and a board write
 //! alike and compare byte for byte.
 //!
 //! ```text
-//! # neuralos-trace v1 case=<name> kind=<kind> n=<neurons> dt_us=<dt> res=<mV|cmV> plasticity=<on|off> divisor=<d> steps=<N> rows=<all|spikes>
+//! # gresil-trace v1 case=<name> kind=<kind> n=<neurons> dt_us=<dt> res=<mV|cmV> plasticity=<on|off> divisor=<d> steps=<N> rows=<all|spikes>
 //! <step> <time_us> | <spiking neuron ids> | <membrane of every neuron, i16 quanta>
 //! ```
 //!
@@ -41,8 +41,15 @@
 //! `row` writes.
 //!
 //! A replay that prints several traces over one serial port ends with
-//! `# neuralos-trace end`: the ESP32-C3 firmware and the QEMU replay print
+//! `# gresil-trace end`: the ESP32-C3 firmware and the QEMU replay print
 //! it, and `tools/esp32c3_trace_diff.py` reads it.
+//!
+//! Through alpha.9 the format's name was `neuralos-trace`, the project's
+//! name before gresil: the same `v1`, a file written under it differs in
+//! that word alone. A reader takes either name, in a header line and in
+//! the end line, so what was written before the rename reads as it did;
+//! the board's and QEMU's captures banked before the rename keep the old
+//! name.
 //!
 //! The library's own traces are `tests/traces/`, one file per case, each
 //! compared line for line with the code by the trace tests.
@@ -59,7 +66,7 @@ use crate::{Error, Result};
 
 /// The format's name and version, the header line's two words after `#`.
 #[cfg(feature = "std")]
-const FORMAT: &str = "neuralos-trace v1";
+const FORMAT: &str = "gresil-trace v1";
 
 /// Where a trace comes from, the header's `kind=`.
 ///
@@ -163,7 +170,7 @@ pub(crate) fn is_case_name(case: &str) -> bool {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
-/// One row of `neuralos-trace v1` (the module doc), its newline included:
+/// One row of `gresil-trace v1` (the module doc), its newline included:
 /// `<step> <time_us> | <ids of the neurons that fired, ascending> |
 /// <membrane of every neuron>`, all decimal; when no neuron fired, nothing
 /// stands between the bars but their two spaces. `time_us` is a `u64`: it
@@ -257,7 +264,7 @@ mod tests {
                 assert_eq!(
                     header(&net, "two-lif-neurons", kind, 150, rows),
                     Ok(format!(
-                        "# neuralos-trace v1 case=two-lif-neurons kind={word} n=2 dt_us=500 \
+                        "# gresil-trace v1 case=two-lif-neurons kind={word} n=2 dt_us=500 \
                          res=cmV plasticity=off divisor=3 steps=150 rows={rows_word}"
                     ))
                 );
