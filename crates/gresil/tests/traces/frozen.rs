@@ -7,9 +7,11 @@
 // trace keeps spiking steps only, the trace's header line verbatim, the
 // neurons as built, each one a constructor call and one setter per
 // parameter (every parameter written, default or not), the synapses in
-// the CSR order, and the drive as runs of equal steps, (count,
-// currents). plasticity-on is not here: a FixedNetwork has no
-// plasticity.
+// the CSR order, and the drive as runs of equal steps, (count, currents).
+// Each module first asserts the step revision it was written for
+// (gresil::STEP_REVISION), so a library whose step has moved its spikes
+// since refuses it at compile time. plasticity-on is not here: a
+// FixedNetwork has no plasticity.
 //
 // Included by #[path] with #[rustfmt::skip] on the `mod frozen;` line, so
 // rustfmt leaves it as written: by tests/traces.rs, and by firmware, since
@@ -19,6 +21,7 @@
 
 pub mod neuron_reference {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 1;
     pub const S: usize = 0;
@@ -40,6 +43,7 @@ pub mod neuron_reference {
 
 pub mod one_neuron_board {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 1;
     pub const S: usize = 0;
@@ -58,6 +62,7 @@ pub mod one_neuron_board {
 
 pub mod chain_3 {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 3;
     pub const S: usize = 2;
@@ -81,6 +86,7 @@ pub mod chain_3 {
 
 pub mod feedforward_8 {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 8;
     pub const S: usize = 6;
@@ -113,6 +119,7 @@ pub mod feedforward_8 {
 
 pub mod recurrent_transmission {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 2;
     pub const S: usize = 1;
@@ -135,6 +142,7 @@ pub mod recurrent_transmission {
 
 pub mod centi_mv_grid {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 2;
     pub const S: usize = 1;
@@ -157,6 +165,7 @@ pub mod centi_mv_grid {
 
 pub mod inhibitory {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 2;
     pub const S: usize = 1;
@@ -178,6 +187,7 @@ pub mod inhibitory {
 
 pub mod refractory {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 1;
     pub const S: usize = 0;
@@ -196,6 +206,7 @@ pub mod refractory {
 
 pub mod plasticity_off {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 2;
     pub const S: usize = 1;
@@ -217,6 +228,7 @@ pub mod plasticity_off {
 
 pub mod saturation_floor_ceiling {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 1;
     pub const S: usize = 0;
@@ -238,6 +250,7 @@ pub mod saturation_floor_ceiling {
 
 pub mod nir_chain_fixture {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 1;
     pub const S: usize = 0;
@@ -256,6 +269,7 @@ pub mod nir_chain_fixture {
 
 pub mod ternary_weights {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 3;
     pub const S: usize = 3;
@@ -280,6 +294,7 @@ pub mod ternary_weights {
 
 pub mod snntorch_two_layer {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 2;
     pub const S: usize = 1;
@@ -304,6 +319,7 @@ pub mod snntorch_two_layer {
 
 pub mod two_lif_neurons {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 2;
     pub const S: usize = 1;

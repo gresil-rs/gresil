@@ -1,5 +1,6 @@
 pub mod stranger {
     use gresil::{FixedSynapse, LIFNeuron, NeuronType, VoltageResolution};
+    const _: () = assert!(gresil::STEP_REVISION == 1);
 
     pub const N: usize = 2;
     pub const S: usize = 1;

@@ -42,6 +42,21 @@ pub use nir::NirImportOptions;
 pub use synapse::STDPRule;
 pub use synapse::Synapse;
 
+/// The revision of the step: the code that turns a frozen file's
+/// neurons, synapses and drive into spikes, [`FixedNetwork::step`] and
+/// the [`LIFNeuron::integrate_and_fire`] it calls. A release that moves
+/// a spike of a frozen file raises it.
+///
+/// Every module the freezer writes (`fixed::freeze::module`, behind
+/// `unstable-freeze`) asserts, after its `use` line, the revision it was
+/// written for. After a raise, an old file refuses to compile instead of
+/// giving other spikes:
+///
+/// ```
+/// const _: () = assert!(gresil::STEP_REVISION == 1);
+/// ```
+pub const STEP_REVISION: u32 = 1;
+
 /// Crate-level error type.
 ///
 /// The network's fallible functions, `Synapse::new`, `FixedNetwork::try_from`
