@@ -80,20 +80,23 @@ pub fn preamble() -> &'static str {
 ///
 /// # Panics
 ///
-/// On what a frozen file cannot hold, each message naming the case:
-/// plasticity on, since a `FixedNetwork` has none; a clock that is not
-/// at 0, since the file starts at 0 and writes no state; neurons on two
-/// grids, which no public constructor builds (`from_neurons` refuses
-/// them), and a `case` that is empty or holds anything but lowercase
-/// ASCII letters, digits and `-`, both of which the header line
-/// refuses; a run of `drive` that does not hold one current per neuron;
-/// a neuron that is not at rest (the assert in `neuron_chain` carries
-/// the reasons it cannot fire on the stranger path); and a neuron whose
-/// `id` is not its position, since the id is what a `FixedNetwork`
-/// indexes it by and what seeds its noise; `from_neurons` refuses both,
-/// so only a network the crate's own tests write reaches them. And when
-/// the chain written for a neuron does not rebuild it, which is this
-/// module's own defect and not the caller's.
+/// On what a frozen file cannot hold, each message naming the case. A
+/// caller outside this crate reaches four: plasticity on, since a
+/// `FixedNetwork` has none (the setter that turns it on is behind
+/// `unstable-stdp`); a clock that is not at 0, since the file starts at
+/// 0 and writes no state; a `case` that is empty or holds anything but
+/// lowercase ASCII letters, digits and `-`, which the header line
+/// refuses; and a run of `drive` that does not hold one current per
+/// neuron.
+///
+/// Three more refuse what `from_neurons` refuses first, so only a
+/// network the crate's own tests write reaches them: neurons on two
+/// grids, which the header line refuses too; a neuron that is not at
+/// rest (the assert in `neuron_chain` carries the reasons it cannot fire
+/// on the stranger path); and a neuron whose `id` is not its position,
+/// since the id is what a `FixedNetwork` indexes it by and what seeds
+/// its noise. And it panics when the chain written for a neuron does not
+/// rebuild it, which is this module's own defect and not the caller's.
 #[must_use]
 pub fn module(
     net: &SpikingNeuralNetwork,

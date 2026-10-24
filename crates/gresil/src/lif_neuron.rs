@@ -379,6 +379,31 @@ impl LIFNeuron {
     ///    setter turns an out-of-range value in a stranger's frozen file
     ///    into a compile error inside their crate, far from the graph
     ///    that produced the value.
+    ///
+    /// A neuron the chain builds starts at rest: this call builds it
+    /// there, [`with_resting_potential`](Self::with_resting_potential)
+    /// moves the membrane with the resting potential, and no other
+    /// setter writes the state. A frozen file holds no state, so each
+    /// of its neurons starts at rest; on every 0.1.x, a neuron built
+    /// by these nine names alone keeps that start.
+    ///
+    /// ```
+    /// use gresil::{LIFNeuron, NeuronType, VoltageResolution};
+    ///
+    /// // the whole chain, every value off its default
+    /// let n = LIFNeuron::new(0, NeuronType::Inhibitory, VoltageResolution::CentiMillivolt)
+    ///     .with_resting_potential(-6_500)
+    ///     .with_threshold(-4_500)
+    ///     .with_reset_potential(-7_500)
+    ///     .with_tau_membrane_us(15_000)
+    ///     .with_refractory_period_us(1_000)
+    ///     .with_resistance_mohm(50)
+    ///     .with_noise_amplitude_pa(3)
+    ///     .with_adaptation_enabled(false);
+    /// assert_eq!(n.membrane_potential(), -6_500, "at rest");
+    /// assert_eq!(n.refractory_remaining_us(), 0);
+    /// assert_eq!((n.synaptic_current_pa(), n.adaptation_current_pa()), (0, 0));
+    /// ```
     #[must_use]
     pub const fn new(id: u16, neuron_type: NeuronType, resolution: VoltageResolution) -> Self {
         let (threshold_mv, tau_membrane_us) = match neuron_type {

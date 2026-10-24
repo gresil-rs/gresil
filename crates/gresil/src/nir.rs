@@ -76,6 +76,11 @@
 //! rounding error is ≤ 1 ulp ≈ 7e-12 of full scale, five orders below
 //! the 0.5 rounding boundary).
 //!
+//! The key `neuralos` of `metadata.neuralos` is the project's name
+//! before gresil, kept as a historical label for safety: the units mark
+//! under it keeps a file in simulation units from importing as native
+//! units ([`NirError::UnitsMismatch`]), and alpha.9 already writes it.
+//!
 //! # `no_std`, zero-alloc, zero new deps
 //!
 //! Everything is buffer-based, like `bridge` (behind `unstable-bridge`):
