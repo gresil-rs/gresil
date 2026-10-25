@@ -4,9 +4,9 @@ slug: 20260815-125500_neuralos-v2
 project: NeuralOS v2
 phase: complete
 progress: 88/88
-head: "main@80215b9 (PR #74 merged 2026-10-22 22:18 UTC: round 77, tier 2, alpha.9's record: the runs of record, § Stamped and § Files, the H2 export's rebuild line, `crates/neuralos-snn/` deleted, the local loop in CI's color; mirror synced, tags identical, branch deleted) · the library and the converter as published, alpha.9 stamped 2026-10-22 (`docs/releases/v0.1.0-alpha.9.md` § Stamped); the fifteen checks hold; the frozen-format sitting ruled 2026-10-24; next, its three PRs, the error-surface sitting, the topology RNG and the converter PR, then `0.1.0-rc.1` · wrote-from: work/format-names, round 78 (tier 2, the names PR: the trace format `gresil-trace v1`, `STEP_REVISION`, the freezer's reachable refusals, the start at rest, the JSON key's label; built in scratch on `80215b9`, three commits and this record) · open(session): the board round at the landing and its evidence commit, the per-commit loop on the four, then the push, the seven `(pull_request)` contexts green in the full listing and the merge, each on the principal's word · next-work: ROADMAP § Practical next moves"
+head: "main@699ad29 (PR #75 merged 2026-10-24 21:07 UTC: round 78, tier 2, the names PR: the trace format `gresil-trace v1`, `STEP_REVISION`, the freezer's reachable refusals, the start at rest, the JSON key's label; the board read before it; mirror synced, tags identical, branch deleted) · the library and the converter ahead of alpha.9 by round 78's names, unpublished (alpha.9 stamped 2026-10-22, `docs/releases/v0.1.0-alpha.9.md` § Stamped); the fifteen checks hold; the frozen-format sitting ruled 2026-10-24, its first PR merged; next, its two others, the error-surface sitting, the topology RNG and the converter PR, then `0.1.0-rc.1` · wrote-from: work/board-tools, round 79 (tier 2, the board tools PR: the board's diff in Rust, `gresil-trace-diff`, its two callers, the Python diff deleted; built in scratch on `699ad29`, two commits and this record, rebuilt for the review's findings and again for its read of the fold) · open(session): the check of this rebuild at its source, the board run and its evidence commit on the principal's word, the `.text` read again at the landing, the per-commit loop on the three, then the push, the seven `(pull_request)` contexts green in the full listing and the merge, each on the principal's word · next-work: ROADMAP § Practical next moves"
 started: 2026-08-15T12:55:00Z
-updated: 2026-10-24T18:59:36Z
+updated: 2026-10-25T23:46:53Z
 principal_stated_goal: "Session I: the null-ladder adjudication — BRANCH B (unattributed perturbation); P5 on infrastructure + method"
 ---
 
@@ -10789,3 +10789,36 @@ not sum to `steps`, as before this PR. **Open**: the board round at the
 landing, its evidence commit, the push, CI and the merge, each on the
 principal's word. **Guards.** 1: appended, head refreshed; 2: the closed
 chapter's outputs as at `main`; 3: no outreach before rc.1.
+
+## Close-out (round 79 — the board tools PR: the board's diff in Rust, `gresil-trace-diff`, its two callers, the Python diff deleted; tier 2 — 2026-10-25)
+
+Two commits and this: `4032631` the crate, a fifth workspace member,
+`publish = false`, std alone (no dependency, no `unsafe`), its binary
+refusing a build from another place; `b23af8d` `stranger.sh` and the
+QEMU replay call it from the root, the Python diff deleted, BREAKING for
+a run by hand, the lines that named it follow; this. **Rulings** (philo,
+2026-10-24 and 25): the frozen-format sitting's Call 7 (e), the capture
+parked; the brief's Calls A to G, each (a); the review's eight items and
+its read's five, with the author's views. **Review**, one, and its read
+of the fold: one blocking each, a shared target dir judging with another
+tree's traces, then a remedy rebuilding the binary alone, both fixed;
+nine cosmetic, then six, folded, four survivors riding the snapshot PR;
+seven record-only, then five. **Measured**, before this commit: on the
+20 banked captures the Python's bytes and exit, and with each one's
+commit's traces its recorded verdict; 3,000 fuzz cases the same, 255
+only under `ascii()`; the QEMU replay and a board-less run green;
+another tree's build refused, shared target dir or moved clone, where
+the first judged with its traces; after the line's touch, the tree's own
+library and binary. **The pass**: 237 mutants run or read, 1 excluded as
+equivalent, 134 caught, 103 unviable; 89 hand mutants, 88 caught, one no
+test reaches kept with its reason; a caught one on 55 of the 101 blind
+lines, 46 put in a class. **Moved**: no trace and no code; of the
+firmware build's inputs, two comments of its `main.rs`, `trace.rs`'s doc
+line, the root manifest's member line and comment. **Counts**: the
+crate's 45 tests; the library's as at `main`. **Record-only**: the board
+README's ten rebuild lines and the QEMU README's files-table row and
+paragraph line name the Python diff, true at their commits. **Open**:
+this rebuild's check, the board run and its evidence commit, the `.text`
+read again, the loop on the three, the push, CI and the merge, each on
+the principal's word. **Guards.** 1: appended, head refreshed; 2: no
+closed-chapter code touched; 3: no outreach before rc.1.
