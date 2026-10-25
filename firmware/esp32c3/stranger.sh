@@ -24,7 +24,7 @@
 # run: the port checked writable before anything is built (below), then
 #   build, then `espflash flash` (never `cargo run`: its runner monitors
 #   the port), then tools/esp32c3_capture.py alone on the port into
-#   <stem>.capture.log, then tools/esp32c3_trace_diff.py with --trace
+#   <stem>.capture.log, then gresil-trace-diff with --trace
 #   <stem>.trace. The verdict is the diff's last line and exit code. The
 #   bench rules are in esp32c3_capture.py's header. A capture is green
 #   only when the fragment before the reset carries no header: a reboot
@@ -33,13 +33,14 @@
 # Paths. The root is resolved first, and GRESIL_GRAPH and
 # CARGO_TARGET_DIR are exported absolute, since a relative one resolves
 # against whatever directory cargo is read from. The converter runs from
-# the root with the caller's target dir: under this crate,
-# .cargo/config.toml would build it for the chip. Two graphs with one
-# stem share one scratch name; the last build wins, and the trace beside
-# it is always that build's. build.sh's `cargo clean -p
-# esp-bootloader-esp-idf` hits the scratch target dir only; its
-# trim-paths canary still probes at the default target/canary, a cheap
-# pre-compile that exits 101 by design (tools/remap.sh).
+# the root with the caller's target dir, and the diff from the root with
+# the scratch one, exported by then: this crate is a workspace of its
+# own, which holds neither, and its .cargo/config.toml would build either
+# for the chip. Two graphs with one stem share one scratch name; the last
+# build wins, and the trace beside it is always that build's. build.sh's
+# `cargo clean -p esp-bootloader-esp-idf` hits the scratch target dir
+# only; its trim-paths canary still probes at the default target/canary,
+# a cheap pre-compile that exits 101 by design (tools/remap.sh).
 #
 # The capacity check, the bar: 44·N + 6·S ≤ 262,144 bytes (256 KiB), a
 # measurement (evidence/esp32c3-bringup/README.md § Ninth entry). It
@@ -186,9 +187,11 @@ if [ "$phase" = build ]; then
   exit 0
 fi
 
-# 4. The board: flash, capture from the reset, diff.
+# 4. The board: flash, capture from the reset, diff (from the root,
+#    the header says why).
 log=$out/$stem.capture.log
 espflash flash --port "$port" --non-interactive "$elf"
 python3 "$repo/tools/esp32c3_capture.py" "$port" "$seconds" "$log"
 echo "capture: $(rel "$log")"
-exec python3 "$repo/tools/esp32c3_trace_diff.py" --trace "$trace" "$log"
+cd "$repo"
+exec cargo run -q --locked -p gresil-trace-diff -- --trace "$trace" "$log"

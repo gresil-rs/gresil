@@ -3,8 +3,8 @@
 #
 # The frozen traces under QEMU riscv64gc: build the replay bare metal,
 # run it on QEMU's virt machine, and diff what its UART printed against
-# the tree's trace files with the board's diff tool
-# (tools/esp32c3_trace_diff.py), so a wrong writer is red, not trusted.
+# the tree's trace files with the board's diff
+# (crates/gresil-trace-diff), so a wrong writer is red, not trusted.
 # Green only if QEMU exits 0 (the test device's pass code, written after
 # the end line) and the diff's last line is "N cases, 0 red", N the
 # plasticity-off traces of crates/gresil/tests/traces/ counted here
@@ -23,7 +23,8 @@
 # evidence/qemu-riscv-gate/README.md). The crate's own format gate runs
 # first: `cargo fmt --all` at the root never reaches this workspace.
 # Needs the riscv64gc-unknown-none-elf target on the pin and
-# qemu-system-riscv64 (8.2.2 on the laptop that banked the log).
+# qemu-system-riscv64 (8.2.2 for round 33's log, 10.2.1 for alpha.9's
+# and round 78's).
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -55,8 +56,13 @@ mkdir -p "$(dirname "$log")"
 qemu=0
 timeout 120 qemu-system-riscv64 -machine virt -nographic -bios none \
   -kernel "$elf" </dev/null >"$log" || qemu=$?
+# The diff runs from the root: this crate is a workspace of its own,
+# without the diff, and its .cargo/config.toml would build the diff for
+# riscv64gc. So the LOG is made absolute first: a relative one names a
+# file under this crate.
+log_abs=$(realpath -- "$log")
 diff=0
-verdict=$(python3 "$repo/tools/esp32c3_trace_diff.py" "$log") || diff=$?
+verdict=$(cd "$repo" && cargo run -q --locked -p gresil-trace-diff -- "$log_abs") || diff=$?
 printf '%s\n' "$verdict"
 echo "log sha256 $(sha256sum "$log" | cut -d' ' -f1)  ${log#"$repo"/}"
 

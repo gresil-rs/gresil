@@ -49,7 +49,7 @@ low), red LED is power. Host: the laptop, espflash 4.5.0, Rust 1.92.0
 | `board-r78-head.log` | the fifteenth entry (ISA round 78, 2026-10-24): the default firmware at the names PR's head, the trace format named `gresil-trace v1`, built by `build.sh` on 1.98.1 in the main clone at `cafc3b6` (ELF `729a0a32…`), 20 s after reset (§ Fifteenth entry) |
 | `SHA256SUMS` | pins the logs and this README |
 | `../../tools/esp32c3_capture.py` | the capture tool (reset + read from one process) |
-| `../../tools/esp32c3_trace_diff.py` | the replay diff: every plasticity-off trace of `crates/gresil/tests/traces/` against its case in a capture, one line per case (§ Sixth entry) |
+| `../../crates/gresil-trace-diff/` | the replay diff: every plasticity-off trace of `crates/gresil/tests/traces/` against its case in a capture, one line per case (§ Sixth entry); until round 79 `tools/esp32c3_trace_diff.py`, which each entry's rebuild line runs at that entry's commit |
 | `../../firmware/esp32c3/` | the firmware crate; the ELF is rebuildable, not committed |
 | `../../proofs/spike-path-bench/` | the host bench harness (standalone crate) |
 

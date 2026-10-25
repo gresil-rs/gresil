@@ -10,7 +10,7 @@
 //! `frozen.rs` by `#[path]` from the library's tests directory,
 //! `for_each_frozen!` over the cases, the rows through the library's row
 //! writer, `gresil::trace::row`. `build.sh` runs it and
-//! diffs the capture with `tools/esp32c3_trace_diff.py`, the board's
+//! diffs the capture with `gresil-trace-diff`, the board's
 //! diff, so a wrong writer is red, not trusted.
 //!
 //! The boot is Leg A's (`proofs/qemu-riscv-leg-a/src/main.rs`), copied,
