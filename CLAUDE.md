@@ -5,8 +5,9 @@
 `no_std`, i16 fixed-point spiking-neural-network library for RISC-V edge
 silicon (`crates/gresil`, published as `neuralos-snn` until alpha.9),
 plus a Slint visualizer (`gresil-scope`), an unpublished research
-runtime (`neuralos-rt`) and a pure-Rust `.nir`→JSON converter for
-strangers' graphs (`gresil-nir2json`).
+runtime (`neuralos-rt`), a pure-Rust `.nir`→JSON converter for
+strangers' graphs (`gresil-nir2json`) and the replay diff
+(`gresil-trace-diff`).
 Not an "AI OS"; that was v0.1. The sibling `NeuralOS` repo is that
 archived v0.1 and is read-only source material.
 
