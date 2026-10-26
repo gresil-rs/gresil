@@ -4,9 +4,9 @@ slug: 20260815-125500_neuralos-v2
 project: NeuralOS v2
 phase: complete
 progress: 88/88
-head: "main@699ad29 (PR #75 merged 2026-10-24 21:07 UTC: round 78, tier 2, the names PR: the trace format `gresil-trace v1`, `STEP_REVISION`, the freezer's reachable refusals, the start at rest, the JSON key's label; the board read before it; mirror synced, tags identical, branch deleted) · the library and the converter ahead of alpha.9 by round 78's names, unpublished (alpha.9 stamped 2026-10-22, `docs/releases/v0.1.0-alpha.9.md` § Stamped); the fifteen checks hold; the frozen-format sitting ruled 2026-10-24, its first PR merged; next, its two others, the error-surface sitting, the topology RNG and the converter PR, then `0.1.0-rc.1` · wrote-from: work/board-tools, round 79 (tier 2, the board tools PR: the board's diff in Rust, `gresil-trace-diff`, its two callers, the Python diff deleted; built in scratch on `699ad29`, two commits and this record, rebuilt for the review's findings and again for its read of the fold) · open(session): the check of this rebuild at its source, the board run and its evidence commit on the principal's word, the `.text` read again at the landing, the per-commit loop on the three, then the push, the seven `(pull_request)` contexts green in the full listing and the merge, each on the principal's word · next-work: ROADMAP § Practical next moves"
+head: "main@d9ffa95 (PR #76 merged 2026-10-26 03:31 UTC: round 79, tier 2, the board tools PR: the board's diff in Rust, `gresil-trace-diff`, its two callers, the Python diff deleted; the board read before it; mirror synced, tags identical, branch deleted) · the library and the converter ahead of alpha.9 by round 78's names, unpublished (alpha.9 stamped 2026-10-22, `docs/releases/v0.1.0-alpha.9.md` § Stamped); the fifteen checks hold; the frozen-format sitting ruled 2026-10-24, its first two PRs merged; next, its third, the snapshot PR, then the error-surface sitting, the topology RNG and the converter PR, then `0.1.0-rc.1` · wrote-from: work/doctrine-gitea-py, round 80 (tier 3, the doctrine round: § Merge procedure's merge line and its rule on a PR's checks name `gitea.py`; built in scratch on `d9ffa95`, two commits and this record) · open(session): the per-commit loop on the three, the push, the seven `(pull_request)` contexts green in the full listing, then the merge, the first through `gitea.py merge`, on the principal's word · next-work: ROADMAP § Practical next moves"
 started: 2026-08-15T12:55:00Z
-updated: 2026-10-25T23:46:53Z
+updated: 2026-10-26T22:09:09Z
 principal_stated_goal: "Session I: the null-ladder adjudication — BRANCH B (unattributed perturbation); P5 on infrastructure + method"
 ---
 
@@ -10822,3 +10822,20 @@ this rebuild's check, the board run and its evidence commit, the `.text`
 read again, the loop on the three, the push, CI and the merge, each on
 the principal's word. **Guards.** 1: appended, head refreshed; 2: no
 closed-chapter code touched; 3: no outreach before rc.1.
+
+## Close-out (round 80 — the doctrine round: § Merge procedure's merge line and its rule on a PR's checks name `gitea.py`; tier 3 — 2026-10-26)
+
+Branch `work/doctrine-gitea-py` from `main@d9ffa95`, tier 3, the
+tools-and-ways sitting's doctrine round, three commits: `f50201b` the
+merge line runs `gitea.py merge`, the sync as it was; `e4f55cc` the rule
+on a PR's checks: the hand listing leaves for `gitea.py status`, the
+rule stays as its spec with its facts, one in, one out; this.
+**Rulings** (philo): the sitting's Calls 4 (a) and 5 (a), 2026-10-24,
+`Gitea.ts` parked, so an old command fails loudly, and the doctrine
+after the test merge; 2026-10-26 at 21:24 UTC, this PR's own merge the
+first through `gitea.py merge`. **Measured**: on PR #76's head
+`aa0120b`, `gitea.py status` read 76 statuses on pages of 50 and 26, 14
+contexts, the seven required present, green; `git grep -F Gitea.ts` at
+`e4f55cc`, no line. No check ticks. **Open**: the per-commit loop on the
+three, the push, CI, then the merge on the principal's word. **Guards.**
+1: appended, head refreshed; 2 and 3: not in play.
