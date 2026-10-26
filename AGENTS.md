@@ -258,17 +258,19 @@ Two rules learned on PR #15 (2026-09-09):
   themselves are untouched; the refs come back at the next sync. Prune
   before the procedure or not at all.
 - **Watch a PR's checks through the full API listing, never the
-  ten-context status view.** `Gitea.ts status` reads the combined
-  status without a page size and shows at most ten contexts; PR #15
-  had twelve and it hid two pending ones. Until that tool carries a
-  page size, the merger reads
-  `GET /repos/{owner}/{repo}/commits/{sha}/statuses?limit=50` and
-  every further page `X-Total-Count` calls for (PR #51's head carried
-  56 statuses, six of them on page 2), keeps the latest status per
-  context, and checks that every context a PR head carries is there,
-  as § Session protocol counts them: a context whose statuses all fall
-  past page 1 reads as missing, never as pending. "Nothing pending" is
-  decided on that listing.
+  ten-context status view.** The combined status, read without a page
+  size, shows at most ten contexts; PR #15 had twelve and it hid two
+  pending ones. The merger reads the checks with
+  `python3 -I ~/projets/tools/gitea.py status gresil-rs/gresil <pr>`,
+  and this rule is its spec: it reads every page of 50 that
+  `X-Total-Count` calls for (PR #51's head carried 56 statuses, six of
+  them on page 2), keeps the latest status per context, and prints a
+  required context with no status as MISSING, never as pending. It
+  marks as required only the seven `(pull_request)` contexts that
+  `main`'s protection names, and its total line counts every context;
+  the merger still checks that every context a PR head carries is
+  there, that count against § Session protocol's fourteen. "Nothing
+  pending" is decided on that listing.
 
 ## Published crate
 
