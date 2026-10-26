@@ -1,12 +1,13 @@
 # AGENTS.md
 
 Read this before touching anything. gresil is the **active** repo —
-pure Rust, AGPL-3.0, local-only. One workspace, four crates, one
+pure Rust, AGPL-3.0, local-only. One workspace, five crates, one
 research record: a published `no_std` SNN library (the spine), a Slint
 visualizer that runs it live (the microscope), a research runtime that
 proved the ternary bridge (closed record), a pure-Rust `.nir`→JSON
-converter for strangers' graphs (the inbound bridge), and the paper
-distilled from it.
+converter for strangers' graphs (the inbound bridge), the replay diff
+that reads a capture, the board's or QEMU's, against the host's traces
+(the judge), and the paper distilled from it.
 
 **Direction lives in `docs/VISION.md` (the north star).** Read it before
 scoping work. Shipping order: `docs/ROADMAP.md`. History:
@@ -30,6 +31,7 @@ archive, not here. `cd` back to this repo.
 | `crates/gresil-scope` | The microscope. Slint visualizer over the library. |
 | `crates/gresil-nir2json` | The inbound bridge. Pure-Rust `.nir` (HDF5 via `hdf5-pure`, no C) → the library's JSON schema, for graphs strangers emit (spike-checked against snnTorch; its README says what converts). The stranger-usable artifact GUARD 3 names: a static musl binary on the Gitea release, built by its README § Build. `publish = false` (crates.io deferred by ruling). |
 | `crates/neuralos-rt` | The research runtime (GGUF container, Q1_0/Q2_0 compute, tokenizer, model). `publish = false`, std-only. Consumed by the frozen bridge examples. |
+| `crates/gresil-trace-diff` | The judge. The replay diff: a capture, the C3's or QEMU's, against the tree's plasticity-off traces, one line per case, exit 0 only when every case is identical; its module doc carries the rules. Pure std, no dependency, no `unsafe`; `publish = false`. From the root: `cargo run -q -p gresil-trace-diff -- [--trace FILE]... LOG`. |
 | `paper/` | The Branch B article. Builds with `make` in `paper/` (`make figs` regenerates figures from evidence; `make gate` enforces the language rules of record). |
 | `evidence/` | Raw judge/experiment logs. Indexed by `evidence/INDEX.md`. |
 | `models/` | Gitignored GGUF weights, 88 GB (`du --si`, 2026-10-17): HF downloads (`prism-ml/Bonsai-1.7B-gguf`, `Bonsai-4B-gguf`, `Ternary-Bonsai-4B-gguf`) and files derived from them. `evidence/INDEX.md` § Models manifest pins the set of 2026-08-22. `cargo run -p neuralos-rt --release --example null_patches` rebuilds its dose and flip nulls; only that example's v1, at `4007027`, rebuilds its `null-random-*` ones. A second copy of the weights lives on an external disk, its path in no file (the repo has a public mirror). Never committed. |
@@ -68,13 +70,13 @@ a capture shows no pane.
 
 ## Commands
 
-Workspace is four members: `crates/gresil` (the library),
+Workspace is five members: `crates/gresil` (the library),
 `crates/gresil-scope` (the visualizer), `crates/neuralos-rt` (the
 research runtime), `crates/gresil-nir2json` (the `.nir`→JSON
-converter). `rust-toolchain.toml` pins the toolchain; the version
-lives there alone. A bump is its own commit: the lints it adds fixed
-before it, the firmware `.text` re-pinned and the board fold read again
-(PR C).
+converter), `crates/gresil-trace-diff` (the replay diff).
+`rust-toolchain.toml` pins the toolchain; the version lives there
+alone. A bump is its own commit: the lints it adds fixed before it,
+the firmware `.text` re-pinned and the board fold read again (PR C).
 
 ```bash
 # Quality gates. `.gitea/workflows/ci.yml` IS THE GATE (origin is Gitea);

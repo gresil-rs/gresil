@@ -149,8 +149,8 @@ STDP by hand without `std`. CI tests all four and checks the two
   the bar replays exactly, but slower than real time.
 - Learning (STDP) sits behind the `unstable-stdp` feature, off by
   default. The network on the chip does not learn.
-- The board's capture and diff are Python 3 scripts, standard library
-  only, for now.
+- The board's capture is a Python 3 script, standard library only,
+  for now.
 - Pre-1.0: the API still moves.
 
 ## Status

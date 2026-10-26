@@ -42,7 +42,7 @@
 //!
 //! A replay that prints several traces over one serial port ends with
 //! `# gresil-trace end`: the ESP32-C3 firmware and the QEMU replay print
-//! it, and `tools/esp32c3_trace_diff.py` reads it.
+//! it, and the repository's `crates/gresil-trace-diff` reads it.
 //!
 //! Through alpha.9 the format's name was `neuralos-trace`, the project's
 //! name before gresil: the same `v1`, a file written under it differs in

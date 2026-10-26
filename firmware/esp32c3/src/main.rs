@@ -32,7 +32,7 @@
 //!    (`gresil::trace::row`) into `esp_println::Printer`; then, in
 //!    a build that names a stranger's graph, that graph the same way; then
 //!    one end line, `# gresil-trace end`.
-//!    `tools/esp32c3_trace_diff.py` diffs a capture against
+//!    `gresil-trace-diff` diffs a capture against
 //!    `tests/traces/`, and against the stranger's trace with `--trace`.
 //!    Then the mark, one line outside every case, `stack: <mark> of
 //!    <total> bytes high-water after the replays`: the stack's depth since
@@ -421,7 +421,7 @@ fn main() -> ! {
     //    through the library's writer; then the stranger's graph, in a
     //    build that names one, on the arm's binding; then the end line,
     //    all before the loop below, whose spike lines would otherwise land
-    //    in the last case. tools/esp32c3_trace_diff.py compares them with
+    //    in the last case. gresil-trace-diff compares them with
     //    the host's files. replay_rows! steps a network it is given;
     //    replay! builds one per case, whose path for_each_frozen! gives as
     //    a name, which replay_frozen! makes a path into frozen.

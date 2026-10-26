@@ -1,0 +1,18 @@
+[package]
+# The board's judge: a replay's capture, the C3's or QEMU's, against the
+# host's trace files. The frozen-format sitting's Call 7 (e), ruled
+# 2026-10-24: the diff alone, in pure std, no dependency, no `unsafe`;
+# the capture stays tools/esp32c3_capture.py.
+name = "gresil-trace-diff"
+version.workspace = true
+edition = "2024"
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Diff an ESP32-C3 or QEMU replay capture against gresil's trace files"
+# A tool of this repository, run from its tree (stranger.sh, the QEMU
+# replay): never published.
+publish = false
+
+# No [dependencies] and no [dev-dependencies]: std alone (the ruling).

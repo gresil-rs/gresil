@@ -53,9 +53,10 @@ and `.text` shas, clippy. It writes into
 `firmware/esp32c3/target/stranger/`: `<stem>.json` and its sidecar,
 `<stem>.rs` (the arrays), `<stem>.trace` (the host's run of them) and
 `<stem>.elf`. `run` does the same, flashes the ELF, captures 20 s from
-the reset into `<stem>.capture.log`, and diffs the capture with
-`tools/esp32c3_trace_diff.py --trace <stem>.trace`. The verdict is the
-diff's last line and its exit code:
+the reset into `<stem>.capture.log`, and diffs the capture from the
+repository's root with
+`cargo run -q --locked -p gresil-trace-diff -- --trace <stem>.trace <stem>.capture.log`.
+The verdict is the diff's last line and its exit code:
 
 ```text
 <case>: identical, <rows> rows     one line per case: the library's, then yours
@@ -115,7 +116,7 @@ firmware/esp32c3/build.sh          # release, remapped, gated; prints the shas, 
 firmware/esp32c3/build.sh clippy
 espflash flash --port /dev/ttyACM0 firmware/esp32c3/target/riscv32imc-unknown-none-elf/release/gresil-esp32c3
 python3 tools/esp32c3_capture.py /dev/ttyACM0 20 board.log
-python3 tools/esp32c3_trace_diff.py board.log
+cargo run -q -p gresil-trace-diff -- board.log
 ```
 
 It needs what § Before the first run installs.

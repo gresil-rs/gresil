@@ -33,4 +33,9 @@ exclude_re = [
     # pass): only the derived equality reads the bytes past the kept
     # ones, and every name is built by `new`, so any two pad alike.
     'crates/gresil/src/nir\.rs:[0-9]+:26: replace 0u8 with 1u8 in NirName::new',
+    # gresil-trace-diff's `compare`, the cut-off test's `end < head` made
+    # `<=` (round 79's pass): a line is a header or the end line, never
+    # both, so the last of each are never one index. Its column, so a
+    # later `<` in the function stays in the pass.
+    'crates/gresil-trace-diff/src/lib\.rs:[0-9]+:40: replace < with <= in compare',
 ]

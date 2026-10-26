@@ -47,9 +47,11 @@ low), red LED is power. Host: the laptop, espflash 4.5.0, Rust 1.92.0
 | `board-r76-tip.log` | the thirteenth entry (ISA round 76, 2026-10-21): the default firmware at the stamp PR's tip, the library at `0.1.0-alpha.9`, built by `build.sh` on 1.98.1 in the main clone at `8bff222` (ELF `7834eb64…`), 20 s after reset (§ Thirteenth entry) |
 | `board-r76-merge.log` | the fourteenth entry (ISA round 77, 2026-10-22): the default firmware at PR #73's merge commit, the tagged commit, built by `build.sh` on 1.98.1 in the main clone at `691bb70` (ELF `608a202a…`, the release's), 20 s after reset (§ Fourteenth entry) |
 | `board-r78-head.log` | the fifteenth entry (ISA round 78, 2026-10-24): the default firmware at the names PR's head, the trace format named `gresil-trace v1`, built by `build.sh` on 1.98.1 in the main clone at `cafc3b6` (ELF `729a0a32…`), 20 s after reset (§ Fifteenth entry) |
+| `board-r79-stranger.log` | the sixteenth entry (ISA round 79, 2026-10-26): the snnTorch witness in the slot by `stranger.sh run` at `fea8d27` (ELF `970c29da…`), 20 s after reset, read by `gresil-trace-diff`; the script's `target/stranger/snnTorch_two_layer.capture.log`, byte for byte (§ Sixteenth entry) |
+| `board-r79-stranger.trace` | the sixteenth entry: the trace the same run's build phase wrote for the witness, the `--trace` its capture is read with; the script's `target/stranger/snnTorch_two_layer.trace`, byte for byte (§ Sixteenth entry) |
 | `SHA256SUMS` | pins the logs and this README |
 | `../../tools/esp32c3_capture.py` | the capture tool (reset + read from one process) |
-| `../../tools/esp32c3_trace_diff.py` | the replay diff: every plasticity-off trace of `crates/gresil/tests/traces/` against its case in a capture, one line per case (§ Sixth entry) |
+| `../../crates/gresil-trace-diff/` | the replay diff: every plasticity-off trace of `crates/gresil/tests/traces/` against its case in a capture, one line per case (§ Sixth entry); until round 79 `tools/esp32c3_trace_diff.py`, which each entry's rebuild line runs at that entry's commit |
 | `../../firmware/esp32c3/` | the firmware crate; the ELF is rebuildable, not committed |
 | `../../proofs/spike-path-bench/` | the host bench harness (standalone crate) |
 
@@ -1345,6 +1347,94 @@ The board held round 52's image before the flash (on-chip MD5
 `582b942d…`, read first) and was given it back after, its on-chip MD5
 `582b942d…` again; a capture of it reads round 52's burst figures to
 1 µs.
+
+## Sixteenth entry: round 79, the board's diff in Rust (2026-10-26)
+
+Same SuperMini (MAC `70:af:09:07:f6:3c`, esp32c3 revision v0.4, as
+`espflash flash` printed them), same port, same tool, 20 s after
+reset, the ELF built and flashed from the main clone by the one
+command. Why this entry exists: round 79 makes the board's judge Rust,
+the crate `gresil-trace-diff` where it was
+`tools/esp32c3_trace_diff.py`, and `stranger.sh` calls it, so the
+round reads the board once through the new judge, at the PR's head
+before the merge. No trace moves, and the firmware's `.text` does not:
+built at one scratch path, `699ad29` and `fea8d27` give one `.text`,
+and a planted change in the library moves it. The capture is banked
+beside the trace it was read with: the first stranger capture here
+whose verdict re-derives with no regeneration.
+
+Stranger: at `fea8d27`, from the repo root, the one command as run:
+
+```bash
+firmware/esp32c3/stranger.sh run crates/gresil-nir2json/tests/fixtures/community/snnTorch_two_layer.nir
+```
+
+It converted the snnTorch witness (module `snntorch_two_layer`, 2
+neurons, 1 synapse, 150 steps; 94 bytes of arrays, within the bar of
+262,144), built the firmware with it in the slot through `build.sh`,
+the gate 0 hits, the trim-paths canary still unstable on 1.98.1 (exit
+101), clippy clean (ELF
+`970c29dadf785ee7ae5b96ecae0254caef4a482db989fde43d06b337c24edb5c`,
+`.text`
+`aaefc1c3c5a38c8f205bbfe037bc7b2938310603140cfccc3f07f96a40a5e796`,
+160,474 B, graph-dependent, so they live in this entry and not in
+§ Rebuild + run; `main`'s frame `0x460`), flashed it, and captured 20 s
+after reset into `target/stranger/snnTorch_two_layer.capture.log`,
+banked byte for byte as `board-r79-stranger.log`, 56,893 bytes. The
+trace its build phase wrote, `target/stranger/snnTorch_two_layer.trace`,
+one header (`kind=stranger`) and 150 rows, is banked byte for byte
+beside it as `board-r79-stranger.trace`, 3,273 bytes. The capture holds
+two boots: it opens with the tail of the boot that followed the flash
+(a bootloader line spliced into the banner, both neuron arms), cut by
+the capture's reset, no trace line in it, then the full run. Every
+figure below is from after the `rst:` line; the before column is round
+78's head, the last capture on record.
+
+| Measurement | Round 78 (head) | Round 79 (stranger) |
+|---|---|---|
+| Burst, pinned arm | 15,044 µs → 1,504 ns/step | 14,983 µs → 1,498 ns/step |
+| Burst, free arm | 2,938 µs → 293 ns/step | 3,001 µs → 300 ns/step |
+| Burst spikes, first spike step, checksum, both neuron arms | 147, 55, `8cd1e63b` | 147, 55, `8cd1e63b` |
+| Burst, network arm (8 neurons, 6 synapses a step) | 141,434 µs → 14,143 ns/step | 141,433 µs → 14,143 ns/step |
+| Network arm: spikes, first spike step, checksum | 3,377, 5, `7e700ee1` | 3,377, 5, `7e700ee1` |
+| Burst, the stranger's arm (2 neurons, 1 synapse; 100 steps) | — | 607 µs → 6,070 ns/step, largest step 200 µs |
+| The stranger's arm: spikes, first spike step, checksum | — | 74, 1, `ba299364` |
+| `main`'s frame, from the prologue | 992 B | 1,120 B |
+| Stack high-water mark, of `.stack` | 1,368 of 316,316 B | 1,496 of 316,308 B |
+| `.stack` free at the mark | 314,948 B | 314,812 B |
+| First spike, real-time loop | step 55, 55,156 µs | step 55, 55,175 µs |
+| Spikes after the reset | 288 in 20 s | 287 in 20 s |
+| Replay diff, last line | `14 cases, 0 red` | `15 cases, 0 red` |
+
+The gates hold. From the repo root,
+
+```bash
+cargo run -q -p gresil-trace-diff -- \
+  --trace evidence/esp32c3-bringup/board-r79-stranger.trace \
+  evidence/esp32c3-bringup/board-r79-stranger.log
+```
+
+reads the fourteen plasticity-off cases identical, then
+`board-r79-stranger (given): identical, 150 rows`, then
+`15 cases, 0 red`, from the two banked files alone; the run printed the
+same lines, the given case under the script's name,
+`snnTorch_two_layer (given)`. The board's rows for the stranger's graph
+equal the trace the host wrote for it, line for line. Case
+`snntorch-two-layer` appears twice in the capture, the pulsed
+regression case (`kind=regression`) and the stranger's default drive
+(`kind=stranger`), as in the eighth entry. Both neuron arms fold to
+`8cd1e63b`, 147 spikes from step 55, and the network arm to
+`7e700ee1`, 3,377 spikes from step 5, round 78's figures each; the
+real-time loop's first spikes land on steps 55, 123, 191 and every 68
+steps on, as round 78's did.
+
+The rest is reported, not gated: the graph in the slot puts 128 B on
+`main`'s frame and on the stack's mark; the pinned burst is 61 µs
+faster and the free 63 µs slower than round 78's head, the network arm
+within 1 µs; 287 spikes in the window, one fewer; not read further.
+The board held round 52's image before the flash (on-chip MD5
+`582b942d…`, read first) and was given it back after, its on-chip MD5
+`582b942d…` again.
 
 ## Rebuild + run (from the repo root; board on /dev/ttyACM0)
 
