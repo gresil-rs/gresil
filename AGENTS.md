@@ -234,7 +234,7 @@ Active.
 The merge is one HTTP call on Gitea, so the laptop's `main` is stale
 right after it; the sync pushes Gitea's refs, never local ones:
 
-    bun ~/.claude/LIFEOS/TOOLS/Gitea.ts merge gresil-rs/gresil <pr>
+    python3 -I ~/projets/tools/gitea.py merge gresil-rs/gresil <pr>
     git fetch origin main '+refs/tags/*:refs/remotes/origin/tags/*'
     git push github origin/main:refs/heads/main
     git push github 'refs/remotes/origin/tags/*:refs/tags/*'
