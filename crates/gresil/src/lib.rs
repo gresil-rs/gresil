@@ -47,6 +47,10 @@ pub use synapse::Synapse;
 /// the [`LIFNeuron::integrate_and_fire`] it calls. A release that moves
 /// a spike of a frozen file raises it.
 ///
+/// Through 0.1.x it stays 1: a frozen file written by any 0.1.x gives
+/// the same spikes on every later 0.1.y, and `tests/kept.rs` replays
+/// the files written at 0.1.0, kept as they were, at every commit.
+///
 /// Every module the freezer writes (`fixed::freeze::module`, behind
 /// `unstable-freeze`) asserts, after its `use` line, the revision it was
 /// written for. After a raise, an old file refuses to compile instead of
