@@ -148,6 +148,18 @@ fn a_header_on_the_log_s_first_line_is_read() {
 }
 
 #[test]
+fn an_indented_header_is_not_a_header() {
+    let dir = tree("indented-header");
+    let indented = vec![format!("  {}", trace("alpha", 2)[0])];
+    let r = diff(
+        &dir,
+        &capture(&[indented, trace("alpha", 2), trace("beta", 3)], Some(END)),
+        &[],
+    );
+    assert_eq!(r, report(&GREEN, 0));
+}
+
+#[test]
 fn a_changed_row_differs_at_its_line() {
     let dir = tree("changed-row");
     let mut beta = trace("beta", 3);
@@ -352,6 +364,20 @@ fn a_plasticity_on_trace_is_not_in_the_set() {
 }
 
 #[test]
+fn plasticity_off_inside_another_field_is_not_in_the_set() {
+    let dir = tree("off-inside-a-field");
+    let mut sweep = trace("sweep", 1);
+    sweep[0] = header("gresil", "plasticity=off-sweep", "on");
+    write(&dir.join("traces/sweep.trace"), &sweep);
+    let r = diff(
+        &dir,
+        &capture(&[trace("alpha", 2), trace("beta", 3)], Some(END)),
+        &[],
+    );
+    assert_eq!(r, report(&GREEN, 0));
+}
+
+#[test]
 fn no_end_line_is_a_capture_cut_off() {
     let dir = tree("no-end");
     let r = diff(
@@ -381,6 +407,15 @@ fn an_end_line_before_the_last_header_is_a_capture_cut_off() {
         "2 cases, 2 red",
     ];
     assert_eq!(r, report(&want, 1));
+}
+
+#[test]
+fn two_end_lines_the_last_after_the_last_header_are_not_a_cut_off() {
+    let dir = tree("two-ends");
+    let mut alpha = trace("alpha", 2);
+    alpha.push(END.into());
+    let r = diff(&dir, &capture(&[alpha, trace("beta", 3)], Some(END)), &[]);
+    assert_eq!(r, report(&GREEN, 0));
 }
 
 #[test]
@@ -724,6 +759,25 @@ fn a_difference_prints_the_lines_as_the_files_hold_them() {
     let r = diff(&dir, &capture(&[alpha, trace("beta", 3)], Some(END)), &[]);
     let want = [
         "alpha: DIFFERS at line 2: file '0 0 | 0 | -7000 alpha', log '# neuralos-trace note'",
+        "beta: identical, 3 rows",
+        "2 cases, 1 red",
+    ];
+    assert_eq!(r, report(&want, 1));
+}
+
+#[test]
+fn a_difference_prints_the_file_s_line_as_the_file_holds_it() {
+    let dir = tree("as-held-file");
+    let mut alpha = trace("alpha", 2);
+    alpha[1] = "# neuralos-trace note".into();
+    write(&dir.join("traces/alpha.trace"), &alpha);
+    let r = diff(
+        &dir,
+        &capture(&[trace("alpha", 2), trace("beta", 3)], Some(END)),
+        &[],
+    );
+    let want = [
+        "alpha: DIFFERS at line 2: file '# neuralos-trace note', log '0 0 | 0 | -7000 alpha'",
         "beta: identical, 3 rows",
         "2 cases, 1 red",
     ];
