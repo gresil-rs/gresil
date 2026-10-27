@@ -32,6 +32,7 @@ LICENSE-NIR in the same folder. Made from one of these files, under
 the same license: the conversion
 crates/gresil/tests/nir_fixtures/two_lif_neurons_sim.json, with a copy
 of LICENSE-NIR beside it, and the two_lif_neurons module of
-crates/gresil/tests/traces/frozen.rs, frozen from that conversion.
+crates/gresil/tests/traces/frozen.rs, frozen from that conversion, and
+of each copy of that file under crates/gresil/tests/kept/.
 
 Contact: the issue tracker at https://gitea.com/gresil-rs/gresil

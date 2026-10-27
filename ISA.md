@@ -4,9 +4,9 @@ slug: 20260815-125500_neuralos-v2
 project: NeuralOS v2
 phase: complete
 progress: 88/88
-head: "main@d9ffa95 (PR #76 merged 2026-10-26 03:31 UTC: round 79, tier 2, the board tools PR: the board's diff in Rust, `gresil-trace-diff`, its two callers, the Python diff deleted; the board read before it; mirror synced, tags identical, branch deleted) · the library and the converter ahead of alpha.9 by round 78's names, unpublished (alpha.9 stamped 2026-10-22, `docs/releases/v0.1.0-alpha.9.md` § Stamped); the fifteen checks hold; the frozen-format sitting ruled 2026-10-24, its first two PRs merged; next, its third, the snapshot PR, then the error-surface sitting, the topology RNG and the converter PR, then `0.1.0-rc.1` · wrote-from: work/doctrine-gitea-py, round 80 (tier 3, the doctrine round: § Merge procedure's merge line and its rule on a PR's checks name `gitea.py`; built in scratch on `d9ffa95`, two commits and this record) · open(session): the per-commit loop on the three, the push, the seven `(pull_request)` contexts green in the full listing, then the merge, the first through `gitea.py merge`, on the principal's word · next-work: ROADMAP § Practical next moves"
+head: "main@e4d7db3 (PR #77 merged 2026-10-26 23:32 UTC: round 80, tier 3, the doctrine round: § Merge procedure's merge line and its rule on a PR's checks name `gitea.py`, the first merge through `gitea.py merge`; mirror synced, tags identical, branch deleted) · the library and the converter ahead of alpha.9 by round 78's names, unpublished (alpha.9 stamped 2026-10-22, `docs/releases/v0.1.0-alpha.9.md` § Stamped); the fifteen checks hold; the frozen-format sitting ruled 2026-10-24, its first two PRs merged; next, its third, the snapshot PR, then the error-surface sitting, the topology RNG and the converter PR, then `0.1.0-rc.1` · wrote-from: work/snapshot, round 81 (tier 3, the snapshot PR: the kept emission and its pin, the kept conversions, the diff's four tests; built in scratch on `e4d7db3`, three commits and this record) · open(session): the per-commit loop on the four, the push, the seven `(pull_request)` contexts green in the full listing, then the merge on the principal's word · next-work: ROADMAP § Practical next moves"
 started: 2026-08-15T12:55:00Z
-updated: 2026-10-26T22:09:09Z
+updated: 2026-10-27T03:27:04Z
 principal_stated_goal: "Session I: the null-ladder adjudication — BRANCH B (unattributed perturbation); P5 on infrastructure + method"
 ---
 
@@ -10839,3 +10839,33 @@ contexts, the seven required present, green; `git grep -F Gitea.ts` at
 `e4f55cc`, no line. No check ticks. **Open**: the per-commit loop on the
 three, the push, CI, then the merge on the principal's word. **Guards.**
 1: appended, head refreshed; 2 and 3: not in play.
+
+## Close-out (round 81 — the snapshot PR: the kept emission and its pin, the kept conversions, the diff's four survivors; tier 3 — 2026-10-27)
+
+Branch `work/snapshot` from `main@e4d7db3`, tier 3, the frozen-format
+sitting's third PR, three commits and this: `4a873ae` the kept emission,
+Call 1 (i): byte copies of `frozen.rs` and its 14 plasticity-off traces,
+63,013 B, in `crates/gresil/tests/kept/0.1.0/`, replayed by
+`tests/kept.rs` from the kept folder alone; Call 2's pin, the revision
+beside one FNV-1a 64 of the 15 files, (1, 0x604de5c3956bd78d); the scope
+sentence in the doc of `STEP_REVISION`; the brief's C, `COPYRIGHT`
+naming each copy under `tests/kept/`; `0c6077a` the kept conversions,
+Call 1 (ii): `kept.tsv`, 188 rows for the 53 tracked `.nir` in three
+modes, 99 hashes (native 9, `--sim-units` 32, `--freeze` 29 twice) and
+89 refusals, every one exit 2, written once from the binary at `e4d7db3`
+and read by a test that runs the binary; `65f346a` the diff's four
+tests, PR #76's F3; this. **Rulings** (philo): the sitting's Calls 1
+(i), 1 (ii) and 2, 2026-10-24; the plan's Calls 1 to 4, each (a),
+2026-10-27 at 01:11:10 and 01:28:03 UTC; the brief's A, B and scope
+sentence, 01:40:19 UTC; its C, the twins' source and the byte copy,
+02:26:23 UTC. **Measured**, before this commit: each falsifier red, then
+green restored: a kept row, its case and line named; one byte of the
+kept `frozen.rs`, the pin alone; revision 2, 14 E0080; in `kept.tsv` a
+hash, two removed rows and a refusal set to 0, each by name. The four
+mutants survive the 45 tests at `e4d7db3`, each red by its own test at
+`65f346a`. The firmware's `.text` the same at both, a planted control
+moving it. **Counts**: the library's tests 3 more, the converter's 2,
+the diff's 45 to 49; the `.crate` 16 entries more. **Open**: the loop on
+the four, the push, CI, then the merge on the principal's word.
+**Guards.** 1: appended, head refreshed; 2: no closed-chapter code
+touched; 3: no outreach before rc.1.
