@@ -4,9 +4,9 @@ slug: 20260815-125500_neuralos-v2
 project: NeuralOS v2
 phase: complete
 progress: 88/88
-head: "main@e4d7db3 (PR #77 merged 2026-10-26 23:32 UTC: round 80, tier 3, the doctrine round: § Merge procedure's merge line and its rule on a PR's checks name `gitea.py`, the first merge through `gitea.py merge`; mirror synced, tags identical, branch deleted) · the library and the converter ahead of alpha.9 by round 78's names, unpublished (alpha.9 stamped 2026-10-22, `docs/releases/v0.1.0-alpha.9.md` § Stamped); the fifteen checks hold; the frozen-format sitting ruled 2026-10-24, its first two PRs merged; next, its third, the snapshot PR, then the error-surface sitting, the topology RNG and the converter PR, then `0.1.0-rc.1` · wrote-from: work/snapshot, round 81 (tier 3, the snapshot PR: the kept emission and its pin, the kept conversions, the diff's four tests; built in scratch on `e4d7db3`, three commits and this record) · open(session): the per-commit loop on the four, the push, the seven `(pull_request)` contexts green in the full listing, then the merge on the principal's word · next-work: ROADMAP § Practical next moves"
+head: "main@4dfbe18 (PR #78 merged 2026-10-27 05:48 UTC: round 81, tier 3, the snapshot PR: the kept emission and its pin beside `STEP_REVISION`, the kept conversions, the diff's four tests; mirror synced, tags identical, branch deleted) · the library and the converter ahead of alpha.9 by round 78's names, unpublished (alpha.9 stamped 2026-10-22, `docs/releases/v0.1.0-alpha.9.md` § Stamped); the fifteen checks hold; the frozen-format sitting's three PRs merged; next, the converter PR as two, the pins then the reader, then the error-surface sitting, the topology RNG and `0.1.0-rc.1` · wrote-from: work/converter-pins, round 82 (tier 3, the converter pins PR: the four layout twins and their kept rows, the value check against the C library, the `r` docs, C-3 and `kept.rs`'s rule after Call 5 (a); built in scratch on `4dfbe18`, three commits and this record) · open(session): the per-commit loop on the four, the push, the seven `(pull_request)` contexts green in the full listing, then the merge on the principal's word · next-work: ROADMAP § Practical next moves"
 started: 2026-08-15T12:55:00Z
-updated: 2026-10-27T03:27:04Z
+updated: 2026-10-28T03:28:56Z
 principal_stated_goal: "Session I: the null-ladder adjudication — BRANCH B (unattributed perturbation); P5 on infrastructure + method"
 ---
 
@@ -10867,5 +10867,38 @@ mutants survive the 45 tests at `e4d7db3`, each red by its own test at
 moving it. **Counts**: the library's tests 3 more, the converter's 2,
 the diff's 45 to 49; the `.crate` 16 entries more. **Open**: the loop on
 the four, the push, CI, then the merge on the principal's word.
+**Guards.** 1: appended, head refreshed; 2: no closed-chapter code
+touched; 3: no outreach before rc.1.
+
+## Close-out (round 82 — the converter pins PR: the layout twins, the value check against the C library, the r docs, C-3 and kept.rs's rule; tier 3 — 2026-10-28)
+
+Branch `work/converter-pins` from `main@4dfbe18`, tier 3, the converter
+plan's pins PR, before the reader's, three commits and this: `1a4c671`
+the layout twins, the two-layer witness in four HDF5 layouts, each one
+property from it, its format bound pinned (superblock v3 at libver v110,
+creation-order groups, its chunks without gzip, HDF5 2.0's format at
+v200), and their 15 `kept.tsv` rows: the three that convert give the
+witness's JSON, the HDF5 2.0 twin is refused in all three modes, exit 2;
+with C-2; `a3da5ac` the value check against the C library:
+`tools/gen_libhdf5_reads.py` writes `tests/libhdf5_reads.tsv`, hashes
+only, 1,664 rows for the 57 `.nir` (h5py 3.16.0, libhdf5 2.0.0), and
+`tests/libhdf5_reads.rs` reads each dataset with the converter's call
+for its dtype, the size bound first, row for row both ways; the HDF5 2.0
+twin read in part, its refusal pinned; `61e3dc4` the `r` docs, r =
+1/(1−β), C-3, and `kept.rs` made true to Call 5 (a); this. **Rulings**
+(philo): the plan's Calls 2 and 4 to 9, 2026-10-28 at 00:39:02 UTC; Call
+1, two PRs, the pins first, 00:40:35 UTC; the twins' layout, 01:13:55
+UTC; the value check's option (a), 01:21:44 UTC; `kept.rs` in this PR,
+02:05:41 UTC. **Measured**, before this commit: the generator twice, the
+same four sha256, no other fixture moved; three twins byte for byte the
+ruling's probe copies; `kept.rs` red with a twin's row removed, and with
+the new rule for a refused row that converts; the manifest twice, the
+same bytes, the tracked files' 1,540 rows the plan's probe's; five
+planted values each red at its own row alone, a file without rows and
+rows without a file each red, the four mutants of the refused reads each
+red; C-3's panic names its seed here, not at the base. The firmware's
+`.text` the same at both, a planted control moving it. **Counts**: the
+converter's tests 68 to 70, `kept.tsv` 188 rows to 203. **Open**: the
+loop on the four, the push, CI, then the merge on the principal's word.
 **Guards.** 1: appended, head refreshed; 2: no closed-chapter code
 touched; 3: no outreach before rc.1.
