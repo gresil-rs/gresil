@@ -240,7 +240,7 @@ cargo test -p gresil-nir2json   # corpus v2: fixtures live in tests/fixtures/
 
 Fixture provenance (the stranger files, sha-pinned): see
 `tests/fixtures/community/PROVENANCE.md`. Regenerate the derived
-fixtures (f32 twins, big graph, the Affine graphs, a 1-D weight):
+fixtures, which the generator's docstring lists:
 `.nirenv/bin/python3 tools/gen_nir2json_fixtures.py`. Regenerate the
 snnTorch fallback emission: `tools/gen_snnTorch_stranger.py` (throwaway
 venv; the script header carries the exact stack), and the two-layer
