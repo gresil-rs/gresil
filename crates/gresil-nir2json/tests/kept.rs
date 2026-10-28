@@ -19,8 +19,10 @@
 //! A red names the file, the mode and the output. From 0.1.0 a conversion
 //! that moves ships behind a new flag until 0.2.0 (Call 1 (ii)); before
 //! 0.1.0, its rows are re-pinned in their own commit. A refusal that
-//! starts to convert is not ruled yet: it is decided when it first
-//! happens. And the three folders that hold `.nir` files,
+//! starts to convert ships without a flag, from 0.1.0 too, since a
+//! refusal wrote no file and nothing a stranger holds moves: its rows are
+//! rewritten in their own commit, with the reason (the converter plan's
+//! Call 5 (a), 2026-10-28). And the three folders that hold `.nir` files,
 //! `crates/gresil-nir2json/tests/fixtures/` and below,
 //! `crates/neuralos-rt/tests/nir_fixtures/` and `evidence/nir-hdf5-gate/`,
 //! hold none without its rows, so a new fixture cannot join unpinned.
@@ -228,7 +230,8 @@ fn every_kept_conversion_gives_its_kept_output() {
             Kept::Refused(want) if code == Some(want) => {}
             Kept::Refused(want) if code == Some(0) => red.push(format!(
                 "{path} {mode} refused: kept exit {want}, now converts. A refusal that starts \
-                 to convert is not ruled yet: it is decided when it first happens."
+                 to convert ships without a flag: its rows are rewritten in their own commit, \
+                 with the reason (tests/kept.rs, the module doc)."
             )),
             Kept::Refused(want) => {
                 moved = true;

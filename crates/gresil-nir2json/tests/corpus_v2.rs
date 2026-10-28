@@ -172,12 +172,13 @@ fn big_linear_converts_bounded() {
 //
 // EMPIRICAL OUTCOME (the corpus-v2 finding of record): the paper
 // corpus's LIF files carry the simulation-unit convention (r = 1–24 Ω)
-// — below the substrate's biological floor (r ≥ 1 MΩ). snnTorch
-// itself exports r = 1.0 (its LIF is dimensionless). The wall is the
-// convention boundary, recorded via named rejections below; the full
-// path is carried by the pre-authorized fallback emission (ladder
-// rung ii): a Linear-only snnTorch head — no LIF, no r, REAL f32
-// weights (torch's default), the audience's own emitter pipeline.
+// — below the substrate's biological floor (r ≥ 1 MΩ). snnTorch's LIF
+// is dimensionless, so its exporter writes r = 1/(1−β): 10 Ω at β 0.9,
+// 50 Ω at β 0.98. The wall is the convention boundary, recorded via
+// named rejections below; the full path is carried by the
+// pre-authorized fallback emission (ladder rung ii): a Linear-only
+// snnTorch head — no LIF, no r, REAL f32 weights (torch's default), the
+// audience's own emitter pipeline.
 
 #[test]
 fn stranger_smoke_two_lif_neurons_is_detected_sim_units_both_walls() {
