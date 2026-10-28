@@ -56,9 +56,10 @@ simulation-unit convention — r = 1.0 Ω (two_lif, norse), 24.02 Ω
 (rockpool) — below the substrate's biological quantization floor
 (r ≥ 1 MΩ, snn nir.rs quantize_lif). snnTorch itself cannot do
 otherwise: its LIF is dimensionless (β/threshold, no R), so its NIR
-exports hard-code r = 1.0. The wall is the CONVENTION BOUNDARY
-itself, not any one emitter — recorded for the principal (it bears on
-GUARD 3's "stranger-usable" wording).
+exporter writes r = 1/(1−β), as the two-layer row above says: 50 Ω at
+its β 0.98, and 10 Ω at β 0.9 in the parity files. The wall is the
+CONVENTION BOUNDARY itself, not any one emitter — recorded for the
+principal (it bears on GUARD 3's "stranger-usable" wording).
 
 sha256: 0c8aab149d13898a0739f3a4ad7e8fa2945e16b4385ff78dcf24e0d246352c07  snnTorch_linear_head.nir
 sha256: 3f1834a74f442c582336a84449d9089c5f2b85293b694fdda5443ed218ef1942  snnTorch_two_layer.nir

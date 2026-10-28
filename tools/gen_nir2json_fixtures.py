@@ -4,7 +4,9 @@
 Inputs : existing rt fixtures (chain_population.nir, merge.nir,
          neg_filter_lzl.nir → REUSED for the lzf-refusal test) — the
          f32 twins cast their F64 datasets down; the big graph is
-         synthesized with a fixed integer formula (no RNG anywhere).
+         synthesized with a fixed integer formula (no RNG anywhere);
+         the two-layer witness, community/snnTorch_two_layer.nir, for
+         the layout twins.
 Output : crates/gresil-nir2json/tests/fixtures/
          - chain_population_f32.nir, merge_f32.nir   (twins)
          - big_linear.nir                            (1M-weight blowup probe)
@@ -19,6 +21,11 @@ Output : crates/gresil-nir2json/tests/fixtures/
            order_lzf_shape.nir                       (past the size count, and
                                                       refused by an earlier step)
          - chunk_past_bound.nir                      (a chunk past the size count)
+         - snnTorch_two_layer_superblock_v3.nir,
+           snnTorch_two_layer_creation_order.nir,
+           snnTorch_two_layer_chunked_no_filter.nir,
+           snnTorch_two_layer_hdf5_2_0.nir           (the layout twins: the
+                                                      witness in four layouts)
 Run    : .nirenv/bin/python3 tools/gen_nir2json_fixtures.py
 
 The three Affine graphs are the layout snnTorch writes for a biased
@@ -247,6 +254,52 @@ def past_the_bound(name: str, what: str) -> None:
     print(f"bound  : {dst.name} ({dst.stat().st_size} B)")
 
 
+def copy_tree(src: h5py.Group, dst: h5py.Group, filters: bool, track: bool) -> None:
+    """Recursively mirror a group: each dataset with its dtype, values,
+    attributes and chunk shape, its filters (compression, shuffle) kept
+    when `filters` is set; each group tracking its links' creation order
+    when `track` is set; the group's attributes."""
+    for key, obj in src.items():
+        if isinstance(obj, h5py.Group):
+            g = dst.create_group(key, track_order=True) if track else dst.create_group(key)
+            copy_tree(obj, g, filters, track)
+        else:
+            opts = {}
+            if obj.chunks is not None:
+                opts["chunks"] = obj.chunks
+                if filters:
+                    opts.update(compression=obj.compression, compression_opts=obj.compression_opts,
+                                shuffle=obj.shuffle)
+            d = dst.create_dataset(key, data=obj[()], dtype=obj.dtype, **opts)
+            for k, v in obj.attrs.items():
+                d.attrs[k] = v
+    for k, v in src.attrs.items():
+        dst.attrs[k] = v
+
+
+def layout_twins() -> None:
+    """The two-layer witness in four HDF5 layouts beside its own, each
+    differing from it in one property, its groups, datasets, dtypes,
+    values and chunks kept, the format's bound pinned, never "latest",
+    whose meaning moves with libhdf5: the file in HDF5 1.10's format,
+    superblock v3 (libver v110); its groups tracking their links'
+    creation order; its gzip filter dropped; the file in HDF5 2.0's
+    format (libver v200)."""
+    src = OUT / "community/snnTorch_two_layer.nir"
+    layouts = (
+        ("superblock_v3", {"libver": ("v110", "v110")}, True),
+        ("creation_order", {"track_order": True}, True),
+        ("chunked_no_filter", {}, False),
+        ("hdf5_2_0", {"libver": ("v200", "v200")}, True),
+    )
+    with h5py.File(src, "r") as s:
+        for label, file_opts, filters in layouts:
+            dst = OUT / f"snnTorch_two_layer_{label}.nir"
+            with h5py.File(dst, "w", **file_opts) as d:
+                copy_tree(s, d, filters, file_opts.get("track_order", False))
+            print(f"layout : {dst.name} ({dst.stat().st_size} B)")
+
+
 if __name__ == "__main__":
     twin("chain_population.nir")
     twin("merge.nir")
@@ -267,4 +320,5 @@ if __name__ == "__main__":
     past_the_bound("order_root_key.nir", "key")
     past_the_bound("order_lzf_shape.nir", "lzf")
     past_the_bound("chunk_past_bound.nir", "chunk")
+    layout_twins()
     print("done — community fixtures are copied, not generated (PROVENANCE.md)")

@@ -20,6 +20,13 @@ fn edited(seed: &str, at: usize, old: &[u8], new: &[u8], name: &str) -> PathBuf 
         .join(seed);
     let mut bytes = std::fs::read(&path).expect("the seed");
     assert_eq!(
+        new.len(),
+        old.len(),
+        "{seed} at {at}: {} new bytes for {} old ones, where an edit keeps the length",
+        new.len(),
+        old.len()
+    );
+    assert_eq!(
         bytes.get(at..at + old.len()),
         Some(old),
         "{seed} at {at}: not the seed this edit was made on"
