@@ -4,9 +4,9 @@ slug: 20260815-125500_neuralos-v2
 project: NeuralOS v2
 phase: complete
 progress: 88/88
-head: "main@4dfbe18 (PR #78 merged 2026-10-27 05:48 UTC: round 81, tier 3, the snapshot PR: the kept emission and its pin beside `STEP_REVISION`, the kept conversions, the diff's four tests; mirror synced, tags identical, branch deleted) · the library and the converter ahead of alpha.9 by round 78's names, unpublished (alpha.9 stamped 2026-10-22, `docs/releases/v0.1.0-alpha.9.md` § Stamped); the fifteen checks hold; the frozen-format sitting's three PRs merged; next, the converter PR as two, the pins then the reader, then the error-surface sitting, the topology RNG and `0.1.0-rc.1` · wrote-from: work/converter-pins, round 82 (tier 3, the converter pins PR: the four layout twins and their kept rows, the value check against the C library, the `r` docs, C-3 and `kept.rs`'s rule after Call 5 (a); built in scratch on `4dfbe18`, three commits and this record) · open(session): the per-commit loop on the four, the push, the seven `(pull_request)` contexts green in the full listing, then the merge on the principal's word · next-work: ROADMAP § Practical next moves"
+head: "main@f97cbe8 (PR #79 merged 2026-10-28 04:57 UTC: round 82, tier 3, the converter pins PR: the four layout twins and their kept rows, the value check against the C library, the `r` docs, C-3 and `kept.rs`'s rule; mirror synced, tags identical, branch deleted) · the library and the converter ahead of alpha.9 by round 78's names, unpublished (alpha.9 stamped 2026-10-22, `docs/releases/v0.1.0-alpha.9.md` § Stamped); the fifteen checks hold; the frozen-format sitting's three PRs merged; the converter PR's pins half merged, ROADMAP § Practical next moves item 3 names the rest · wrote-from: fix/audit-lock, round 83 (tier 3, the two crates `cargo audit` refuses: `libz-sys` and `pulldown-cmark` in the root lock; built in scratch on `f97cbe8`, one commit and this record) · open(session): the per-commit loop on the two, the push, the seven `(pull_request)` contexts green in the full listing, then the merge on the principal's word · next-work: ROADMAP § Practical next moves"
 started: 2026-08-15T12:55:00Z
-updated: 2026-10-28T03:28:56Z
+updated: 2026-10-31T19:49:44Z
 principal_stated_goal: "Session I: the null-ladder adjudication — BRANCH B (unattributed perturbation); P5 on infrastructure + method"
 ---
 
@@ -10902,3 +10902,25 @@ converter's tests 68 to 70, `kept.tsv` 188 rows to 203. **Open**: the
 loop on the four, the push, CI, then the merge on the principal's word.
 **Guards.** 1: appended, head refreshed; 2: no closed-chapter code
 touched; 3: no outreach before rc.1.
+
+## Close-out (round 83 — the two crates cargo audit refuses: the lock moves, nothing else; tier 3 — 2026-10-31)
+
+Branch `fix/audit-lock` from `main@f97cbe8`, tier 3, one commit and
+this: `b99097d` the root `Cargo.lock`, `libz-sys` 1.1.29 to 1.1.31
+(RUSTSEC-2026-0418) and `pulldown-cmark` 0.13.4 to 0.13.6
+(RUSTSEC-2026-0414), four lines in and four out, no manifest moved,
+`tempfile`'s `getrandom` line kept as it was; this. The audit job reads
+the advisory database, not the diff, so a pull request that touches no
+lock reads red on both. Neither reaches gresil today. The first needs
+`cc` 1.6.0 or later and a build without its `static` feature; the lock
+holds 1.4.4, and `hdf5-src` asks for `static`. The second needs
+`ENABLE_WIKILINKS`, which `i-slint-common` 1.17.1 never sets.
+**Rulings** (philo): the fix alone, in its own PR, 2026-10-31 18:18:22
+UTC. **Measured**, before this commit, the database at `2295466c`:
+`cargo audit` exit 1 on exactly the two at `f97cbe8`, exit 0 at
+`b99097d`, 9 allowed warnings at both; the firmware's lock exit 0 at
+both, 2 allowed; `cargo metadata --locked --offline` exit 0; no tracked
+file outside the root lock names either crate. **Open**: the loop on the
+two, the push, CI, then the merge on the principal's word. **Guards.**
+1: appended, head refreshed; 2: no closed-chapter code touched; 3: no
+outreach before rc.1.
